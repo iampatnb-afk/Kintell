@@ -1,0 +1,17 @@
++.env
+__pycache__/
+abs_data/
+contacts_data/
+data/
+*.json
+*.csv
+*.xlsx
+*.log
+*.txt
+fix_*.py
+patch_*.py
+install_*.py
+check_*.py
+*_backup.py
+*_export.txt
+test.txt
