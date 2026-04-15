@@ -1508,23 +1508,55 @@ function buildTrendCharts() {
     const rawLabels = getSlicedData(histData.labels, n);
     const labels = rawLabels.map((l, i) => i % 4 === 0 ? l : '');
 
+    // Key sector events for annotation
+    const sectorEvents = [
+        { quarter: 'Q3 2013', label: 'NQF Launch', color: 'rgba(61,126,255,0.6)' },
+        { quarter: 'Q1 2018', label: 'NQS Reform', color: 'rgba(61,126,255,0.6)' },
+        { quarter: 'Q2 2020', label: 'COVID', color: 'rgba(224,92,58,0.7)' },
+        { quarter: 'Q3 2022', label: 'CCS Reform', color: 'rgba(0,201,167,0.6)' },
+        { quarter: 'Q3 2023', label: 'Wage +15%', color: 'rgba(155,89,182,0.7)' },
+        { quarter: 'Q1 2026', label: '3-Day Guar.', color: 'rgba(0,201,167,0.6)' },
+    ];
+
+    function getEventIndices(labels) {
+        return sectorEvents.map(ev => {
+            const idx = labels.indexOf(ev.quarter);
+            return idx >= 0 ? { idx, label: ev.label, color: ev.color } : null;
+        }).filter(Boolean);
+    }
+
     const chartOpts = {
         responsive: true,
         maintainAspectRatio: true,
+        interaction: { mode: 'index', intersect: false },
         plugins: {
             legend: { labels: { color: '#8890a8', font: { size: 10 }, boxWidth: 12 } },
             tooltip: {
+                backgroundColor: 'rgba(24,28,38,0.95)',
+                borderColor: '#2a2f3f',
+                borderWidth: 1,
+                titleColor: '#e8eaf0',
+                bodyColor: '#8890a8',
+                padding: 10,
                 callbacks: {
+                    title: function(items) {
+                        return items[0].label || '';
+                    },
                     label: function(ctx) {
                         const v = ctx.raw;
                         const arr = ctx.dataset.data;
                         const i = ctx.dataIndex;
-                        let s = ctx.dataset.label + ': ' + v.toLocaleString();
+                        let s = '  ' + ctx.dataset.label + ': ' + v.toLocaleString();
                         if (i > 0 && arr[i-1]) {
                             const chg = ((v - arr[i-1]) / arr[i-1] * 100).toFixed(1);
-                            s += ' (' + (chg > 0 ? '+' : '') + chg + '% QoQ)';
+                            s += '  (' + (chg > 0 ? '+' : '') + chg + '% QoQ)';
                         }
                         return s;
+                    },
+                    afterBody: function(items) {
+                        const label = items[0].label;
+                        const ev = sectorEvents.find(e => e.quarter === label);
+                        return ev ? ['', '  ★ ' + ev.label] : [];
                     }
                 }
             }
@@ -1532,6 +1564,62 @@ function buildTrendCharts() {
         scales: {
             x: { ticks: { color: '#8890a8', font: { size: 9 }, maxRotation: 45 }, grid: { color: '#2a2f3f' } },
             y: { ticks: { color: '#8890a8', font: { size: 9 } }, grid: { color: '#2a2f3f' } }
+        }
+    };
+
+    // Event annotation plugin (vertical lines)
+    const eventAnnotationPlugin = {
+        id: 'eventLines',
+        afterDraw(chart) {
+            const ctx2 = chart.ctx;
+            const xAxis = chart.scales.x;
+            const yAxis = chart.scales.y;
+            if (!xAxis || !yAxis) return;
+
+            const rawLabels = chart.data.labels;
+            const allLabels = histData.labels;
+
+            sectorEvents.forEach(ev => {
+                const fullIdx = allLabels.indexOf(ev.quarter);
+                if (fullIdx < 0) return;
+                const slicedLabels = getSlicedData(allLabels, currentRange);
+                const slicedIdx = slicedLabels.indexOf(ev.quarter);
+                if (slicedIdx < 0) return;
+
+                // Find the display label index
+                const displayIdx = rawLabels.indexOf(ev.quarter);
+                let xPixel;
+                if (displayIdx >= 0) {
+                    xPixel = xAxis.getPixelForIndex(displayIdx);
+                } else {
+                    // Label might be hidden (empty string), find by position
+                    xPixel = xAxis.getPixelForValue(slicedIdx);
+                }
+
+                if (!xPixel) return;
+
+                ctx2.save();
+                ctx2.strokeStyle = ev.color;
+                ctx2.lineWidth = 1;
+                ctx2.setLineDash([4, 3]);
+                ctx2.beginPath();
+                ctx2.moveTo(xPixel, yAxis.top);
+                ctx2.lineTo(xPixel, yAxis.bottom);
+                ctx2.stroke();
+
+                // Label at top
+                ctx2.setLineDash([]);
+                ctx2.fillStyle = ev.color.replace('0.', '0.9').replace('0.6', '0.9').replace('0.7', '0.9');
+                ctx2.font = 'bold 9px DM Mono, monospace';
+                ctx2.textAlign = 'center';
+                ctx2.save();
+                ctx2.translate(xPixel, yAxis.top + 8);
+                ctx2.rotate(-Math.PI / 2);
+                ctx2.fillText(ev.label, 0, 0);
+                ctx2.restore();
+
+                ctx2.restore();
+            });
         }
     };
 
@@ -1552,6 +1640,7 @@ function buildTrendCharts() {
     buildGrowthStat('stat-services-growth', getSlicedData(histData.services, n), ' services');
     chartInstances['services'] = new Chart(document.getElementById('chart-services'), {
         type: 'line', options: chartOpts,
+        plugins: [eventAnnotationPlugin],
         data: { labels, datasets: [makeDataset('LDC Services', histData.services, '#3d7eff', 'rgba(61,126,255,0.1)')] }
     });
 
@@ -1559,12 +1648,14 @@ function buildTrendCharts() {
     buildGrowthStat('stat-places-growth', getSlicedData(histData.places, n), ' places');
     chartInstances['places'] = new Chart(document.getElementById('chart-places'), {
         type: 'line', options: chartOpts,
+        plugins: [eventAnnotationPlugin],
         data: { labels, datasets: [makeDataset('Licensed Places', histData.places, '#00c9a7', 'rgba(0,201,167,0.08)')] }
     });
 
     // 3. NQS trends
     chartInstances['nqs'] = new Chart(document.getElementById('chart-nqs'), {
         type: 'line', options: chartOpts,
+        plugins: [eventAnnotationPlugin],
         data: { labels, datasets: [
             makeDataset('Exceeding', histData.exceeding, '#00c9a7'),
             makeDataset('Meeting',   histData.meeting,   '#3d7eff'),
@@ -1575,6 +1666,7 @@ function buildTrendCharts() {
     // 4. State growth
     chartInstances['states'] = new Chart(document.getElementById('chart-states'), {
         type: 'line', options: chartOpts,
+        plugins: [eventAnnotationPlugin],
         data: { labels, datasets: [
             makeDataset('NSW', histData.nsw, '#3d7eff'),
             makeDataset('VIC', histData.vic, '#00c9a7'),
