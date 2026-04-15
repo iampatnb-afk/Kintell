@@ -1529,6 +1529,7 @@ function buildTrendCharts() {
         responsive: true,
         maintainAspectRatio: true,
         interaction: { mode: 'index', intersect: false },
+        hover: { mode: 'index', intersect: false },
         plugins: {
             legend: { labels: { color: '#8890a8', font: { size: 10 }, boxWidth: 12 } },
             tooltip: {
@@ -1576,48 +1577,34 @@ function buildTrendCharts() {
             const yAxis = chart.scales.y;
             if (!xAxis || !yAxis) return;
 
-            const rawLabels = chart.data.labels;
-            const allLabels = histData.labels;
+            const slicedLabels = getSlicedData(histData.labels, currentRange);
 
             sectorEvents.forEach(ev => {
-                const fullIdx = allLabels.indexOf(ev.quarter);
-                if (fullIdx < 0) return;
-                const slicedLabels = getSlicedData(allLabels, currentRange);
-                const slicedIdx = slicedLabels.indexOf(ev.quarter);
-                if (slicedIdx < 0) return;
+                const idx = slicedLabels.indexOf(ev.quarter);
+                if (idx < 0) return;
 
-                // Find the display label index
-                const displayIdx = rawLabels.indexOf(ev.quarter);
-                let xPixel;
-                if (displayIdx >= 0) {
-                    xPixel = xAxis.getPixelForIndex(displayIdx);
-                } else {
-                    // Label might be hidden (empty string), find by position
-                    xPixel = xAxis.getPixelForValue(slicedIdx);
-                }
-
-                if (!xPixel) return;
+                const xPixel = xAxis.getPixelForValue(idx);
+                if (!xPixel || xPixel < xAxis.left || xPixel > xAxis.right) return;
 
                 ctx2.save();
                 ctx2.strokeStyle = ev.color;
-                ctx2.lineWidth = 1;
+                ctx2.lineWidth = 1.5;
                 ctx2.setLineDash([4, 3]);
                 ctx2.beginPath();
                 ctx2.moveTo(xPixel, yAxis.top);
                 ctx2.lineTo(xPixel, yAxis.bottom);
                 ctx2.stroke();
-
-                // Label at top
                 ctx2.setLineDash([]);
-                ctx2.fillStyle = ev.color.replace('0.', '0.9').replace('0.6', '0.9').replace('0.7', '0.9');
-                ctx2.font = 'bold 9px DM Mono, monospace';
-                ctx2.textAlign = 'center';
+
+                // Rotated label
+                ctx2.fillStyle = ev.color;
+                ctx2.font = 'bold 8px monospace';
+                ctx2.textAlign = 'left';
                 ctx2.save();
-                ctx2.translate(xPixel, yAxis.top + 8);
+                ctx2.translate(xPixel + 3, yAxis.top + 40);
                 ctx2.rotate(-Math.PI / 2);
                 ctx2.fillText(ev.label, 0, 0);
                 ctx2.restore();
-
                 ctx2.restore();
             });
         }
