@@ -618,6 +618,21 @@ body {
     font-family: var(--mono);
 }
 
+/* ── TIME RANGE BUTTONS ── */
+.range-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 4px 12px;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.range-btn:hover { color: var(--text); border-color: var(--accent); }
+.range-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
 /* ── SCROLLBAR ── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
@@ -672,23 +687,42 @@ body {
 
     <!-- TREND CHARTS -->
     <div class="section" style="margin-bottom:24px">
-        <div class="section-title">Sector Growth — Q3 2013 to Q4 2025</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+            <div class="section-title" style="margin-bottom:0">Sector Growth — Q3 2013 to Q4 2025</div>
+            <div style="display:flex;gap:6px" id="time-range-btns">
+                <button class="range-btn" onclick="setRange(4)">1Y</button>
+                <button class="range-btn" onclick="setRange(8)">2Y</button>
+                <button class="range-btn" onclick="setRange(20)">5Y</button>
+                <button class="range-btn active" onclick="setRange(0)">All</button>
+            </div>
+        </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
             <div>
-                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:12px">Total LDC Services</div>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">Total LDC Services</div>
+                <div id="stat-services-growth" style="font-size:11px;color:var(--accent2);margin-bottom:8px"></div>
                 <canvas id="chart-services" height="120"></canvas>
             </div>
             <div>
-                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:12px">NQS Rating Trends</div>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">Licensed Places</div>
+                <div id="stat-places-growth" style="font-size:11px;color:var(--accent2);margin-bottom:8px"></div>
+                <canvas id="chart-places" height="120"></canvas>
+            </div>
+            <div>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">NQS Rating Trends</div>
                 <canvas id="chart-nqs" height="120"></canvas>
             </div>
             <div>
-                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:12px">State Growth (LDC Services)</div>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">State Growth (LDC Services)</div>
                 <canvas id="chart-states" height="120"></canvas>
             </div>
             <div>
-                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:12px">For-Profit vs NFP</div>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">For-Profit vs NFP (share of all services)</div>
                 <canvas id="chart-mgmt" height="120"></canvas>
+            </div>
+            <div>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">For-Profit % Share</div>
+                <div id="stat-fp-growth" style="font-size:11px;color:var(--accent2);margin-bottom:8px"></div>
+                <canvas id="chart-fp-pct" height="120"></canvas>
             </div>
         </div>
     </div>
@@ -1440,50 +1474,141 @@ function jumpToOperator(name) {
 }
 
 // CHART.JS TREND CHARTS
+let chartInstances = {};
+let currentRange = 0; // 0 = all
+
+function getSlicedData(arr, n) {
+    if (!n || n === 0) return arr;
+    return arr.slice(-n);
+}
+
+function setRange(n) {
+    currentRange = n;
+    document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    // Destroy and rebuild all charts
+    Object.values(chartInstances).forEach(c => c.destroy());
+    chartInstances = {};
+    buildTrendCharts();
+}
+
+function buildGrowthStat(elId, data, suffix) {
+    if (!data || data.length < 2) return;
+    const first = data[0], last = data[data.length-1];
+    const pct = ((last - first) / first * 100).toFixed(1);
+    const sign = pct > 0 ? '+' : '';
+    const el = document.getElementById(elId);
+    if (el) el.textContent = last.toLocaleString() + suffix + '  (' + sign + pct + '% over period)';
+}
+
 function buildTrendCharts() {
     if (!histData || !histData.labels || histData.labels.length === 0) return;
-    const labels = histData.labels.map((l, i) => i % 4 === 0 ? l : '');
-    const defaults = {
+
+    const n = currentRange;
+    const rawLabels = getSlicedData(histData.labels, n);
+    const labels = rawLabels.map((l, i) => i % 4 === 0 ? l : '');
+
+    const chartOpts = {
         responsive: true,
         maintainAspectRatio: true,
-        plugins: { legend: { labels: { color: '#8890a8', font: { size: 10 } } } },
+        plugins: {
+            legend: { labels: { color: '#8890a8', font: { size: 10 }, boxWidth: 12 } },
+            tooltip: {
+                callbacks: {
+                    label: function(ctx) {
+                        const v = ctx.raw;
+                        const arr = ctx.dataset.data;
+                        const i = ctx.dataIndex;
+                        let s = ctx.dataset.label + ': ' + v.toLocaleString();
+                        if (i > 0 && arr[i-1]) {
+                            const chg = ((v - arr[i-1]) / arr[i-1] * 100).toFixed(1);
+                            s += ' (' + (chg > 0 ? '+' : '') + chg + '% QoQ)';
+                        }
+                        return s;
+                    }
+                }
+            }
+        },
         scales: {
             x: { ticks: { color: '#8890a8', font: { size: 9 }, maxRotation: 45 }, grid: { color: '#2a2f3f' } },
             y: { ticks: { color: '#8890a8', font: { size: 9 } }, grid: { color: '#2a2f3f' } }
         }
     };
-    new Chart(document.getElementById('chart-services'), {
-        type: 'line', options: defaults,
-        data: { labels, datasets: [{
-            label: 'LDC Services', data: histData.services,
-            borderColor: '#3d7eff', backgroundColor: 'rgba(61,126,255,0.1)',
-            fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2
-        }] }
+
+    // COVID + event annotations
+    const events = [
+        { quarter: 'Q1 2020', label: 'COVID', color: 'rgba(224,92,58,0.3)' },
+        { quarter: 'Q1 2018', label: 'NQS reform', color: 'rgba(61,126,255,0.2)' },
+        { quarter: 'Q1 2026', label: '3-Day Guarantee', color: 'rgba(0,201,167,0.2)' },
+    ];
+
+    function makeDataset(label, data, color, fill) {
+        return { label, data: getSlicedData(data, n), borderColor: color,
+                  backgroundColor: fill || 'transparent',
+                  fill: !!fill, tension: 0.3, pointRadius: 0, borderWidth: 2 };
+    }
+
+    // 1. Services
+    buildGrowthStat('stat-services-growth', getSlicedData(histData.services, n), ' services');
+    chartInstances['services'] = new Chart(document.getElementById('chart-services'), {
+        type: 'line', options: chartOpts,
+        data: { labels, datasets: [makeDataset('LDC Services', histData.services, '#3d7eff', 'rgba(61,126,255,0.1)')] }
     });
-    new Chart(document.getElementById('chart-nqs'), {
-        type: 'line', options: defaults,
+
+    // 2. Places
+    buildGrowthStat('stat-places-growth', getSlicedData(histData.places, n), ' places');
+    chartInstances['places'] = new Chart(document.getElementById('chart-places'), {
+        type: 'line', options: chartOpts,
+        data: { labels, datasets: [makeDataset('Licensed Places', histData.places, '#00c9a7', 'rgba(0,201,167,0.08)')] }
+    });
+
+    // 3. NQS trends
+    chartInstances['nqs'] = new Chart(document.getElementById('chart-nqs'), {
+        type: 'line', options: chartOpts,
         data: { labels, datasets: [
-            { label: 'Exceeding', data: histData.exceeding, borderColor: '#00c9a7', pointRadius: 0, borderWidth: 2, tension: 0.3 },
-            { label: 'Meeting',   data: histData.meeting,   borderColor: '#3d7eff', pointRadius: 0, borderWidth: 2, tension: 0.3 },
-            { label: 'Working',   data: histData.working,   borderColor: '#d4890a', pointRadius: 0, borderWidth: 2, tension: 0.3 },
+            makeDataset('Exceeding', histData.exceeding, '#00c9a7'),
+            makeDataset('Meeting',   histData.meeting,   '#3d7eff'),
+            makeDataset('Working',   histData.working,   '#d4890a'),
         ] }
     });
-    new Chart(document.getElementById('chart-states'), {
-        type: 'line', options: defaults,
+
+    // 4. State growth
+    chartInstances['states'] = new Chart(document.getElementById('chart-states'), {
+        type: 'line', options: chartOpts,
         data: { labels, datasets: [
-            { label: 'NSW', data: histData.nsw, borderColor: '#3d7eff', pointRadius: 0, borderWidth: 2, tension: 0.3 },
-            { label: 'VIC', data: histData.vic, borderColor: '#00c9a7', pointRadius: 0, borderWidth: 2, tension: 0.3 },
-            { label: 'QLD', data: histData.qld, borderColor: '#d4890a', pointRadius: 0, borderWidth: 2, tension: 0.3 },
-            { label: 'WA',  data: histData.wa,  borderColor: '#e05c3a', pointRadius: 0, borderWidth: 2, tension: 0.3 },
-            { label: 'SA',  data: histData.sa,  borderColor: '#9b59b6', pointRadius: 0, borderWidth: 2, tension: 0.3 },
+            makeDataset('NSW', histData.nsw, '#3d7eff'),
+            makeDataset('VIC', histData.vic, '#00c9a7'),
+            makeDataset('QLD', histData.qld, '#d4890a'),
+            makeDataset('WA',  histData.wa,  '#e05c3a'),
+            makeDataset('SA',  histData.sa,  '#9b59b6'),
         ] }
     });
-    new Chart(document.getElementById('chart-mgmt'), {
-        type: 'line', options: defaults,
+
+    // 5. For-profit vs NFP absolute
+    chartInstances['mgmt'] = new Chart(document.getElementById('chart-mgmt'), {
+        type: 'line', options: chartOpts,
         data: { labels, datasets: [
-            { label: 'For-Profit', data: histData.forprofit, borderColor: '#3d7eff', pointRadius: 0, borderWidth: 2, tension: 0.3 },
-            { label: 'NFP',        data: histData.nfp,       borderColor: '#8890a8', pointRadius: 0, borderWidth: 2, tension: 0.3 },
+            makeDataset('For-Profit', histData.forprofit, '#3d7eff'),
+            makeDataset('NFP',        histData.nfp,       '#8890a8'),
         ] }
+    });
+
+    // 6. For-profit % share
+    const fpPct = histData.forprofit.map((fp, i) => {
+        const total = fp + (histData.nfp[i] || 0);
+        return total ? +(fp / total * 100).toFixed(1) : 0;
+    });
+    const fpPctSliced = getSlicedData(fpPct, n);
+    const fpLast = fpPctSliced[fpPctSliced.length-1];
+    const fpFirst = fpPctSliced[0];
+    const fpEl = document.getElementById('stat-fp-growth');
+    if (fpEl && fpLast) fpEl.textContent = fpLast + '% for-profit  (' + (fpLast - fpFirst).toFixed(1) + 'pp change over period)';
+
+    const fpOpts = JSON.parse(JSON.stringify(chartOpts));
+    fpOpts.scales.y.ticks.callback = v => v + '%';
+    chartInstances['fp-pct'] = new Chart(document.getElementById('chart-fp-pct'), {
+        type: 'line', options: fpOpts,
+        data: { labels, datasets: [makeDataset('For-Profit %', fpPct, '#3d7eff', 'rgba(61,126,255,0.08)')] }
     });
 }
 
