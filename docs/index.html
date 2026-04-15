@@ -657,6 +657,23 @@ body {
 <!-- ═══════════════════════════════════════════ -->
 <div class="panel active" id="panel-industry">
 
+    <!-- STATE FILTER -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <div style="font-size:12px;color:var(--muted);font-weight:500">Filter by state:</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap" id="state-filter-btns">
+            <button class="range-btn active" onclick="setStateFilter('')">National</button>
+            <button class="range-btn" onclick="setStateFilter('NSW')">NSW</button>
+            <button class="range-btn" onclick="setStateFilter('VIC')">VIC</button>
+            <button class="range-btn" onclick="setStateFilter('QLD')">QLD</button>
+            <button class="range-btn" onclick="setStateFilter('WA')">WA</button>
+            <button class="range-btn" onclick="setStateFilter('SA')">SA</button>
+            <button class="range-btn" onclick="setStateFilter('TAS')">TAS</button>
+            <button class="range-btn" onclick="setStateFilter('ACT')">ACT</button>
+            <button class="range-btn" onclick="setStateFilter('NT')">NT</button>
+        </div>
+        <div id="state-filter-label" style="font-size:12px;color:var(--accent2);margin-left:8px"></div>
+    </div>
+
     <div class="stat-grid">
         <div class="stat-card">
             <div class="stat-label">LDC Services</div>
@@ -780,7 +797,7 @@ body {
     <div class="two-col">
         <div class="section">
             <div class="section-title">Top 20 For-Profit Operators (non-listed)</div>
-            <table class="data-table">
+            <table class="data-table" id="top20-table">
                 <thead>
                     <tr>
                         <th>#</th>
@@ -792,7 +809,7 @@ body {
                     </tr>
                 </thead>
                 <tbody>
-        <tr onclick="jumpToOperator('GREEN LEAVES (WA14) EARLY LEARNING CENTRES PT')" style='cursor:pointer'>
+        <tr onclick="jumpToOperator('GREEN LEAVES (WA14) EARLY LEARNING CENTRES PT')" data-states="NSW,QLD,SA,TAS,VIC,WA" style='cursor:pointer'>
             <td class='rank'>1</td>
             <td class='op-name'>GREEN LEAVES (WA14) EARLY LEARNING CENTRES PT</td>
             <td class='text-center'>71</td>
@@ -800,7 +817,7 @@ body {
             <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
             <td class='text-center'>63</td>
         </tr>
-        <tr onclick="jumpToOperator('NEST EARLY EDUCATION SERVICES PTY LTD')" style='cursor:pointer'>
+        <tr onclick="jumpToOperator('NEST EARLY EDUCATION SERVICES PTY LTD')" data-states="ACT,NSW,SA,VIC,WA" style='cursor:pointer'>
             <td class='rank'>2</td>
             <td class='op-name'>NEST EARLY EDUCATION SERVICES PTY LTD</td>
             <td class='text-center'>75</td>
@@ -808,7 +825,7 @@ body {
             <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
             <td class='text-center'>63</td>
         </tr>
-        <tr onclick="jumpToOperator('FEL Child Care Centres 1 Pty Ltd')" style='cursor:pointer'>
+        <tr onclick="jumpToOperator('FEL Child Care Centres 1 Pty Ltd')" data-states="ACT,NSW,QLD,VIC,WA" style='cursor:pointer'>
             <td class='rank'>3</td>
             <td class='op-name'>FEL Child Care Centres 1 Pty Ltd</td>
             <td class='text-center'>56</td>
@@ -816,7 +833,7 @@ body {
             <td class='text-center'><span class='tier-badge tier-warm'>WARM</span></td>
             <td class='text-center'>56</td>
         </tr>
-        <tr onclick="jumpToOperator('Journey ELC Pty Ltd')" style='cursor:pointer'>
+        <tr onclick="jumpToOperator('Journey ELC Pty Ltd')" data-states="NT,QLD,VIC" style='cursor:pointer'>
             <td class='rank'>4</td>
             <td class='op-name'>Journey ELC Pty Ltd</td>
             <td class='text-center'>43</td>
@@ -824,7 +841,7 @@ body {
             <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
             <td class='text-center'>63</td>
         </tr>
-        <tr onclick="jumpToOperator('LZ PTY LTD')" style='cursor:pointer'>
+        <tr onclick="jumpToOperator('LZ PTY LTD')" data-states="NSW,QLD,SA" style='cursor:pointer'>
             <td class='rank'>5</td>
             <td class='op-name'>LZ PTY LTD</td>
             <td class='text-center'>39</td>
@@ -832,7 +849,7 @@ body {
             <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
             <td class='text-center'>63</td>
         </tr>
-        <tr onclick="jumpToOperator('Kazcorp Holdings Pty Ltd')" style='cursor:pointer'>
+        <tr onclick="jumpToOperator('Kazcorp Holdings Pty Ltd')" data-states="NSW" style='cursor:pointer'>
             <td class='rank'>6</td>
             <td class='op-name'>Kazcorp Holdings Pty Ltd</td>
             <td class='text-center'>45</td>
@@ -840,7 +857,7 @@ body {
             <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
             <td class='text-center'>75</td>
         </tr>
-        <tr onclick="jumpToOperator('Evolve Early Education Pty Ltd')" style='cursor:pointer'>
+        <tr onclick="jumpToOperator('Evolve Early Education Pty Ltd')" data-states="NSW,QLD,SA,TAS,VIC" style='cursor:pointer'>
             <td class='rank'>7</td>
             <td class='op-name'>Evolve Early Education Pty Ltd</td>
             <td class='text-center'>33</td>
@@ -848,7 +865,7 @@ body {
             <td class='text-center'><span class='tier-badge tier-warm'>WARM</span></td>
             <td class='text-center'>51</td>
         </tr>
-        <tr onclick="jumpToOperator('nan')" style='cursor:pointer'>
+        <tr onclick="jumpToOperator('nan')" data-states="ACT,NSW,QLD,VIC,WA" style='cursor:pointer'>
             <td class='rank'>8</td>
             <td class='op-name'>nan</td>
             <td class='text-center'>66</td>
@@ -856,7 +873,7 @@ body {
             <td class='text-center'><span class='tier-badge tier-warm'>WARM</span></td>
             <td class='text-center'>55</td>
         </tr>
-        <tr onclick="jumpToOperator('Stepping Stone (S.A.) Childcare & Early Devel')" style='cursor:pointer'>
+        <tr onclick="jumpToOperator('Stepping Stone (S.A.) Childcare & Early Devel')" data-states="SA" style='cursor:pointer'>
             <td class='rank'>9</td>
             <td class='op-name'>Stepping Stone (S.A.) Childcare & Early Devel</td>
             <td class='text-center'>26</td>
@@ -864,7 +881,7 @@ body {
             <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
             <td class='text-center'>68</td>
         </tr>
-        <tr onclick="jumpToOperator('EDGE EARLY LEARNING SOUTH AUSTRALIA PTY LTD')" style='cursor:pointer'>
+        <tr onclick="jumpToOperator('EDGE EARLY LEARNING SOUTH AUSTRALIA PTY LTD')" data-states="SA" style='cursor:pointer'>
             <td class='rank'>10</td>
             <td class='op-name'>EDGE EARLY LEARNING SOUTH AUSTRALIA PTY LTD</td>
             <td class='text-center'>24</td>
@@ -872,7 +889,7 @@ body {
             <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
             <td class='text-center'>67</td>
         </tr>
-        <tr onclick="jumpToOperator('Sparrow Group Vic Pty Ltd')" style='cursor:pointer'>
+        <tr onclick="jumpToOperator('Sparrow Group Vic Pty Ltd')" data-states="VIC,WA" style='cursor:pointer'>
             <td class='rank'>11</td>
             <td class='op-name'>Sparrow Group Vic Pty Ltd</td>
             <td class='text-center'>29</td>
@@ -880,7 +897,7 @@ body {
             <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
             <td class='text-center'>63</td>
         </tr>
-        <tr onclick="jumpToOperator('Baker Street Childcare Education Pty Ltd')" style='cursor:pointer'>
+        <tr onclick="jumpToOperator('Baker Street Childcare Education Pty Ltd')" data-states="NSW,QLD,SA,VIC,WA" style='cursor:pointer'>
             <td class='rank'>12</td>
             <td class='op-name'>Baker Street Childcare Education Pty Ltd</td>
             <td class='text-center'>25</td>
@@ -888,7 +905,7 @@ body {
             <td class='text-center'><span class='tier-badge tier-warm'>WARM</span></td>
             <td class='text-center'>51</td>
         </tr>
-        <tr onclick="jumpToOperator('The Scholars Group Pty Ltd')" style='cursor:pointer'>
+        <tr onclick="jumpToOperator('The Scholars Group Pty Ltd')" data-states="QLD" style='cursor:pointer'>
             <td class='rank'>13</td>
             <td class='op-name'>The Scholars Group Pty Ltd</td>
             <td class='text-center'>17</td>
@@ -896,7 +913,7 @@ body {
             <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
             <td class='text-center'>75</td>
         </tr>
-        <tr onclick="jumpToOperator('INSPIRE O2 EDUCATION HOLDING GROUP PTY LTD')" style='cursor:pointer'>
+        <tr onclick="jumpToOperator('INSPIRE O2 EDUCATION HOLDING GROUP PTY LTD')" data-states="VIC" style='cursor:pointer'>
             <td class='rank'>14</td>
             <td class='op-name'>INSPIRE O2 EDUCATION HOLDING GROUP PTY LTD</td>
             <td class='text-center'>15</td>
@@ -904,7 +921,7 @@ body {
             <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
             <td class='text-center'>83</td>
         </tr>
-        <tr onclick="jumpToOperator('MMZ Holdings PTY LTD')" style='cursor:pointer'>
+        <tr onclick="jumpToOperator('MMZ Holdings PTY LTD')" data-states="NSW" style='cursor:pointer'>
             <td class='rank'>15</td>
             <td class='op-name'>MMZ Holdings PTY LTD</td>
             <td class='text-center'>21</td>
@@ -912,7 +929,7 @@ body {
             <td class='text-center'><span class='tier-badge tier-warm'>WARM</span></td>
             <td class='text-center'>55</td>
         </tr>
-        <tr onclick="jumpToOperator('BUTTERCUPS CHILDCARE PTY LTD')" style='cursor:pointer'>
+        <tr onclick="jumpToOperator('BUTTERCUPS CHILDCARE PTY LTD')" data-states="WA" style='cursor:pointer'>
             <td class='rank'>16</td>
             <td class='op-name'>BUTTERCUPS CHILDCARE PTY LTD</td>
             <td class='text-center'>20</td>
@@ -920,7 +937,7 @@ body {
             <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
             <td class='text-center'>75</td>
         </tr>
-        <tr onclick="jumpToOperator('G8 KP Pty Ltd')" style='cursor:pointer'>
+        <tr onclick="jumpToOperator('G8 KP Pty Ltd')" data-states="NSW,QLD" style='cursor:pointer'>
             <td class='rank'>17</td>
             <td class='op-name'>G8 KP Pty Ltd</td>
             <td class='text-center'>20</td>
@@ -928,7 +945,7 @@ body {
             <td class='text-center'><span class='tier-badge tier-warm'>WARM</span></td>
             <td class='text-center'>58</td>
         </tr>
-        <tr onclick="jumpToOperator('Little Kindy Pty Ltd')" style='cursor:pointer'>
+        <tr onclick="jumpToOperator('Little Kindy Pty Ltd')" data-states="NSW,QLD,SA,TAS,VIC,WA" style='cursor:pointer'>
             <td class='rank'>18</td>
             <td class='op-name'>Little Kindy Pty Ltd</td>
             <td class='text-center'>25</td>
@@ -936,7 +953,7 @@ body {
             <td class='text-center'><span class='tier-badge tier-warm'>WARM</span></td>
             <td class='text-center'>55</td>
         </tr>
-        <tr onclick="jumpToOperator('EDGE EARLY LEARNING QLD PTY LTD')" style='cursor:pointer'>
+        <tr onclick="jumpToOperator('EDGE EARLY LEARNING QLD PTY LTD')" data-states="QLD" style='cursor:pointer'>
             <td class='rank'>19</td>
             <td class='op-name'>EDGE EARLY LEARNING QLD PTY LTD</td>
             <td class='text-center'>14</td>
@@ -944,7 +961,7 @@ body {
             <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
             <td class='text-center'>75</td>
         </tr>
-        <tr onclick="jumpToOperator('MINDCHAMPS EARLY LEARNING 6 PTY. LIMITED')" style='cursor:pointer'>
+        <tr onclick="jumpToOperator('MINDCHAMPS EARLY LEARNING 6 PTY. LIMITED')" data-states="NSW" style='cursor:pointer'>
             <td class='rank'>20</td>
             <td class='op-name'>MINDCHAMPS EARLY LEARNING 6 PTY. LIMITED</td>
             <td class='text-center'>18</td>
@@ -984,211 +1001,241 @@ body {
             </tr>
         </thead>
         <tbody>
-        <tr class='approval-row' data-operator='Freckles Toowoomba Pty Ltd ATF Frec'>
-            <td class='approval-centre'>Everen Early Learning</td>
+        <tr class='approval-row' data-operator='Freckles Toowoomba Pty Ltd ATF Frec' data-state='QLD'
+            onclick='jumpToOperator("Freckles Toowoomba Pty Ltd ATF")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Everen Early Learning</td>
             <td>Freckles Toowoomba Pty Ltd ATF Frec</td>
             <td>WILSONTON, QLD</td>
             <td class='text-center'></td>
             <td class='text-center'>09/04/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='CRIBS, CRADLES & CRAYONS PTY LTD'>
-            <td class='approval-centre'>CRIBS, CRADLES & CRAYONS</td>
+        <tr class='approval-row' data-operator='CRIBS, CRADLES & CRAYONS PTY LTD' data-state='NSW'
+            onclick='jumpToOperator("CRIBS, CRADLES & CRAYONS PTY L")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>CRIBS, CRADLES & CRAYONS</td>
             <td>CRIBS, CRADLES & CRAYONS PTY LTD <span class='tier-badge tier-watch'>WATCH</span></td>
             <td>CHESTER HILL, NSW</td>
             <td class='text-center'></td>
             <td class='text-center'>09/04/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='LITTLE GUMNUTS EARLY LEARNING TWO P'>
-            <td class='approval-centre'>Little Gumnuts Wyoming Early Learning Centre</td>
+        <tr class='approval-row' data-operator='LITTLE GUMNUTS EARLY LEARNING TWO P' data-state='NSW'
+            onclick='jumpToOperator("LITTLE GUMNUTS EARLY LEARNING ")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Little Gumnuts Wyoming Early Learning Centre</td>
             <td>LITTLE GUMNUTS EARLY LEARNING TWO P <span class='tier-badge tier-watch'>WATCH</span></td>
             <td>WYOMING, NSW</td>
             <td class='text-center'></td>
             <td class='text-center'>09/04/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='Trustees of The Roman Catholic Chur'>
-            <td class='approval-centre'>St Nicholas Early Education Forster</td>
+        <tr class='approval-row' data-operator='Trustees of The Roman Catholic Chur' data-state='NSW'
+            onclick='jumpToOperator("Trustees of The Roman Catholic")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>St Nicholas Early Education Forster</td>
             <td>Trustees of The Roman Catholic Chur <span class='tier-badge tier-nfp_excluded'>NFP_EXCLUDED</span></td>
             <td>FORSTER, NSW</td>
             <td class='text-center'></td>
             <td class='text-center'>08/04/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='FIDEM PTY LTD'>
-            <td class='approval-centre'>CATERPILLAR KIDZ EARLY LEARNING CENTRE AND KINDERGARTEN</td>
+        <tr class='approval-row' data-operator='FIDEM PTY LTD' data-state='VIC'
+            onclick='jumpToOperator("FIDEM PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>CATERPILLAR KIDZ EARLY LEARNING CENTRE AND KINDERGARTEN</td>
             <td>FIDEM PTY LTD <span class='tier-badge tier-warm'>WARM</span></td>
             <td>RESERVOIR, VIC</td>
             <td class='text-center'></td>
             <td class='text-center'>08/04/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='Trustees of The Roman Catholic Chur'>
-            <td class='approval-centre'>St Nicholas Early Education Kotara South</td>
+        <tr class='approval-row' data-operator='Trustees of The Roman Catholic Chur' data-state='NSW'
+            onclick='jumpToOperator("Trustees of The Roman Catholic")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>St Nicholas Early Education Kotara South</td>
             <td>Trustees of The Roman Catholic Chur <span class='tier-badge tier-nfp_excluded'>NFP_EXCLUDED</span></td>
             <td>Kotara South, NSW</td>
             <td class='text-center'></td>
             <td class='text-center'>07/04/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='DALB Holdings PTY LTD'>
-            <td class='approval-centre'>Sugarloaf Bay Preschool</td>
+        <tr class='approval-row' data-operator='DALB Holdings PTY LTD' data-state='NSW'
+            onclick='jumpToOperator("DALB Holdings PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Sugarloaf Bay Preschool</td>
             <td>DALB Holdings PTY LTD <span class='tier-badge tier-hot'>HOT</span></td>
             <td>Castlecrag, NSW</td>
             <td class='text-center'></td>
             <td class='text-center'>07/04/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='AUSSIE KIDZ CHILDCARE AND EDUCATION'>
-            <td class='approval-centre'>Cherish Early Years Learning</td>
+        <tr class='approval-row' data-operator='AUSSIE KIDZ CHILDCARE AND EDUCATION' data-state='WA'
+            onclick='jumpToOperator("AUSSIE KIDZ CHILDCARE AND EDUC")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Cherish Early Years Learning</td>
             <td>AUSSIE KIDZ CHILDCARE AND EDUCATION <span class='tier-badge tier-watch'>WATCH</span></td>
             <td>Byford, WA</td>
             <td class='text-center'></td>
             <td class='text-center'>02/04/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='Young Men's Christian Association o'>
-            <td class='approval-centre'>YMCA Early Learning Centre Strathnairn</td>
+        <tr class='approval-row' data-operator='Young Men's Christian Association o' data-state='ACT'
+            onclick='jumpToOperator("Young Men's Christian Associat")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>YMCA Early Learning Centre Strathnairn</td>
             <td>Young Men's Christian Association o</td>
             <td>STRATHNAIRN, ACT</td>
             <td class='text-center'></td>
             <td class='text-center'>02/04/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='ST CHARLES CCC PTY LTD'>
-            <td class='approval-centre'>Adelaide Early Learning - Athelstone</td>
+        <tr class='approval-row' data-operator='ST CHARLES CCC PTY LTD' data-state='SA'
+            onclick='jumpToOperator("ST CHARLES CCC PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Adelaide Early Learning - Athelstone</td>
             <td>ST CHARLES CCC PTY LTD <span class='tier-badge tier-hot'>HOT</span></td>
             <td>ATHELSTONE, SA</td>
             <td class='text-center'></td>
             <td class='text-center'>02/04/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='HUMMINGBIRDS EARLY LEARNING CENTRE '>
-            <td class='approval-centre'>Hummingbirds Early Learning Centre</td>
+        <tr class='approval-row' data-operator='HUMMINGBIRDS EARLY LEARNING CENTRE ' data-state='NSW'
+            onclick='jumpToOperator("HUMMINGBIRDS EARLY LEARNING CE")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Hummingbirds Early Learning Centre</td>
             <td>HUMMINGBIRDS EARLY LEARNING CENTRE  <span class='tier-badge tier-watch'>WATCH</span></td>
             <td>WYONG, NSW</td>
             <td class='text-center'></td>
             <td class='text-center'>01/04/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='BRIGHT STEPS PTY LTD'>
-            <td class='approval-centre'>Bright Steps Academy Chiton</td>
+        <tr class='approval-row' data-operator='BRIGHT STEPS PTY LTD' data-state='SA'
+            onclick='jumpToOperator("BRIGHT STEPS PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Bright Steps Academy Chiton</td>
             <td>BRIGHT STEPS PTY LTD <span class='tier-badge tier-hot'>HOT</span></td>
             <td>CHITON, SA</td>
             <td class='text-center'></td>
             <td class='text-center'>31/03/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='BUTTERCUPS CHILDCARE PTY LTD'>
-            <td class='approval-centre'>Buttercups Childcare and Early Learning Centre Lakelands</td>
+        <tr class='approval-row' data-operator='BUTTERCUPS CHILDCARE PTY LTD' data-state='WA'
+            onclick='jumpToOperator("BUTTERCUPS CHILDCARE PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Buttercups Childcare and Early Learning Centre Lakelands</td>
             <td>BUTTERCUPS CHILDCARE PTY LTD <span class='tier-badge tier-hot'>HOT</span></td>
             <td>LAKELANDS, WA</td>
             <td class='text-center'></td>
             <td class='text-center'>31/03/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='EVERGREEN LEARNING PTY LTD'>
-            <td class='approval-centre'>Little Achievers @ Nepean</td>
+        <tr class='approval-row' data-operator='EVERGREEN LEARNING PTY LTD' data-state='NSW'
+            onclick='jumpToOperator("EVERGREEN LEARNING PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Little Achievers @ Nepean</td>
             <td>EVERGREEN LEARNING PTY LTD <span class='tier-badge tier-hot'>HOT</span></td>
             <td>PENRITH, NSW</td>
             <td class='text-center'></td>
             <td class='text-center'>31/03/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='BRIGHT STEPS PTY LTD'>
-            <td class='approval-centre'>Bright Steps Academy Elizabeth East</td>
+        <tr class='approval-row' data-operator='BRIGHT STEPS PTY LTD' data-state='SA'
+            onclick='jumpToOperator("BRIGHT STEPS PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Bright Steps Academy Elizabeth East</td>
             <td>BRIGHT STEPS PTY LTD <span class='tier-badge tier-hot'>HOT</span></td>
             <td>ELIZABETH EAST, SA</td>
             <td class='text-center'></td>
             <td class='text-center'>31/03/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='MILLBROOK MONTESSORI PTY LTD'>
-            <td class='approval-centre'>Millbrook Montessori</td>
+        <tr class='approval-row' data-operator='MILLBROOK MONTESSORI PTY LTD' data-state='QLD'
+            onclick='jumpToOperator("MILLBROOK MONTESSORI PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Millbrook Montessori</td>
             <td>MILLBROOK MONTESSORI PTY LTD <span class='tier-badge tier-watch'>WATCH</span></td>
             <td>EAST TOOWOOMBA, QLD</td>
             <td class='text-center'></td>
             <td class='text-center'>27/03/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='THE GROVE ACADEMY - BEXLEY PTY LTD'>
-            <td class='approval-centre'>The Grove Academy - Bankstown</td>
+        <tr class='approval-row' data-operator='THE GROVE ACADEMY - BEXLEY PTY LTD' data-state='NSW'
+            onclick='jumpToOperator("THE GROVE ACADEMY - BEXLEY PTY")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>The Grove Academy - Bankstown</td>
             <td>THE GROVE ACADEMY - BEXLEY PTY LTD <span class='tier-badge tier-nfp_excluded'>NFP_EXCLUDED</span></td>
             <td>BANKSTOWN, NSW</td>
             <td class='text-center'></td>
             <td class='text-center'>27/03/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='Tillys Play & Education Centre Pty '>
-            <td class='approval-centre'>Tillys Play and Education Centre - The Junction</td>
+        <tr class='approval-row' data-operator='Tillys Play & Education Centre Pty ' data-state='NSW'
+            onclick='jumpToOperator("Tillys Play & Education Centre")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Tillys Play and Education Centre - The Junction</td>
             <td>Tillys Play & Education Centre Pty  <span class='tier-badge tier-nfp_excluded'>NFP_EXCLUDED</span></td>
             <td>THE JUNCTION, NSW</td>
             <td class='text-center'></td>
             <td class='text-center'>25/03/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='KIDDIWINKS WARRIEWOOD PTY LTD'>
-            <td class='approval-centre'>Kiddiwinks Play Laugh & Learn St. Ives</td>
+        <tr class='approval-row' data-operator='KIDDIWINKS WARRIEWOOD PTY LTD' data-state='NSW'
+            onclick='jumpToOperator("KIDDIWINKS WARRIEWOOD PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Kiddiwinks Play Laugh & Learn St. Ives</td>
             <td>KIDDIWINKS WARRIEWOOD PTY LTD <span class='tier-badge tier-hot'>HOT</span></td>
             <td>ST IVES, NSW</td>
             <td class='text-center'></td>
             <td class='text-center'>24/03/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='BUILDING BLOCKS WARRAGUL PTY LTD'>
-            <td class='approval-centre'>Thrive Early Leaning Centre Drysdale</td>
+        <tr class='approval-row' data-operator='BUILDING BLOCKS WARRAGUL PTY LTD' data-state='VIC'
+            onclick='jumpToOperator("BUILDING BLOCKS WARRAGUL PTY L")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Thrive Early Leaning Centre Drysdale</td>
             <td>BUILDING BLOCKS WARRAGUL PTY LTD <span class='tier-badge tier-warm'>WARM</span></td>
             <td>DRYSDALE, VIC</td>
             <td class='text-center'></td>
             <td class='text-center'>24/03/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='WILDFLOWERS EARLY LEARNING PTY LTD'>
-            <td class='approval-centre'>WILDFLOWERS EARLY LEARNING EAST VICTORIA PARK</td>
+        <tr class='approval-row' data-operator='WILDFLOWERS EARLY LEARNING PTY LTD' data-state='WA'
+            onclick='jumpToOperator("WILDFLOWERS EARLY LEARNING PTY")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>WILDFLOWERS EARLY LEARNING EAST VICTORIA PARK</td>
             <td>WILDFLOWERS EARLY LEARNING PTY LTD <span class='tier-badge tier-hot'>HOT</span></td>
             <td>East Victoria Park, WA</td>
             <td class='text-center'></td>
             <td class='text-center'>23/03/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='The Trustee for Atherton Childcare '>
-            <td class='approval-centre'>Bloom Early Learning Kingaroy</td>
+        <tr class='approval-row' data-operator='The Trustee for Atherton Childcare ' data-state='QLD'
+            onclick='jumpToOperator("The Trustee for Atherton Child")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Bloom Early Learning Kingaroy</td>
             <td>The Trustee for Atherton Childcare  <span class='tier-badge tier-nfp_excluded'>NFP_EXCLUDED</span></td>
             <td>KINGAROY, QLD</td>
             <td class='text-center'></td>
             <td class='text-center'>20/03/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='Kindy Australia Group Pty Ltd'>
-            <td class='approval-centre'>Glenmore Park Early Learning Centre</td>
+        <tr class='approval-row' data-operator='Kindy Australia Group Pty Ltd' data-state='NSW'
+            onclick='jumpToOperator("Kindy Australia Group Pty Ltd")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Glenmore Park Early Learning Centre</td>
             <td>Kindy Australia Group Pty Ltd <span class='tier-badge tier-hot'>HOT</span></td>
             <td>GLENMORE PARK, NSW</td>
             <td class='text-center'></td>
             <td class='text-center'>19/03/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='Nextgen Early Learning Centre Pty L'>
-            <td class='approval-centre'>NextGen Early Learning Spring Farm</td>
+        <tr class='approval-row' data-operator='Nextgen Early Learning Centre Pty L' data-state='NSW'
+            onclick='jumpToOperator("Nextgen Early Learning Centre ")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>NextGen Early Learning Spring Farm</td>
             <td>Nextgen Early Learning Centre Pty L <span class='tier-badge tier-hot'>HOT</span></td>
             <td>SPRING FARM, NSW</td>
             <td class='text-center'></td>
             <td class='text-center'>18/03/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='Story House Early Learning No 1 Pty'>
-            <td class='approval-centre'>Story House Early Learning Upper Coomera</td>
+        <tr class='approval-row' data-operator='Story House Early Learning No 1 Pty' data-state='QLD'
+            onclick='jumpToOperator("Story House Early Learning No ")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Story House Early Learning Upper Coomera</td>
             <td>Story House Early Learning No 1 Pty <span class='tier-badge tier-hot'>HOT</span></td>
             <td>UPPER COOMERA, QLD</td>
             <td class='text-center'></td>
             <td class='text-center'>18/03/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='BORONIA BUSINESS ONE EEG PTY LTD'>
-            <td class='approval-centre'>Boronia Business ONE EEG Pty Ltd</td>
+        <tr class='approval-row' data-operator='BORONIA BUSINESS ONE EEG PTY LTD' data-state='VIC'
+            onclick='jumpToOperator("BORONIA BUSINESS ONE EEG PTY L")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Boronia Business ONE EEG Pty Ltd</td>
             <td>BORONIA BUSINESS ONE EEG PTY LTD <span class='tier-badge tier-watch'>WATCH</span></td>
             <td>BORONIA, VIC</td>
             <td class='text-center'></td>
             <td class='text-center'>17/03/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='SUNRISE CHILDREN PTY LTD'>
-            <td class='approval-centre'>Billy-beet Childcare & Kindergarten Templestowe Lower</td>
+        <tr class='approval-row' data-operator='SUNRISE CHILDREN PTY LTD' data-state='VIC'
+            onclick='jumpToOperator("SUNRISE CHILDREN PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Billy-beet Childcare & Kindergarten Templestowe Lower</td>
             <td>SUNRISE CHILDREN PTY LTD <span class='tier-badge tier-warm'>WARM</span></td>
             <td>TEMPLESTOWE LOWER, VIC</td>
             <td class='text-center'></td>
             <td class='text-center'>17/03/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='Eden Academy Childcare Pty Ltd'>
-            <td class='approval-centre'>Eden Academy Thomastown</td>
+        <tr class='approval-row' data-operator='Eden Academy Childcare Pty Ltd' data-state='VIC'
+            onclick='jumpToOperator("Eden Academy Childcare Pty Ltd")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Eden Academy Thomastown</td>
             <td>Eden Academy Childcare Pty Ltd <span class='tier-badge tier-nfp_excluded'>NFP_EXCLUDED</span></td>
             <td>THOMASTOWN, VIC</td>
             <td class='text-center'></td>
             <td class='text-center'>17/03/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='COVE ELC BLACKWALL PTY LTD'>
-            <td class='approval-centre'>Cove Early Learning</td>
+        <tr class='approval-row' data-operator='COVE ELC BLACKWALL PTY LTD' data-state='NSW'
+            onclick='jumpToOperator("COVE ELC BLACKWALL PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Cove Early Learning</td>
             <td>COVE ELC BLACKWALL PTY LTD <span class='tier-badge tier-watch'>WATCH</span></td>
             <td>BLACKWALL, NSW</td>
             <td class='text-center'></td>
             <td class='text-center'>16/03/2026</td>
         </tr>
-        <tr class='approval-row' data-operator='B2BASICS PTY LTD'>
-            <td class='approval-centre'>Basics First Early Learning</td>
+        <tr class='approval-row' data-operator='B2BASICS PTY LTD' data-state='NSW'
+            onclick='jumpToOperator("B2BASICS PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Basics First Early Learning</td>
             <td>B2BASICS PTY LTD <span class='tier-badge tier-watch'>WATCH</span></td>
             <td>CANLEY HEIGHTS, NSW</td>
             <td class='text-center'></td>
@@ -1342,7 +1389,123 @@ function buildStatGrowths() {
     if (hEl) hEl.innerHTML = histData.labels[0] + ' → ' + histData.labels[histData.labels.length-1] + '&nbsp;&nbsp;' + histData.labels.length + ' quarters';
 }
 
+// ── STATE FILTER ──
+let currentStateFilter = '';
+
+function setStateFilter(state) {
+    currentStateFilter = state;
+    document.querySelectorAll('#state-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+
+    const label = document.getElementById('state-filter-label');
+    if (label) label.textContent = state ? 'Showing ' + state + ' only' : '';
+
+    // Filter top 20 table
+    document.querySelectorAll('#top20-table tr[data-states]').forEach(row => {
+        const states = row.dataset.states || '';
+        row.style.display = (!state || states.includes(state)) ? '' : 'none';
+    });
+
+    // Filter approvals table
+    document.querySelectorAll('.approval-row').forEach(row => {
+        const rowState = row.dataset.state || '';
+        row.style.display = (!state || rowState === state) ? '' : 'none';
+    });
+
+    // Filter services by state chart highlight
+    if (window.stateChartInstance) {
+        window.stateChartInstance.data.datasets.forEach(ds => {
+            ds.borderWidth = (!state || ds.label === state) ? 3 : 1;
+            ds.borderColor = (!state || ds.label === state)
+                ? ds.originalColor
+                : ds.originalColor.replace('1)', '0.2)').replace('0.6)', '0.2)');
+        });
+        window.stateChartInstance.update();
+    }
+
+    // Update stat cards with state-filtered data
+    updateStatCardsForState(state);
+}
+
+function updateStatCardsForState(state) {
+    if (!state) {
+        // Reset to national - already shown
+        return;
+    }
+    // Filter histData by state
+    const stateKey = state.toLowerCase();
+    const stateData = histData[stateKey];
+    if (!stateData) return;
+
+    // Could update charts here - for now just show note
+    const label = document.getElementById('state-filter-label');
+    if (label) {
+        const latest = stateData[stateData.length - 1] || 0;
+        const prev4  = stateData[stateData.length - 5] || 0;
+        const yoy    = prev4 ? (((latest - prev4) / prev4) * 100).toFixed(1) : 0;
+        label.textContent = state + ': ' + latest.toLocaleString() + ' services  (1Y: ' + (yoy > 0 ? '+' : '') + yoy + '%)';
+    }
+}
+
 // Load Chart.js then build trend charts
+
+// ── STATE FILTER ──
+let currentStateFilter = '';
+
+function setStateFilter(state) {
+    currentStateFilter = state;
+    document.querySelectorAll('#state-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+
+    const label = document.getElementById('state-filter-label');
+    if (label) label.textContent = state ? 'Showing ' + state + ' only' : '';
+
+    // Filter top 20 table
+    document.querySelectorAll('#top20-table tr[data-states]').forEach(row => {
+        const states = row.dataset.states || '';
+        row.style.display = (!state || states.includes(state)) ? '' : 'none';
+    });
+
+    // Filter approvals table
+    document.querySelectorAll('.approval-row').forEach(row => {
+        const rowState = row.dataset.state || '';
+        row.style.display = (!state || rowState === state) ? '' : 'none';
+    });
+
+    // Filter services by state chart highlight
+    if (window.stateChartInstance) {
+        window.stateChartInstance.data.datasets.forEach(ds => {
+            ds.borderWidth = (!state || ds.label === state) ? 3 : 1;
+            ds.borderColor = (!state || ds.label === state)
+                ? ds.originalColor
+                : ds.originalColor.replace('1)', '0.2)').replace('0.6)', '0.2)');
+        });
+        window.stateChartInstance.update();
+    }
+
+    // Update stat cards with state-filtered data
+    updateStatCardsForState(state);
+}
+
+function updateStatCardsForState(state) {
+    if (!state) {
+        // Reset to national - already shown
+        return;
+    }
+    // Filter histData by state
+    const stateKey = state.toLowerCase();
+    const stateData = histData[stateKey];
+    if (!stateData) return;
+
+    // Could update charts here - for now just show note
+    const label = document.getElementById('state-filter-label');
+    if (label) {
+        const latest = stateData[stateData.length - 1] || 0;
+        const prev4  = stateData[stateData.length - 5] || 0;
+        const yoy    = prev4 ? (((latest - prev4) / prev4) * 100).toFixed(1) : 0;
+        label.textContent = state + ': ' + latest.toLocaleString() + ' services  (1Y: ' + (yoy > 0 ? '+' : '') + yoy + '%)';
+    }
+}
 
 // Load Chart.js then build trend charts
 const chartScript = document.createElement('script');
