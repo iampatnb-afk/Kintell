@@ -794,6 +794,31 @@ body {
         </div>
     </div>
 
+    <!-- METRO / REGIONAL BREAKDOWN -->
+    <div class="section" style="margin-bottom:24px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+            <div class="section-title" style="margin-bottom:0">Metro vs Regional Breakdown</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap" id="aria-filter-btns">
+                <button class="range-btn active" onclick="setAriaFilter('',this)">All</button>
+                <button class="range-btn" onclick="setAriaFilter('major',this)">Major Cities</button>
+                <button class="range-btn" onclick="setAriaFilter('inner',this)">Inner Regional</button>
+                <button class="range-btn" onclick="setAriaFilter('outer',this)">Outer Regional</button>
+                <button class="range-btn" onclick="setAriaFilter('remote',this)">Remote</button>
+                <button class="range-btn" onclick="setAriaFilter('very_remote',this)">Very Remote</button>
+            </div>
+        </div>
+        <div id="aria-breakdown-cards" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px">
+        </div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.8;padding:12px;background:var(--surface2);border-radius:6px">
+            <strong style="color:var(--text)">ARIA+ Remoteness definitions:</strong>&nbsp;&nbsp;
+            <strong style="color:#3d7eff">Major Cities</strong> — pop. centres &ge;100,000 &bull;
+            <strong style="color:#00c9a7">Inner Regional</strong> — reasonably accessible, pop. 1,000&ndash;99,999 &bull;
+            <strong style="color:#d4890a">Outer Regional</strong> — limited accessibility &bull;
+            <strong style="color:#e05c3a">Remote</strong> — very limited service access &bull;
+            <strong style="color:#9b59b6">Very Remote</strong> — extremely isolated communities
+        </div>
+    </div>
+
     <div class="two-col">
         <div class="section">
             <div class="section-title">Top 20 For-Profit Operators (non-listed)</div>
