@@ -1396,6 +1396,51 @@ buildStateChart();
 // Populate stat card growth rates from history
 let currentAriaFilter = '';
 
+const ARIA_KEYS = {
+    'major':       'Major Cities of Australia',
+    'inner':       'Inner Regional Australia',
+    'outer':       'Outer Regional Australia',
+    'remote':      'Remote Australia',
+    'very_remote': 'Very Remote Australia',
+};
+
+function applyFilters() {
+    const state = currentStateFilter;
+    const aria  = currentAriaFilter;
+
+    // Filter Top 20 table
+    document.querySelectorAll('#top20-table tr[data-states]').forEach(row => {
+        const rowStates = (row.dataset.states || '').split(',');
+        const ok = (!state || rowStates.includes(state));
+        row.style.display = ok ? '' : 'none';
+    });
+
+    // Filter approvals table
+    document.querySelectorAll('.approval-row').forEach(row => {
+        const rowState = row.dataset.state || '';
+        const ok = (!state || rowState === state);
+        row.style.display = ok ? '' : 'none';
+    });
+
+    // Update label
+    const label = document.getElementById('state-filter-label');
+    if (label) {
+        let parts = [];
+        if (state) parts.push(state);
+        if (aria && ARIA_KEYS[aria]) parts.push(ARIA_KEYS[aria]);
+        if (parts.length) {
+            const sd = state ? histData[state.toLowerCase()] : histData.services;
+            const latest = sd ? sd[sd.length-1] : 0;
+            const prev4  = sd ? sd[sd.length-5] : 0;
+            const yoy    = prev4 ? (((latest-prev4)/prev4)*100).toFixed(1) : '';
+            const sign   = parseFloat(yoy) > 0 ? '+' : '';
+            label.textContent = parts.join(' · ') + (latest ? ': ' + latest.toLocaleString() + ' services' : '') + (yoy ? '  (1Y: ' + sign + yoy + '%)' : '');
+        } else {
+            label.textContent = '';
+        }
+    }
+}
+
 function setAriaFilter(aria, el) {
     currentAriaFilter = aria;
     document.querySelectorAll('#aria-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
