@@ -1568,7 +1568,7 @@ function buildTrendCharts() {
         }
     };
 
-    // Event annotation plugin (vertical lines)
+    // Event annotation plugin (vertical lines + hover labels)
     const eventAnnotationPlugin = {
         id: 'eventLines',
         afterDraw(chart) {
@@ -1586,6 +1586,7 @@ function buildTrendCharts() {
                 const xPixel = xAxis.getPixelForValue(idx);
                 if (!xPixel || xPixel < xAxis.left || xPixel > xAxis.right) return;
 
+                // Dashed vertical line
                 ctx2.save();
                 ctx2.strokeStyle = ev.color;
                 ctx2.lineWidth = 1.5;
@@ -1596,15 +1597,46 @@ function buildTrendCharts() {
                 ctx2.stroke();
                 ctx2.setLineDash([]);
 
-                // Rotated label
+                // Diamond marker at top of line
+                const mx = xPixel;
+                const my = yAxis.top + 6;
                 ctx2.fillStyle = ev.color;
-                ctx2.font = 'bold 8px monospace';
-                ctx2.textAlign = 'left';
-                ctx2.save();
-                ctx2.translate(xPixel + 3, yAxis.top + 40);
-                ctx2.rotate(-Math.PI / 2);
-                ctx2.fillText(ev.label, 0, 0);
-                ctx2.restore();
+                ctx2.beginPath();
+                ctx2.moveTo(mx, my - 5);
+                ctx2.lineTo(mx + 4, my);
+                ctx2.lineTo(mx, my + 5);
+                ctx2.lineTo(mx - 4, my);
+                ctx2.closePath();
+                ctx2.fill();
+
+                // Short label tag below diamond
+                const label = ev.label;
+                const padding = 4;
+                ctx2.font = 'bold 9px DM Mono, monospace';
+                const tw = ctx2.measureText(label).width;
+                const bx = mx - tw/2 - padding;
+                const by = my + 8;
+                const bw = tw + padding * 2;
+                const bh = 14;
+
+                // Background pill
+                ctx2.fillStyle = 'rgba(15,17,23,0.85)';
+                ctx2.beginPath();
+                ctx2.roundRect(bx, by, bw, bh, 3);
+                ctx2.fill();
+
+                // Border
+                ctx2.strokeStyle = ev.color;
+                ctx2.lineWidth = 1;
+                ctx2.beginPath();
+                ctx2.roundRect(bx, by, bw, bh, 3);
+                ctx2.stroke();
+
+                // Text
+                ctx2.fillStyle = ev.color;
+                ctx2.textAlign = 'center';
+                ctx2.fillText(label, mx, by + 10);
+
                 ctx2.restore();
             });
         }
