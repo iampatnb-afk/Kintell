@@ -661,15 +661,15 @@ body {
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
         <div style="font-size:12px;color:var(--muted);font-weight:500">Filter by state:</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap" id="state-filter-btns">
-            <button class="range-btn active" onclick="setStateFilter('')">National</button>
-            <button class="range-btn" onclick="setStateFilter('NSW')">NSW</button>
-            <button class="range-btn" onclick="setStateFilter('VIC')">VIC</button>
-            <button class="range-btn" onclick="setStateFilter('QLD')">QLD</button>
-            <button class="range-btn" onclick="setStateFilter('WA')">WA</button>
-            <button class="range-btn" onclick="setStateFilter('SA')">SA</button>
-            <button class="range-btn" onclick="setStateFilter('TAS')">TAS</button>
-            <button class="range-btn" onclick="setStateFilter('ACT')">ACT</button>
-            <button class="range-btn" onclick="setStateFilter('NT')">NT</button>
+            <button class="range-btn active" onclick="setStateFilter('',this)">National</button>
+            <button class="range-btn" onclick="setStateFilter('NSW',this)">NSW</button>
+            <button class="range-btn" onclick="setStateFilter('VIC',this)">VIC</button>
+            <button class="range-btn" onclick="setStateFilter('QLD',this)">QLD</button>
+            <button class="range-btn" onclick="setStateFilter('WA',this)">WA</button>
+            <button class="range-btn" onclick="setStateFilter('SA',this)">SA</button>
+            <button class="range-btn" onclick="setStateFilter('TAS',this)">TAS</button>
+            <button class="range-btn" onclick="setStateFilter('ACT',this)">ACT</button>
+            <button class="range-btn" onclick="setStateFilter('NT',this)">NT</button>
         </div>
         <div id="state-filter-label" style="font-size:12px;color:var(--accent2);margin-left:8px"></div>
     </div>
@@ -713,16 +713,16 @@ body {
             <div class="section-title" style="margin-bottom:0">Sector Growth — Q3 2013 to Q4 2025</div>
             <div style="display:flex;gap:12px;align-items:center">
                 <div style="display:flex;gap:6px" id="time-range-btns">
-                    <button class="range-btn" onclick="setRange(4)">1Y</button>
-                    <button class="range-btn" onclick="setRange(8)">2Y</button>
-                    <button class="range-btn" onclick="setRange(20)">5Y</button>
-                    <button class="range-btn active" onclick="setRange(0)">All</button>
+                    <button class="range-btn" onclick="setRange(4,this)">1Y</button>
+                    <button class="range-btn" onclick="setRange(8,this)">2Y</button>
+                    <button class="range-btn" onclick="setRange(20,this)">5Y</button>
+                    <button class="range-btn active" onclick="setRange(0,this)">All</button>
                 </div>
                 <div style="width:1px;height:20px;background:var(--border)"></div>
                 <div style="display:flex;gap:6px" id="compare-btns">
-                    <button class="range-btn active" onclick="setCompare(1,'QoQ')">QoQ</button>
-                    <button class="range-btn" onclick="setCompare(2,'HoH')">HoH</button>
-                    <button class="range-btn" onclick="setCompare(4,'YoY')">YoY</button>
+                    <button class="range-btn active" onclick="setCompare(1,'QoQ',this)">QoQ</button>
+                    <button class="range-btn" onclick="setCompare(2,'HoH',this)">HoH</button>
+                    <button class="range-btn" onclick="setCompare(4,'YoY',this)">YoY</button>
                 </div>
             </div>
         </div>
@@ -1392,10 +1392,10 @@ function buildStatGrowths() {
 // ── STATE FILTER ──
 let currentStateFilter = '';
 
-function setStateFilter(state) {
+function setStateFilter(state, el) {
     currentStateFilter = state;
     document.querySelectorAll('#state-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
-    event.target.classList.add('active');
+    if (el) el.classList.add('active');
 
     const label = document.getElementById('state-filter-label');
     if (label) label.textContent = state ? 'Showing ' + state + ' only' : '';
@@ -1452,10 +1452,10 @@ function updateStatCardsForState(state) {
 // ── STATE FILTER ──
 let currentStateFilter = '';
 
-function setStateFilter(state) {
+function setStateFilter(state, el) {
     currentStateFilter = state;
     document.querySelectorAll('#state-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
-    event.target.classList.add('active');
+    if (el) el.classList.add('active');
 
     const label = document.getElementById('state-filter-label');
     if (label) label.textContent = state ? 'Showing ' + state + ' only' : '';
@@ -1723,20 +1723,20 @@ function getSlicedData(arr, n) {
 let compareWindow = 1; // 1=QoQ, 2=HoH, 4=YoY
 let compareLabel = 'QoQ';
 
-function setCompare(n, label) {
+function setCompare(n, label, el) {
     compareWindow = n;
     compareLabel = label;
     document.querySelectorAll('#compare-btns .range-btn').forEach(b => b.classList.remove('active'));
-    event.target.classList.add('active');
+    if (el) el.classList.add('active');
     Object.values(chartInstances).forEach(c => c.destroy());
     chartInstances = {};
     buildTrendCharts();
 }
 
-function setRange(n) {
+function setRange(n, el) {
     currentRange = n;
     document.querySelectorAll('#time-range-btns .range-btn').forEach(b => b.classList.remove('active'));
-    event.target.classList.add('active');
+    if (el) el.classList.add('active');
     Object.values(chartInstances).forEach(c => c.destroy());
     chartInstances = {};
     buildTrendCharts();
