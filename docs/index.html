@@ -689,11 +689,19 @@ body {
     <div class="section" style="margin-bottom:24px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
             <div class="section-title" style="margin-bottom:0">Sector Growth — Q3 2013 to Q4 2025</div>
-            <div style="display:flex;gap:6px" id="time-range-btns">
-                <button class="range-btn" onclick="setRange(4)">1Y</button>
-                <button class="range-btn" onclick="setRange(8)">2Y</button>
-                <button class="range-btn" onclick="setRange(20)">5Y</button>
-                <button class="range-btn active" onclick="setRange(0)">All</button>
+            <div style="display:flex;gap:12px;align-items:center">
+                <div style="display:flex;gap:6px" id="time-range-btns">
+                    <button class="range-btn" onclick="setRange(4)">1Y</button>
+                    <button class="range-btn" onclick="setRange(8)">2Y</button>
+                    <button class="range-btn" onclick="setRange(20)">5Y</button>
+                    <button class="range-btn active" onclick="setRange(0)">All</button>
+                </div>
+                <div style="width:1px;height:20px;background:var(--border)"></div>
+                <div style="display:flex;gap:6px" id="compare-btns">
+                    <button class="range-btn active" onclick="setCompare(1,'QoQ')">QoQ</button>
+                    <button class="range-btn" onclick="setCompare(2,'HoH')">HoH</button>
+                    <button class="range-btn" onclick="setCompare(4,'YoY')">YoY</button>
+                </div>
             </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
@@ -1482,11 +1490,23 @@ function getSlicedData(arr, n) {
     return arr.slice(-n);
 }
 
+let compareWindow = 1; // 1=QoQ, 2=HoH, 4=YoY
+let compareLabel = 'QoQ';
+
+function setCompare(n, label) {
+    compareWindow = n;
+    compareLabel = label;
+    document.querySelectorAll('#compare-btns .range-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    Object.values(chartInstances).forEach(c => c.destroy());
+    chartInstances = {};
+    buildTrendCharts();
+}
+
 function setRange(n) {
     currentRange = n;
-    document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#time-range-btns .range-btn').forEach(b => b.classList.remove('active'));
     event.target.classList.add('active');
-    // Destroy and rebuild all charts
     Object.values(chartInstances).forEach(c => c.destroy());
     chartInstances = {};
     buildTrendCharts();
@@ -1548,9 +1568,10 @@ function buildTrendCharts() {
                         const arr = ctx.dataset.data;
                         const i = ctx.dataIndex;
                         let s = '  ' + ctx.dataset.label + ': ' + v.toLocaleString();
-                        if (i > 0 && arr[i-1]) {
-                            const chg = ((v - arr[i-1]) / arr[i-1] * 100).toFixed(1);
-                            s += '  (' + (chg > 0 ? '+' : '') + chg + '% QoQ)';
+                        if (i >= compareWindow && arr[i - compareWindow] != null) {
+                            const prev = arr[i - compareWindow];
+                            const chg = ((v - prev) / prev * 100).toFixed(1);
+                            s += '  (' + (chg > 0 ? '+' : '') + chg + '% ' + compareLabel + ')';
                         }
                         return s;
                     },
