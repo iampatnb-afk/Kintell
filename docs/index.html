@@ -1342,33 +1342,7 @@ function setStateFilter(state, el) {
     document.querySelectorAll('#state-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
     if (el) el.classList.add('active');
 
-    const label = document.getElementById('state-filter-label');
-    if (label) label.textContent = state ? 'Showing ' + state + ' only' : '';
-
-    // Filter top 20 table
-    document.querySelectorAll('#top20-table tr[data-states]').forEach(row => {
-        const states = (row.dataset.states || '').split(',');
-        row.style.display = (!state || states.includes(state)) ? '' : 'none';
-    });
-
-    // Filter approvals table
-    document.querySelectorAll('.approval-row').forEach(row => {
-        const rowState = row.dataset.state || '';
-        row.style.display = (!state || rowState === state) ? '' : 'none';
-    });
-
-    // Filter services by state chart highlight
-    if (window.stateChartInstance) {
-        window.stateChartInstance.data.datasets.forEach(ds => {
-            ds.borderWidth = (!state || ds.label === state) ? 3 : 1;
-            ds.borderColor = (!state || ds.label === state)
-                ? ds.originalColor
-                : ds.originalColor.replace('1)', '0.2)').replace('0.6)', '0.2)');
-        });
-        window.stateChartInstance.update();
-    }
-
-    // Update stat cards with state-filtered data
+    applyFilters();
     updateStatCardsForState(state);
 }
 
@@ -1420,14 +1394,64 @@ function buildStateChart() {
 buildStateChart();
 
 // Populate stat card growth rates from history
+let currentAriaFilter = '';
+
 function setAriaFilter(aria, el) {
+    currentAriaFilter = aria;
     document.querySelectorAll('#aria-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
     if (el) el.classList.add('active');
-    // Filter top 20 by aria (future enhancement)
-    // For now just highlight the selected card
+    // Highlight selected ARIA card
     document.querySelectorAll('.aria-card').forEach(c => {
         c.style.opacity = (!aria || c.dataset.aria === aria) ? '1' : '0.3';
     });
+    applyFilters();
+}
+
+// ARIA label → key mapping for row data attributes
+const ARIA_KEYS = {
+    'major':      'Major Cities of Australia',
+    'inner':      'Inner Regional Australia',
+    'outer':      'Outer Regional Australia',
+    'remote':     'Remote Australia',
+    'very_remote':'Very Remote Australia',
+};
+
+function applyFilters() {
+    const state = currentStateFilter;
+    const aria  = currentAriaFilter;
+    const ariaLabel = aria ? ARIA_KEYS[aria] : '';
+
+    // Filter Top 20 table
+    document.querySelectorAll('#top20-table tr[data-states]').forEach(row => {
+        const rowStates = (row.dataset.states || '').split(',');
+        const stateOk = !state || rowStates.includes(state);
+        row.style.display = stateOk ? '' : 'none';
+    });
+
+    // Filter approvals table
+    document.querySelectorAll('.approval-row').forEach(row => {
+        const rowState = row.dataset.state || '';
+        const stateOk  = !state || rowState === state;
+        row.style.display = stateOk ? '' : 'none';
+    });
+
+    // Update state label
+    const label = document.getElementById('state-filter-label');
+    if (label) {
+        let parts = [];
+        if (state) parts.push(state);
+        if (ariaLabel) parts.push(ariaLabel);
+        if (parts.length > 0) {
+            const stateData = state ? histData[state.toLowerCase()] : histData.services;
+            const latest = stateData ? stateData[stateData.length-1] : 0;
+            const prev4  = stateData ? stateData[stateData.length-5] : 0;
+            const yoy    = prev4 ? (((latest-prev4)/prev4)*100).toFixed(1) : '';
+            const sign   = yoy > 0 ? '+' : '';
+            label.textContent = parts.join(' · ') + (latest ? ': ' + latest.toLocaleString() + ' services' : '') + (yoy ? '  (1Y: ' + sign + yoy + '%)' : '');
+        } else {
+            label.textContent = '';
+        }
+    }
 }
 
 function buildAriaCards() {
