@@ -1558,10 +1558,34 @@ function buildStatGrowths() {
 
 // ── STATE FILTER ──
 // Load Chart.js then build trend charts
-const chartScript = document.createElement('script');
-chartScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js';
-chartScript.onload = function() { buildTrendCharts(); buildStatGrowths(); buildAriaCards(); };
-document.head.appendChild(chartScript);
+function initCharts() {
+    if (typeof Chart === 'undefined') {
+        setTimeout(initCharts, 100);
+        return;
+    }
+    buildTrendCharts();
+    buildStatGrowths();
+    buildAriaCards();
+}
+
+// Try multiple CDN sources for resilience
+function loadChartJS() {
+    const urls = [
+        'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js',
+        'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
+    ];
+    let idx = 0;
+    function tryNext() {
+        if (idx >= urls.length) { console.error('Chart.js failed to load'); return; }
+        const s = document.createElement('script');
+        s.src = urls[idx++];
+        s.onload = initCharts;
+        s.onerror = tryNext;
+        document.head.appendChild(s);
+    }
+    tryNext();
+}
+loadChartJS();
 
 // ── HOT BUTTONS (from brief) ──
 const hotButtons = [];
