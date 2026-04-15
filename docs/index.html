@@ -1316,7 +1316,7 @@ function setStateFilter(state, el) {
 
     // Filter top 20 table
     document.querySelectorAll('#top20-table tr[data-states]').forEach(row => {
-        const states = row.dataset.states || '';
+        const states = (row.dataset.states || '').split(',');
         row.style.display = (!state || states.includes(state)) ? '' : 'none';
     });
 
@@ -1389,6 +1389,49 @@ function buildStateChart() {
 buildStateChart();
 
 // Populate stat card growth rates from history
+function setAriaFilter(aria, el) {
+    document.querySelectorAll('#aria-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
+    if (el) el.classList.add('active');
+    // Filter top 20 by aria (future enhancement)
+    // For now just highlight the selected card
+    document.querySelectorAll('.aria-card').forEach(c => {
+        c.style.opacity = (!aria || c.dataset.aria === aria) ? '1' : '0.3';
+    });
+}
+
+function buildAriaCards() {
+    if (!histData || !histData.major_cities) return;
+    const el = document.getElementById('aria-breakdown-cards');
+    if (!el) return;
+    const n = histData.major_cities.length;
+    if (n === 0) return;
+
+    const categories = [
+        { key: 'major', label: 'Major Cities', data: histData.major_cities, color: '#3d7eff' },
+        { key: 'inner', label: 'Inner Regional', data: histData.inner_regional, color: '#00c9a7' },
+        { key: 'outer', label: 'Outer Regional', data: histData.outer_regional, color: '#d4890a' },
+        { key: 'remote', label: 'Remote', data: histData.remote, color: '#e05c3a' },
+        { key: 'very_remote', label: 'Very Remote', data: histData.very_remote, color: '#9b59b6' },
+    ];
+
+    el.innerHTML = categories.map(cat => {
+        const latest = cat.data[n-1] || 0;
+        const prev4  = cat.data[n-5] || 0;
+        const yoy    = prev4 ? (((latest - prev4) / prev4) * 100).toFixed(1) : '—';
+        const sign   = yoy > 0 ? '+' : '';
+        const yoyColor = yoy > 0 ? 'var(--accent2)' : yoy < 0 ? 'var(--hot)' : 'var(--muted)';
+        return `
+        <div class="aria-card stat-card" data-aria="${cat.key}" style="border-top:2px solid ${cat.color}">
+            <div class="stat-label">${cat.label}</div>
+            <div class="stat-value" style="font-size:22px">${latest.toLocaleString()}</div>
+            <div class="stat-sub">LDC services</div>
+            <div style="margin-top:6px;font-size:11px;color:${yoyColor}">
+                1Y: ${yoy === '—' ? '—' : sign + yoy + '%'}
+            </div>
+        </div>`;
+    }).join('');
+}
+
 function buildStatGrowths() {
     if (!histData || !histData.services || histData.services.length < 5) return;
     const n = histData.services.length;
@@ -1454,7 +1497,7 @@ function buildStatGrowths() {
 // Load Chart.js then build trend charts
 const chartScript = document.createElement('script');
 chartScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js';
-chartScript.onload = function() { buildTrendCharts(); buildStatGrowths(); };
+chartScript.onload = function() { buildTrendCharts(); buildStatGrowths(); buildAriaCards(); };
 document.head.appendChild(chartScript);
 
 // ── HOT BUTTONS (from brief) ──
