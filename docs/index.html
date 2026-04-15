@@ -1303,6 +1303,65 @@ body {
 </div>
 
 <script>
+// ── STATE FILTER ──
+let currentStateFilter = '';
+
+function setStateFilter(state, el) {
+    currentStateFilter = state;
+    document.querySelectorAll('#state-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
+    if (el) el.classList.add('active');
+
+    const label = document.getElementById('state-filter-label');
+    if (label) label.textContent = state ? 'Showing ' + state + ' only' : '';
+
+    // Filter top 20 table
+    document.querySelectorAll('#top20-table tr[data-states]').forEach(row => {
+        const states = row.dataset.states || '';
+        row.style.display = (!state || states.includes(state)) ? '' : 'none';
+    });
+
+    // Filter approvals table
+    document.querySelectorAll('.approval-row').forEach(row => {
+        const rowState = row.dataset.state || '';
+        row.style.display = (!state || rowState === state) ? '' : 'none';
+    });
+
+    // Filter services by state chart highlight
+    if (window.stateChartInstance) {
+        window.stateChartInstance.data.datasets.forEach(ds => {
+            ds.borderWidth = (!state || ds.label === state) ? 3 : 1;
+            ds.borderColor = (!state || ds.label === state)
+                ? ds.originalColor
+                : ds.originalColor.replace('1)', '0.2)').replace('0.6)', '0.2)');
+        });
+        window.stateChartInstance.update();
+    }
+
+    // Update stat cards with state-filtered data
+    updateStatCardsForState(state);
+}
+
+function updateStatCardsForState(state) {
+    if (!state) {
+        // Reset to national - already shown
+        return;
+    }
+    // Filter histData by state
+    const stateKey = state.toLowerCase();
+    const stateData = histData[stateKey];
+    if (!stateData) return;
+
+    // Could update charts here - for now just show note
+    const label = document.getElementById('state-filter-label');
+    if (label) {
+        const latest = stateData[stateData.length - 1] || 0;
+        const prev4  = stateData[stateData.length - 5] || 0;
+        const yoy    = prev4 ? (((latest - prev4) / prev4) * 100).toFixed(1) : 0;
+        label.textContent = state + ': ' + latest.toLocaleString() + ' services  (1Y: ' + (yoy > 0 ? '+' : '') + yoy + '%)';
+    }
+}
+
+
 // ── TAB NAVIGATION ──
 function showPanel(name) {
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
@@ -1389,124 +1448,9 @@ function buildStatGrowths() {
     if (hEl) hEl.innerHTML = histData.labels[0] + ' → ' + histData.labels[histData.labels.length-1] + '&nbsp;&nbsp;' + histData.labels.length + ' quarters';
 }
 
-// ── STATE FILTER ──
-let currentStateFilter = '';
-
-function setStateFilter(state, el) {
-    currentStateFilter = state;
-    document.querySelectorAll('#state-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
-    if (el) el.classList.add('active');
-
-    const label = document.getElementById('state-filter-label');
-    if (label) label.textContent = state ? 'Showing ' + state + ' only' : '';
-
-    // Filter top 20 table
-    document.querySelectorAll('#top20-table tr[data-states]').forEach(row => {
-        const states = row.dataset.states || '';
-        row.style.display = (!state || states.includes(state)) ? '' : 'none';
-    });
-
-    // Filter approvals table
-    document.querySelectorAll('.approval-row').forEach(row => {
-        const rowState = row.dataset.state || '';
-        row.style.display = (!state || rowState === state) ? '' : 'none';
-    });
-
-    // Filter services by state chart highlight
-    if (window.stateChartInstance) {
-        window.stateChartInstance.data.datasets.forEach(ds => {
-            ds.borderWidth = (!state || ds.label === state) ? 3 : 1;
-            ds.borderColor = (!state || ds.label === state)
-                ? ds.originalColor
-                : ds.originalColor.replace('1)', '0.2)').replace('0.6)', '0.2)');
-        });
-        window.stateChartInstance.update();
-    }
-
-    // Update stat cards with state-filtered data
-    updateStatCardsForState(state);
-}
-
-function updateStatCardsForState(state) {
-    if (!state) {
-        // Reset to national - already shown
-        return;
-    }
-    // Filter histData by state
-    const stateKey = state.toLowerCase();
-    const stateData = histData[stateKey];
-    if (!stateData) return;
-
-    // Could update charts here - for now just show note
-    const label = document.getElementById('state-filter-label');
-    if (label) {
-        const latest = stateData[stateData.length - 1] || 0;
-        const prev4  = stateData[stateData.length - 5] || 0;
-        const yoy    = prev4 ? (((latest - prev4) / prev4) * 100).toFixed(1) : 0;
-        label.textContent = state + ': ' + latest.toLocaleString() + ' services  (1Y: ' + (yoy > 0 ? '+' : '') + yoy + '%)';
-    }
-}
-
 // Load Chart.js then build trend charts
 
 // ── STATE FILTER ──
-let currentStateFilter = '';
-
-function setStateFilter(state, el) {
-    currentStateFilter = state;
-    document.querySelectorAll('#state-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
-    if (el) el.classList.add('active');
-
-    const label = document.getElementById('state-filter-label');
-    if (label) label.textContent = state ? 'Showing ' + state + ' only' : '';
-
-    // Filter top 20 table
-    document.querySelectorAll('#top20-table tr[data-states]').forEach(row => {
-        const states = row.dataset.states || '';
-        row.style.display = (!state || states.includes(state)) ? '' : 'none';
-    });
-
-    // Filter approvals table
-    document.querySelectorAll('.approval-row').forEach(row => {
-        const rowState = row.dataset.state || '';
-        row.style.display = (!state || rowState === state) ? '' : 'none';
-    });
-
-    // Filter services by state chart highlight
-    if (window.stateChartInstance) {
-        window.stateChartInstance.data.datasets.forEach(ds => {
-            ds.borderWidth = (!state || ds.label === state) ? 3 : 1;
-            ds.borderColor = (!state || ds.label === state)
-                ? ds.originalColor
-                : ds.originalColor.replace('1)', '0.2)').replace('0.6)', '0.2)');
-        });
-        window.stateChartInstance.update();
-    }
-
-    // Update stat cards with state-filtered data
-    updateStatCardsForState(state);
-}
-
-function updateStatCardsForState(state) {
-    if (!state) {
-        // Reset to national - already shown
-        return;
-    }
-    // Filter histData by state
-    const stateKey = state.toLowerCase();
-    const stateData = histData[stateKey];
-    if (!stateData) return;
-
-    // Could update charts here - for now just show note
-    const label = document.getElementById('state-filter-label');
-    if (label) {
-        const latest = stateData[stateData.length - 1] || 0;
-        const prev4  = stateData[stateData.length - 5] || 0;
-        const yoy    = prev4 ? (((latest - prev4) / prev4) * 100).toFixed(1) : 0;
-        label.textContent = state + ': ' + latest.toLocaleString() + ' services  (1Y: ' + (yoy > 0 ? '+' : '') + yoy + '%)';
-    }
-}
-
 // Load Chart.js then build trend charts
 const chartScript = document.createElement('script');
 chartScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js';
