@@ -1568,7 +1568,7 @@ function buildTrendCharts() {
         }
     };
 
-    // Event annotation plugin (vertical lines + hover labels)
+    // Event annotation plugin (vertical lines + visible labels)
     const eventAnnotationPlugin = {
         id: 'eventLines',
         afterDraw(chart) {
@@ -1579,63 +1579,58 @@ function buildTrendCharts() {
 
             const slicedLabels = getSlicedData(histData.labels, currentRange);
 
-            sectorEvents.forEach(ev => {
+            sectorEvents.forEach((ev, evIdx) => {
                 const idx = slicedLabels.indexOf(ev.quarter);
                 if (idx < 0) return;
 
                 const xPixel = xAxis.getPixelForValue(idx);
                 if (!xPixel || xPixel < xAxis.left || xPixel > xAxis.right) return;
 
-                // Dashed vertical line
                 ctx2.save();
+
+                // Dashed vertical line - more visible
                 ctx2.strokeStyle = ev.color;
-                ctx2.lineWidth = 1.5;
-                ctx2.setLineDash([4, 3]);
+                ctx2.lineWidth = 2;
+                ctx2.setLineDash([5, 4]);
+                ctx2.globalAlpha = 0.8;
                 ctx2.beginPath();
-                ctx2.moveTo(xPixel, yAxis.top);
+                ctx2.moveTo(xPixel, yAxis.top + 28);
                 ctx2.lineTo(xPixel, yAxis.bottom);
                 ctx2.stroke();
                 ctx2.setLineDash([]);
+                ctx2.globalAlpha = 1;
 
-                // Diamond marker at top of line
-                const mx = xPixel;
-                const my = yAxis.top + 6;
-                ctx2.fillStyle = ev.color;
-                ctx2.beginPath();
-                ctx2.moveTo(mx, my - 5);
-                ctx2.lineTo(mx + 4, my);
-                ctx2.lineTo(mx, my + 5);
-                ctx2.lineTo(mx - 4, my);
-                ctx2.closePath();
-                ctx2.fill();
-
-                // Short label tag below diamond
+                // Label box - stagger vertically to avoid overlap
                 const label = ev.label;
-                const padding = 4;
-                ctx2.font = 'bold 9px DM Mono, monospace';
+                ctx2.font = 'bold 10px sans-serif';
                 const tw = ctx2.measureText(label).width;
-                const bx = mx - tw/2 - padding;
-                const by = my + 8;
-                const bw = tw + padding * 2;
-                const bh = 14;
+                const pad = 5;
+                const bw = tw + pad * 2;
+                const bh = 18;
+                const bx = xPixel - bw / 2;
+                // Stagger: alternate between top positions
+                const by = yAxis.top + (evIdx % 2 === 0 ? 2 : 22);
 
-                // Background pill
-                ctx2.fillStyle = 'rgba(15,17,23,0.85)';
-                ctx2.beginPath();
-                ctx2.roundRect(bx, by, bw, bh, 3);
-                ctx2.fill();
+                // Shadow for readability
+                ctx2.shadowColor = 'rgba(0,0,0,0.8)';
+                ctx2.shadowBlur = 4;
 
-                // Border
+                // Solid background
+                ctx2.fillStyle = 'rgba(15,17,23,0.95)';
+                ctx2.fillRect(bx, by, bw, bh);
+
+                ctx2.shadowBlur = 0;
+
+                // Colored border
                 ctx2.strokeStyle = ev.color;
-                ctx2.lineWidth = 1;
-                ctx2.beginPath();
-                ctx2.roundRect(bx, by, bw, bh, 3);
-                ctx2.stroke();
+                ctx2.lineWidth = 1.5;
+                ctx2.strokeRect(bx, by, bw, bh);
 
                 // Text
-                ctx2.fillStyle = ev.color;
+                ctx2.fillStyle = '#ffffff';
                 ctx2.textAlign = 'center';
-                ctx2.fillText(label, mx, by + 10);
+                ctx2.textBaseline = 'middle';
+                ctx2.fillText(label, xPixel, by + bh / 2);
 
                 ctx2.restore();
             });
