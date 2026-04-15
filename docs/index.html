@@ -662,26 +662,31 @@ body {
             <div class="stat-label">LDC Services</div>
             <div class="stat-value">9,693</div>
             <div class="stat-sub">Active nationally</div>
+            <div id="growth-services" style="margin-top:8px;font-size:11px;color:var(--muted)">Loading...</div>
         </div>
         <div class="stat-card">
             <div class="stat-label">Licensed Places</div>
             <div class="stat-value">736,334</div>
             <div class="stat-sub">Total capacity</div>
+            <div id="growth-places" style="margin-top:8px;font-size:11px;color:var(--muted)">Loading...</div>
         </div>
         <div class="stat-card">
             <div class="stat-label">Exceeding NQS</div>
             <div class="stat-value">15%</div>
             <div class="stat-sub">1,479 services</div>
+            <div id="growth-nqs" style="margin-top:8px;font-size:11px;color:var(--muted)">Loading...</div>
         </div>
         <div class="stat-card">
             <div class="stat-label">Operators Tracked</div>
             <div class="stat-value">4,187</div>
             <div class="stat-sub">758 hot+warm targets</div>
+            <div id="growth-fp" style="margin-top:8px;font-size:11px;color:var(--muted)">Loading...</div>
         </div>
         <div class="stat-card">
             <div class="stat-label">Weekly Update</div>
             <div class="stat-value" style="font-size:16px;">2026-04-15</div>
             <div class="stat-sub">Next: Tuesday 10am</div>
+            <div id="growth-hist" style="margin-top:8px;font-size:11px;color:var(--muted)">Loading...</div>
         </div>
     </div>
 
@@ -1277,10 +1282,72 @@ function buildStateChart() {
 }
 buildStateChart();
 
+// Populate stat card growth rates from history
+function buildStatGrowths() {
+    if (!histData || !histData.services || histData.services.length < 5) return;
+    const n = histData.services.length;
+
+    function growth(arr, periods) {
+        if (arr.length < periods + 1) return null;
+        const curr = arr[arr.length - 1];
+        const prev = arr[arr.length - 1 - periods];
+        if (!prev) return null;
+        const pct = ((curr - prev) / prev * 100).toFixed(1);
+        const sign = pct > 0 ? '+' : '';
+        const color = pct > 0 ? 'var(--accent2)' : 'var(--hot)';
+        return `<span style="color:${color}">${sign}${pct}%</span>`;
+    }
+
+    function growthLine(arr) {
+        const h = growth(arr, 2);
+        const y = growth(arr, 4);
+        const t = growth(arr, 8);
+        const all = arr.length > 1 ? (() => {
+            const pct = ((arr[arr.length-1] - arr[0]) / arr[0] * 100).toFixed(0);
+            const sign = pct > 0 ? '+' : '';
+            const color = pct > 0 ? 'var(--accent2)' : 'var(--hot)';
+            return `<span style="color:${color}">${sign}${pct}%</span>`;
+        })() : null;
+        let parts = [];
+        if (h) parts.push('6M: ' + h);
+        if (y) parts.push('1Y: ' + y);
+        if (t) parts.push('2Y: ' + t);
+        if (all) parts.push('All: ' + all);
+        return parts.join('&nbsp;&nbsp;');
+    }
+
+    const sEl = document.getElementById('growth-services');
+    const pEl = document.getElementById('growth-places');
+    const nEl = document.getElementById('growth-nqs');
+    const fEl = document.getElementById('growth-fp');
+    const hEl = document.getElementById('growth-hist');
+
+    if (sEl) sEl.innerHTML = growthLine(histData.services);
+    if (pEl) pEl.innerHTML = growthLine(histData.places);
+    if (nEl) {
+        // For NQS % exceeding
+        const excPct = histData.exceeding.map((e, i) => {
+            const total = e + (histData.meeting[i]||0) + (histData.working[i]||0);
+            return total ? +(e/total*100).toFixed(1) : 0;
+        });
+        nEl.innerHTML = growthLine(excPct);
+    }
+    if (fEl) {
+        const fpPct = histData.forprofit.map((fp, i) => {
+            const total = fp + (histData.nfp[i]||0);
+            return total ? +(fp/total*100).toFixed(1) : 0;
+        });
+        fEl.innerHTML = 'For-profit share: ' + growthLine(fpPct);
+    }
+    if (hEl) hEl.innerHTML = histData.labels[0] + ' → ' + histData.labels[histData.labels.length-1] + '&nbsp;&nbsp;' + histData.labels.length + ' quarters';
+}
+
+// Load Chart.js then build trend charts
+
 // Load Chart.js then build trend charts
 const chartScript = document.createElement('script');
 chartScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js';
-chartScript.onload = buildTrendCharts;
+chartScript.onload = function() { buildTrendCharts(); buildStatGrowths(); };
 document.head.appendChild(chartScript);
 
 // ── HOT BUTTONS (from brief) ──
