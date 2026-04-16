@@ -1176,7 +1176,7 @@ body {{
                 <canvas id="chart-places" height="120"></canvas>
             </div>
             <div>
-                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">NQS Rating Trends</div>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">NQS Quality & Stress (%)</div>
                 <canvas id="chart-nqs" height="120"></canvas>
             </div>
             <div>
@@ -1347,7 +1347,7 @@ body {{
 
 <script>
 // ── STATE FILTER ──
-let currentStateFilter = '';
+var currentStateFilter = '';
 
 function setStateFilter(state, el) {{
     currentStateFilter = state;
@@ -1955,15 +1955,33 @@ function buildTrendCharts() {{
                   fill: !!fill, tension: 0.3, pointRadius: 0, borderWidth: 2 }};
     }}
 
-    // 1. Services
-    buildGrowthStat('stat-services-growth', getSlicedData(histData.services, n), ' services');
+    // Resolve active data series based on state/ARIA filter
+    const activeState = currentStateFilter ? currentStateFilter.toLowerCase() : '';
+    const activeAria  = currentAriaFilter;
+    const ariaSeriesKey = activeAria ? ARIA_SERIES[activeAria] : null;
+
+    // Primary services series — state → state series, ARIA → ARIA series, else national
+    let primaryServices = histData.services;
+    let primaryLabel    = 'LDC Services (National)';
+    let primaryColor    = '#3d7eff';
+    if (activeState && histData[activeState]) {{
+        primaryServices = histData[activeState];
+        primaryLabel    = 'LDC Services (' + currentStateFilter + ')';
+    }} else if (ariaSeriesKey && histData[ariaSeriesKey]) {{
+        primaryServices = histData[ariaSeriesKey];
+        primaryLabel    = 'LDC Services (' + (ARIA_KEYS[activeAria] || activeAria) + ')';
+        primaryColor    = '#00c9a7';
+    }}
+
+    // 1. Services — uses filtered primary series
+    buildGrowthStat('stat-services-growth', getSlicedData(primaryServices, n), ' services');
     chartInstances['services'] = new Chart(document.getElementById('chart-services'), {{
         type: 'line', options: chartOpts,
         plugins: [eventAnnotationPlugin],
-        data: {{ labels, datasets: [makeDataset('LDC Services', histData.services, '#3d7eff', 'rgba(61,126,255,0.1)')] }}
+        data: {{ labels, datasets: [makeDataset(primaryLabel, primaryServices, primaryColor, 'rgba(61,126,255,0.1)')] }}
     }});
 
-    // 2. Places
+    // 2. Places — national only (no per-state places history available)
     buildGrowthStat('stat-places-growth', getSlicedData(histData.places, n), ' places');
     chartInstances['places'] = new Chart(document.getElementById('chart-places'), {{
         type: 'line', options: chartOpts,
@@ -1971,27 +1989,43 @@ function buildTrendCharts() {{
         data: {{ labels, datasets: [makeDataset('Licensed Places', histData.places, '#00c9a7', 'rgba(0,201,167,0.08)')] }}
     }});
 
-    // 3. NQS trends
+    // 3. NQS quality & stress as % of total rated
+    const nqsPctOpts = JSON.parse(JSON.stringify(chartOpts));
+    nqsPctOpts.scales.y.ticks = {{ ...nqsPctOpts.scales.y.ticks, callback: v => v + '%' }};
+    const excPctData = histData.exceeding.map((e, i) => {{
+        const total = e + (histData.meeting[i]||0) + (histData.working[i]||0);
+        return total ? +(e/total*100).toFixed(1) : null;
+    }});
+    const wtnPctData = histData.working.map((w, i) => {{
+        const total = (histData.exceeding[i]||0) + (histData.meeting[i]||0) + w;
+        return total ? +(w/total*100).toFixed(1) : null;
+    }});
     chartInstances['nqs'] = new Chart(document.getElementById('chart-nqs'), {{
-        type: 'line', options: chartOpts,
+        type: 'line', options: nqsPctOpts,
         plugins: [eventAnnotationPlugin],
         data: {{ labels, datasets: [
-            makeDataset('Exceeding', histData.exceeding, '#00c9a7'),
-            makeDataset('Meeting',   histData.meeting,   '#3d7eff'),
-            makeDataset('Working',   histData.working,   '#d4890a'),
+            makeDataset('Exceeding NQS %', excPctData, '#00c9a7'),
+            makeDataset('Working Towards %', wtnPctData, '#d4890a'),
         ] }}
     }});
 
-    // 4. State growth
+    // 4. State growth — highlight selected state if filtered
+    const stateColors = {{ nsw:'#3d7eff', vic:'#00c9a7', qld:'#d4890a', wa:'#e05c3a', sa:'#9b59b6' }};
+    function stateDataset(label, key, color) {{
+        const dimmed = activeState && activeState !== key;
+        return {{ label, data: getSlicedData(histData[key], n), borderColor: dimmed ? color + '33' : color,
+                  backgroundColor: 'transparent', fill: false, tension: 0.3,
+                  pointRadius: 0, borderWidth: dimmed ? 1 : (activeState === key ? 3 : 2) }};
+    }}
     chartInstances['states'] = new Chart(document.getElementById('chart-states'), {{
         type: 'line', options: chartOpts,
         plugins: [eventAnnotationPlugin],
         data: {{ labels, datasets: [
-            makeDataset('NSW', histData.nsw, '#3d7eff'),
-            makeDataset('VIC', histData.vic, '#00c9a7'),
-            makeDataset('QLD', histData.qld, '#d4890a'),
-            makeDataset('WA',  histData.wa,  '#e05c3a'),
-            makeDataset('SA',  histData.sa,  '#9b59b6'),
+            stateDataset('NSW', 'nsw', '#3d7eff'),
+            stateDataset('VIC', 'vic', '#00c9a7'),
+            stateDataset('QLD', 'qld', '#d4890a'),
+            stateDataset('WA',  'wa',  '#e05c3a'),
+            stateDataset('SA',  'sa',  '#9b59b6'),
         ] }}
     }});
 

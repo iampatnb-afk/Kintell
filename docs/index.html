@@ -757,7 +757,7 @@ body {
                 <canvas id="chart-places" height="120"></canvas>
             </div>
             <div>
-                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">NQS Rating Trends</div>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">NQS Quality & Stress (%)</div>
                 <canvas id="chart-nqs" height="120"></canvas>
             </div>
             <div>
@@ -1982,14 +1982,23 @@ function buildTrendCharts() {
         data: { labels, datasets: [makeDataset('Licensed Places', histData.places, '#00c9a7', 'rgba(0,201,167,0.08)')] }
     });
 
-    // 3. NQS trends
+    // 3. NQS quality & stress as % of total rated
+    const nqsPctOpts = JSON.parse(JSON.stringify(chartOpts));
+    nqsPctOpts.scales.y.ticks = { ...nqsPctOpts.scales.y.ticks, callback: v => v + '%' };
+    const excPctData = histData.exceeding.map((e, i) => {
+        const total = e + (histData.meeting[i]||0) + (histData.working[i]||0);
+        return total ? +(e/total*100).toFixed(1) : null;
+    });
+    const wtnPctData = histData.working.map((w, i) => {
+        const total = (histData.exceeding[i]||0) + (histData.meeting[i]||0) + w;
+        return total ? +(w/total*100).toFixed(1) : null;
+    });
     chartInstances['nqs'] = new Chart(document.getElementById('chart-nqs'), {
-        type: 'line', options: chartOpts,
+        type: 'line', options: nqsPctOpts,
         plugins: [eventAnnotationPlugin],
         data: { labels, datasets: [
-            makeDataset('Exceeding', histData.exceeding, '#00c9a7'),
-            makeDataset('Meeting',   histData.meeting,   '#3d7eff'),
-            makeDataset('Working',   histData.working,   '#d4890a'),
+            makeDataset('Exceeding NQS %', excPctData, '#00c9a7'),
+            makeDataset('Working Towards %', wtnPctData, '#d4890a'),
         ] }
     });
 
