@@ -7,7 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root {
     --bg:        #0f1117;
@@ -709,16 +708,20 @@ body {
             <div id="growth-nqs" style="margin-top:8px;font-size:11px;color:var(--muted)">Loading...</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Operators Tracked</div>
-            <div class="stat-value">4,187</div>
-            <div class="stat-sub">758 hot+warm targets</div>
-            <div id="growth-fp" style="margin-top:8px;font-size:11px;color:var(--muted)">Loading...</div>
+            <div class="stat-label">New Approvals (30d)</div>
+            <div class="stat-value">25</div>
+            <div class="stat-sub">New LDC services approved</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Weekly Update</div>
-            <div class="stat-value" style="font-size:16px;">2026-04-16</div>
-            <div class="stat-sub">Next: Tuesday 10am</div>
-            <div id="growth-hist" style="margin-top:8px;font-size:11px;color:var(--muted)">Loading...</div>
+            <div class="stat-label">Regulatory Stress</div>
+            <div class="stat-value">8%</div>
+            <div class="stat-sub">767 working towards NQS</div>
+            <div id="growth-wtn" style="margin-top:8px;font-size:11px;color:var(--muted)">Loading...</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Formative Centres</div>
+            <div class="stat-value">8.8%</div>
+            <div class="stat-sub">853 approved in last 24 months</div>
         </div>
     </div>
 
@@ -761,8 +764,8 @@ body {
                 <canvas id="chart-states" height="120"></canvas>
             </div>
             <div>
-                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">For-Profit vs NFP (share of all services)</div>
-                <canvas id="chart-mgmt" height="120"></canvas>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">Top 10 Operators — Licensed Places</div>
+                <div id="chart-concentration" style="padding-top:4px"></div>
             </div>
             <div>
                 <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">For-Profit % Share</div>
@@ -1342,27 +1345,29 @@ function setStateFilter(state, el) {
     currentStateFilter = state;
     document.querySelectorAll('#state-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
     if (el) el.classList.add('active');
+
     applyFilters();
-    rebuildChartsForFilter();
-}
-
-// Maps ARIA key → histData series key
-const ARIA_SERIES = {
-    'major':       'major_cities',
-    'inner':       'inner_regional',
-    'outer':       'outer_regional',
-    'remote':      'remote',
-    'very_remote': 'very_remote',
-};
-
-function rebuildChartsForFilter() {
-    Object.values(chartInstances).forEach(c => c.destroy());
-    chartInstances = {};
-    buildTrendCharts();
+    updateStatCardsForState(state);
 }
 
 function updateStatCardsForState(state) {
-    // Kept for compatibility
+    if (!state) {
+        // Reset to national - already shown
+        return;
+    }
+    // Filter histData by state
+    const stateKey = state.toLowerCase();
+    const stateData = histData[stateKey];
+    if (!stateData) return;
+
+    // Could update charts here - for now just show note
+    const label = document.getElementById('state-filter-label');
+    if (label) {
+        const latest = stateData[stateData.length - 1] || 0;
+        const prev4  = stateData[stateData.length - 5] || 0;
+        const yoy    = prev4 ? (((latest - prev4) / prev4) * 100).toFixed(1) : 0;
+        label.textContent = state + ': ' + latest.toLocaleString() + ' services  (1Y: ' + (yoy > 0 ? '+' : '') + yoy + '%)';
+    }
 }
 
 
@@ -1399,11 +1404,11 @@ function setAriaFilter(aria, el) {
     currentAriaFilter = aria;
     document.querySelectorAll('#aria-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
     if (el) el.classList.add('active');
+    // Highlight selected ARIA card
     document.querySelectorAll('.aria-card').forEach(c => {
         c.style.opacity = (!aria || c.dataset.aria === aria) ? '1' : '0.3';
     });
     applyFilters();
-    rebuildChartsForFilter();
 }
 
 // ARIA label → key mapping for row data attributes
@@ -1522,7 +1527,7 @@ function buildStatGrowths() {
     const sEl = document.getElementById('growth-services');
     const pEl = document.getElementById('growth-places');
     const nEl = document.getElementById('growth-nqs');
-    const fEl = document.getElementById('growth-fp');
+    const wEl = document.getElementById('growth-wtn');
     const hEl = document.getElementById('growth-hist');
 
     if (sEl) sEl.innerHTML = growthLine(histData.services);
@@ -1535,20 +1540,19 @@ function buildStatGrowths() {
         });
         nEl.innerHTML = growthLine(excPct);
     }
-    if (fEl) {
-        const fpPct = histData.forprofit.map((fp, i) => {
-            const total = fp + (histData.nfp[i]||0);
-            return total ? +(fp/total*100).toFixed(1) : 0;
+    if (wEl) {
+        // Working Towards NQS % trend
+        const wtnPct = histData.working.map((w, i) => {
+            const total = w + (histData.meeting[i]||0) + (histData.exceeding[i]||0);
+            return total ? +(w/total*100).toFixed(1) : 0;
         });
-        fEl.innerHTML = 'For-profit share: ' + growthLine(fpPct);
+        wEl.innerHTML = growthLine(wtnPct);
     }
     if (hEl) hEl.innerHTML = histData.labels[0] + ' → ' + histData.labels[histData.labels.length-1] + '&nbsp;&nbsp;' + histData.labels.length + ' quarters';
 }
 
-// Initialise charts — Chart.js loaded synchronously in <head> so safe to call directly
-buildTrendCharts();
-buildStatGrowths();
-buildAriaCards();
+// Chart.js loaded statically in <head> — call initialisers directly
+// buildConcentrationChart called after operators.json fetch completes
 
 // ── HOT BUTTONS (from brief) ──
 const hotButtons = [];
@@ -1568,6 +1572,11 @@ function buildHotButtons() {
 }
 buildHotButtons();
 
+// Initialise charts
+buildTrendCharts();
+buildStatGrowths();
+buildAriaCards();
+
 // ── OPERATOR DATA ──
 let allOperators = [];
 fetch('operators.json')
@@ -1576,6 +1585,7 @@ fetch('operators.json')
         allOperators = data;
         renderOpList();
         document.getElementById('op-count').textContent = data.length.toLocaleString() + ' operators';
+        buildConcentrationChart();
     })
     .catch(e => {
         document.getElementById('op-count').textContent = 'Error loading operators — open locally or check network';
@@ -1795,25 +1805,6 @@ function buildTrendCharts() {
     const rawLabels = getSlicedData(histData.labels, n);
     const labels = rawLabels.map((l, i) => i % 4 === 0 ? l : '');
 
-    // Resolve active data series based on state/ARIA filter
-    const state = currentStateFilter ? currentStateFilter.toLowerCase() : '';
-    const aria  = currentAriaFilter;
-    const ariaSeriesKey = aria ? ARIA_SERIES[aria] : null;
-
-    // Primary services series: state → state series, ARIA → ARIA series, else national
-    let primaryServices = histData.services;
-    let primaryLabel    = 'LDC Services (National)';
-    let primaryColor    = '#3d7eff';
-    if (state && histData[state]) {
-        primaryServices = histData[state];
-        primaryLabel    = 'LDC Services (' + currentStateFilter + ')';
-        primaryColor    = '#3d7eff';
-    } else if (ariaSeriesKey && histData[ariaSeriesKey]) {
-        primaryServices = histData[ariaSeriesKey];
-        primaryLabel    = 'LDC Services (' + ARIA_KEYS[aria] + ')';
-        primaryColor    = '#00c9a7';
-    }
-
     // Key sector events for annotation
     const sectorEvents = [
         { quarter: 'Q3 2013', label: 'NQF Launch', color: 'rgba(61,126,255,0.6)' },
@@ -1957,15 +1948,15 @@ function buildTrendCharts() {
                   fill: !!fill, tension: 0.3, pointRadius: 0, borderWidth: 2 };
     }
 
-    // 1. Services — uses filtered primary series
-    buildGrowthStat('stat-services-growth', getSlicedData(primaryServices, n), ' services');
+    // 1. Services
+    buildGrowthStat('stat-services-growth', getSlicedData(histData.services, n), ' services');
     chartInstances['services'] = new Chart(document.getElementById('chart-services'), {
         type: 'line', options: chartOpts,
         plugins: [eventAnnotationPlugin],
-        data: { labels, datasets: [makeDataset(primaryLabel, primaryServices, primaryColor, 'rgba(61,126,255,0.1)')] }
+        data: { labels, datasets: [makeDataset('LDC Services', histData.services, '#3d7eff', 'rgba(61,126,255,0.1)')] }
     });
 
-    // 2. Places — national only (no per-state places history available)
+    // 2. Places
     buildGrowthStat('stat-places-growth', getSlicedData(histData.places, n), ' places');
     chartInstances['places'] = new Chart(document.getElementById('chart-places'), {
         type: 'line', options: chartOpts,
@@ -1984,36 +1975,20 @@ function buildTrendCharts() {
         ] }
     });
 
-    // 4. State growth — highlight selected state if filtered
-    const stateColors = { nsw:'#3d7eff', vic:'#00c9a7', qld:'#d4890a', wa:'#e05c3a', sa:'#9b59b6' };
-    function stateDataset(label, key, color) {
-        const dimmed = state && state !== key;
-        return { label, data: getSlicedData(histData[key], n), borderColor: dimmed ? color + '33' : color,
-                  backgroundColor: 'transparent', fill: false, tension: 0.3,
-                  pointRadius: 0, borderWidth: dimmed ? 1 : (state === key ? 3 : 2) };
-    }
+    // 4. State growth
     chartInstances['states'] = new Chart(document.getElementById('chart-states'), {
         type: 'line', options: chartOpts,
         plugins: [eventAnnotationPlugin],
         data: { labels, datasets: [
-            stateDataset('NSW', 'nsw', '#3d7eff'),
-            stateDataset('VIC', 'vic', '#00c9a7'),
-            stateDataset('QLD', 'qld', '#d4890a'),
-            stateDataset('WA',  'wa',  '#e05c3a'),
-            stateDataset('SA',  'sa',  '#9b59b6'),
+            makeDataset('NSW', histData.nsw, '#3d7eff'),
+            makeDataset('VIC', histData.vic, '#00c9a7'),
+            makeDataset('QLD', histData.qld, '#d4890a'),
+            makeDataset('WA',  histData.wa,  '#e05c3a'),
+            makeDataset('SA',  histData.sa,  '#9b59b6'),
         ] }
     });
 
-    // 5. For-profit vs NFP absolute
-    chartInstances['mgmt'] = new Chart(document.getElementById('chart-mgmt'), {
-        type: 'line', options: chartOpts,
-        data: { labels, datasets: [
-            makeDataset('For-Profit', histData.forprofit, '#3d7eff'),
-            makeDataset('NFP',        histData.nfp,       '#8890a8'),
-        ] }
-    });
-
-    // 6. For-profit % share
+    // 5. For-profit % share
     const fpPct = histData.forprofit.map((fp, i) => {
         const total = fp + (histData.nfp[i] || 0);
         return total ? +(fp / total * 100).toFixed(1) : 0;
@@ -2030,6 +2005,36 @@ function buildTrendCharts() {
         type: 'line', options: fpOpts,
         data: { labels, datasets: [makeDataset('For-Profit %', fpPct, '#3d7eff', 'rgba(61,126,255,0.08)')] }
     });
+}
+
+function buildConcentrationChart() {
+    if (!allOperators || allOperators.length === 0) return;
+    const el = document.getElementById('chart-concentration');
+    if (!el) return;
+
+    // Get top 10 by total_places (or n_centres * 80 as proxy)
+    const sorted = [...allOperators]
+        .filter(o => o.n_centres > 0)
+        .sort((a, b) => (b.total_places || b.n_centres * 80) - (a.total_places || a.n_centres * 80))
+        .slice(0, 10);
+
+    const totalPlaces = 736334;
+    const maxVal = sorted[0] ? (sorted[0].total_places || sorted[0].n_centres * 80) : 1;
+
+    el.innerHTML = sorted.map(op => {
+        const places = op.total_places || op.n_centres * 80;
+        const pct = totalPlaces ? (places / totalPlaces * 100).toFixed(1) : 0;
+        const barPct = Math.round(places / maxVal * 100);
+        const name = op.legal_name.length > 30 ? op.legal_name.slice(0,28) + '…' : op.legal_name;
+        return `
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px">
+            <div style="width:160px;font-size:11px;color:var(--muted);flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div>
+            <div style="flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden">
+                <div style="width:${barPct}%;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:4px"></div>
+            </div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--muted);width:44px;text-align:right">${pct}%</div>
+        </div>`;
+    }).join('');
 }
 
 // Catchment placeholder
