@@ -1456,16 +1456,6 @@ function setAriaFilter(aria, el) {
     applyFilters();
 }
 
-// ARIA label → key mapping for row data attributes
-const ARIA_KEYS = {
-    'major':      'Major Cities of Australia',
-    'inner':      'Inner Regional Australia',
-    'outer':      'Outer Regional Australia',
-    'remote':     'Remote Australia',
-    'very_remote':'Very Remote Australia',
-};
-
-
 function buildAriaCards() {
     if (!histData || !histData.major_cities) return;
     const el = document.getElementById('aria-breakdown-cards');
