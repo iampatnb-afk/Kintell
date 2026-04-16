@@ -372,11 +372,13 @@ def generate():
         "qld":        [h.get("by_state", {}).get("QLD", 0) for h in hist_data],
         "wa":         [h.get("by_state", {}).get("WA", 0) for h in hist_data],
         "sa":         [h.get("by_state", {}).get("SA", 0) for h in hist_data],
-        "major_cities":   [h.get("by_aria", {}).get("Major Cities of Australia", 0) for h in hist_data],
-        "inner_regional": [h.get("by_aria", {}).get("Inner Regional Australia", 0) for h in hist_data],
-        "outer_regional": [h.get("by_aria", {}).get("Outer Regional Australia", 0) for h in hist_data],
-        "remote":         [h.get("by_aria", {}).get("Remote Australia", 0) for h in hist_data],
-        "very_remote":    [h.get("by_aria", {}).get("Very Remote Australia", 0) for h in hist_data],
+        "major_cities":   [(h.get("by_aria") or {}).get("Major Cities of Australia") for h in hist_data],
+        "inner_regional": [(h.get("by_aria") or {}).get("Inner Regional Australia") for h in hist_data],
+        "outer_regional": [(h.get("by_aria") or {}).get("Outer Regional Australia") for h in hist_data],
+        "remote":         [(h.get("by_aria") or {}).get("Remote Australia") for h in hist_data],
+        "very_remote":    [(h.get("by_aria") or {}).get("Very Remote Australia") for h in hist_data],
+        "supply_demand":  [h.get("supply_demand_ratio") for h in hist_data],
+        "new_approvals":  [h.get("new_approvals") for h in hist_data],
     }
     op_cards    = build_operator_cards(operators, property_d)
     news_html   = build_news_html(brief)
@@ -1191,6 +1193,16 @@ body {{
                 <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">For-Profit % Share</div>
                 <div id="stat-fp-growth" style="font-size:11px;color:var(--accent2);margin-bottom:8px"></div>
                 <canvas id="chart-fp-pct" height="120"></canvas>
+            </div>
+            <div>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">Supply/Demand Ratio — Licensed Places per 100 Children Under 5</div>
+                <div id="stat-supply-demand" style="font-size:11px;color:var(--accent2);margin-bottom:8px"></div>
+                <canvas id="chart-supply-demand" height="120"></canvas>
+            </div>
+            <div>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">New Service Approvals per Quarter <span style="color:var(--muted);font-size:10px">(4-quarter rolling sum)</span></div>
+                <div id="stat-new-approvals" style="font-size:11px;color:var(--accent2);margin-bottom:8px"></div>
+                <canvas id="chart-new-approvals" height="120"></canvas>
             </div>
         </div>
     </div>
@@ -2045,6 +2057,53 @@ function buildTrendCharts() {{
     chartInstances['fp-pct'] = new Chart(document.getElementById('chart-fp-pct'), {{
         type: 'line', options: fpOpts,
         data: {{ labels, datasets: [makeDataset('For-Profit %', fpPct, '#3d7eff', 'rgba(61,126,255,0.08)')] }}
+    }});
+
+    // 6. Supply/Demand ratio — licensed places per 100 children under 5
+    // Trim to first non-null index so empty pre-2019 period doesn't dominate the x-axis
+    const sdAllData = histData.supply_demand;
+    const sdStartIdx = sdAllData.findIndex(v => v !== null);
+    const sdLabels = sdStartIdx >= 0 ? labels.slice(sdStartIdx) : labels;
+    const sdSliced = sdStartIdx >= 0 ? sdAllData.slice(sdStartIdx) : sdAllData;
+    const sdLast = sdSliced.filter(v => v !== null).slice(-1)[0];
+    const sdFirst = sdSliced.filter(v => v !== null)[0];
+    const sdEl = document.getElementById('stat-supply-demand');
+    if (sdEl && sdLast != null) {{
+        const sdChange = sdFirst != null ? ' (+' + (sdLast - sdFirst).toFixed(1) + ' over period)' : '';
+        sdEl.textContent = sdLast.toFixed(1) + ' places per 100 children under 5' + sdChange;
+    }}
+    const sdOpts = JSON.parse(JSON.stringify(chartOpts));
+    chartInstances['supply-demand'] = new Chart(document.getElementById('chart-supply-demand'), {{
+        type: 'line', options: sdOpts,
+        plugins: [eventAnnotationPlugin],
+        data: {{ labels: sdLabels, datasets: [makeDataset('Places per 100 Under-5', sdSliced, '#9b59b6', 'rgba(155,89,182,0.08)')] }}
+    }});
+
+    // 7. New approvals per quarter — shown as 4-quarter rolling sum to smooth lumpiness
+    // Trim to first non-null index so empty gap period doesn't dominate the x-axis
+    const apprAllRaw = histData.new_approvals;
+    const apprStartIdx = apprAllRaw.findIndex(v => v !== null);
+    const apprLabels = apprStartIdx >= 0 ? labels.slice(apprStartIdx) : labels;
+    const apprRawSliced = apprStartIdx >= 0 ? apprAllRaw.slice(apprStartIdx) : apprAllRaw;
+    const rolling4 = apprRawSliced.map((v, i, arr) => {{
+        const win = arr.slice(Math.max(0, i - 3), i + 1).filter(x => x !== null);
+        return win.length === 4 ? win.reduce((a, b) => a + b, 0) : null;
+    }});
+    const apprLast = rolling4.filter(v => v !== null).slice(-1)[0];
+    const apprEl = document.getElementById('stat-new-approvals');
+    if (apprEl && apprLast != null) {{
+        apprEl.textContent = apprLast + ' new approvals (trailing 4-quarter sum)';
+    }}
+    const apprOpts = JSON.parse(JSON.stringify(chartOpts));
+    chartInstances['new-approvals'] = new Chart(document.getElementById('chart-new-approvals'), {{
+        type: 'line', options: apprOpts,
+        plugins: [eventAnnotationPlugin],
+        data: {{ labels: apprLabels, datasets: [
+            makeDataset('Rolling 4-Qtr Approvals', rolling4, '#e05c3a', 'rgba(224,92,58,0.08)'),
+            {{ label: 'Quarterly Approvals', data: apprRawSliced, borderColor: 'rgba(224,92,58,0.3)',
+               backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 0,
+               borderWidth: 1, borderDash: [4, 3] }},
+        ] }}
     }});
 }}
 
