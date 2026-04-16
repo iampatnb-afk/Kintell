@@ -341,8 +341,8 @@ def generate():
     approvals   = get_recent_approvals(snap, 30)
     state_stats = build_state_stats_js(stats)
 
-    # Compute formative centres — approved within last 24 months
-    cutoff_24m = datetime.now() - timedelta(days=730)
+    # Compute formative centres — approved within last 18 months
+    cutoff_24m = datetime.now() - timedelta(days=548)
     cutoff_30d = datetime.now() - timedelta(days=30)
     formative_count = sum(
         1 for row in snap
@@ -1141,7 +1141,7 @@ body {{
         <div class="stat-card">
             <div class="stat-label">Formative Centres</div>
             <div class="stat-value">{formative_pct}%</div>
-            <div class="stat-sub">{formative_count:,} approved in last 24 months</div>
+            <div class="stat-sub">{formative_count:,} approved in last 18 months</div>
         </div>
     </div>
 
@@ -1353,29 +1353,12 @@ function setStateFilter(state, el) {{
     currentStateFilter = state;
     document.querySelectorAll('#state-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
     if (el) el.classList.add('active');
-
     applyFilters();
-    updateStatCardsForState(state);
+    rebuildChartsForFilter();
 }}
 
 function updateStatCardsForState(state) {{
-    if (!state) {{
-        // Reset to national - already shown
-        return;
-    }}
-    // Filter histData by state
-    const stateKey = state.toLowerCase();
-    const stateData = histData[stateKey];
-    if (!stateData) return;
-
-    // Could update charts here - for now just show note
-    const label = document.getElementById('state-filter-label');
-    if (label) {{
-        const latest = stateData[stateData.length - 1] || 0;
-        const prev4  = stateData[stateData.length - 5] || 0;
-        const yoy    = prev4 ? (((latest - prev4) / prev4) * 100).toFixed(1) : 0;
-        label.textContent = state + ': ' + latest.toLocaleString() + ' services  (1Y: ' + (yoy > 0 ? '+' : '') + yoy + '%)';
-    }}
+    // Kept for compatibility
 }}
 
 
@@ -1406,17 +1389,32 @@ function buildStateChart() {{
 buildStateChart();
 
 // Populate stat card growth rates from history
-let currentAriaFilter = '';
+var currentAriaFilter = '';
+
+// Maps ARIA key → histData series key
+var ARIA_SERIES = {{
+    'major':       'major_cities',
+    'inner':       'inner_regional',
+    'outer':       'outer_regional',
+    'remote':      'remote',
+    'very_remote': 'very_remote',
+}};
+
+function rebuildChartsForFilter() {{
+    Object.values(chartInstances).forEach(c => c.destroy());
+    chartInstances = {{}};
+    buildTrendCharts();
+}}
 
 function setAriaFilter(aria, el) {{
     currentAriaFilter = aria;
     document.querySelectorAll('#aria-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
     if (el) el.classList.add('active');
-    // Highlight selected ARIA card
     document.querySelectorAll('.aria-card').forEach(c => {{
         c.style.opacity = (!aria || c.dataset.aria === aria) ? '1' : '0.3';
     }});
     applyFilters();
+    rebuildChartsForFilter();
 }}
 
 // ARIA label → key mapping for row data attributes
