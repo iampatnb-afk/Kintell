@@ -1537,8 +1537,10 @@ function buildStatGrowths() {{
     if (hEl) hEl.innerHTML = histData.labels[0] + ' → ' + histData.labels[histData.labels.length-1] + '&nbsp;&nbsp;' + histData.labels.length + ' quarters';
 }}
 
-// Chart.js loaded statically in <head>
-window.addEventListener('load', function() {{ buildTrendCharts(); buildStatGrowths(); buildAriaCards(); }});
+// Initialise charts — Chart.js loaded synchronously in <head> so safe to call directly
+buildTrendCharts();
+buildStatGrowths();
+buildAriaCards();
 
 // ── HOT BUTTONS (from brief) ──
 const hotButtons = {json.dumps(brief.get('hot_buttons', []))};
