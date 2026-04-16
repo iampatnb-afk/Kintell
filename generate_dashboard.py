@@ -1579,6 +1579,12 @@ function buildHotButtons() {{
 }}
 buildHotButtons();
 
+// Chart state variables — must be declared before buildTrendCharts() is called
+var chartInstances = {{}};
+var currentRange = 0;
+var compareWindow = 1;
+var compareLabel = 'QoQ';
+
 // Initialise charts
 buildTrendCharts();
 buildStatGrowths();
@@ -1766,16 +1772,11 @@ function jumpToOperator(name) {{
 }}
 
 // CHART.JS TREND CHARTS
-let chartInstances = {{}};
-let currentRange = 0; // 0 = all
 
 function getSlicedData(arr, n) {{
     if (!n || n === 0) return arr;
     return arr.slice(-n);
 }}
-
-let compareWindow = 1; // 1=QoQ, 2=HoH, 4=YoY
-let compareLabel = 'QoQ';
 
 function setCompare(n, label, el) {{
     compareWindow = n;
