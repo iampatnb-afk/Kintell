@@ -1203,6 +1203,9 @@ body {{
                 <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">New Service Approvals per Quarter <span style="color:var(--muted);font-size:10px">(4-quarter rolling sum)</span></div>
                 <div id="stat-new-approvals" style="font-size:11px;color:var(--accent2);margin-bottom:8px"></div>
                 <canvas id="chart-new-approvals" height="120"></canvas>
+                <div style="margin-top:10px;padding:10px 12px;background:var(--surface2);border-left:3px solid var(--warm);border-radius:0 6px 6px 0;font-size:11px;color:var(--muted);line-height:1.6">
+                    <span style="color:var(--warm);font-weight:600">Seasonal pattern:</span> Q1 (Jan–Mar) approvals average 101/quarter vs 77 for Q2–Q4 — a structural 30% premium. Operators target Q1 openings to capture the new-year enrolment wave, making Q1 the lowest-risk quarter to begin ramp-up. A Q1 undershoot is an early pipeline slowdown signal; a Q2–Q4 spike (as seen post-CCS Reform 2023–24) indicates operators accelerating despite the seasonal headwind.
+                </div>
             </div>
         </div>
     </div>
