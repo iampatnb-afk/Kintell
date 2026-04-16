@@ -1,0 +1,2027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="expires" content="0" />
+<meta http-equiv="pragma" content="no-cache" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kintell — ECEC Market Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg:        #0f1117;
+    --surface:   #181c26;
+    --surface2:  #1e2333;
+    --border:    #2a2f3f;
+    --text:      #e8eaf0;
+    --muted:     #8890a8;
+    --accent:    #3d7eff;
+    --accent2:   #00c9a7;
+    --hot:       #e05c3a;
+    --warm:      #d4890a;
+    --watch:     #5a6480;
+    --fgc:       #9b59b6;
+    --radius:    10px;
+    --font:      'DM Sans', sans-serif;
+    --mono:      'DM Mono', monospace;
+    --display:   'Playfair Display', serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+/* ── HEADER ── */
+.header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.logo {
+    font-family: var(--display);
+    font-size: 22px;
+    color: var(--text);
+    letter-spacing: -0.5px;
+}
+
+.logo span { color: var(--accent); }
+
+.header-meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+}
+
+/* ── TABS ── */
+.tabs {
+    display: flex;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    gap: 0;
+}
+
+.tab {
+    padding: 14px 24px;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.tab:hover { color: var(--text); }
+.tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+/* ── PANELS ── */
+.panel { display: none; padding: 32px; max-width: 1400px; margin: 0 auto; }
+.panel.active { display: block; }
+
+/* ── STAT CARDS ── */
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+}
+
+.stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+}
+
+.stat-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 8px;
+}
+
+.stat-value {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1;
+}
+
+.stat-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+}
+
+/* ── SECTION HEADERS ── */
+.section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.section-title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+/* ── TWO COLUMN ── */
+.two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+@media (max-width: 900px) {
+    .two-col { grid-template-columns: 1fr; }
+}
+
+/* ── NQS BARS ── */
+.nqs-bar-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.nqs-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.nqs-label {
+    width: 180px;
+    font-size: 12px;
+    color: var(--muted);
+    flex-shrink: 0;
+}
+
+.nqs-bar-bg {
+    flex: 1;
+    height: 8px;
+    background: var(--surface2);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.nqs-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.8s ease;
+}
+
+.nqs-count {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    width: 50px;
+    text-align: right;
+}
+
+/* ── STATE CHART ── */
+.state-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.state-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.state-label {
+    width: 40px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.state-bar-bg {
+    flex: 1;
+    height: 10px;
+    background: var(--surface2);
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.state-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 5px;
+}
+
+.state-count {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    width: 60px;
+    text-align: right;
+}
+
+/* ── TOP OPERATORS TABLE ── */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.data-table th {
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    font-weight: 500;
+}
+
+.data-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+}
+
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: var(--surface2); cursor: pointer; }
+
+.rank {
+    font-family: var(--mono);
+    color: var(--muted);
+    width: 30px;
+}
+
+.op-name { font-weight: 500; }
+.text-center { text-align: center; }
+
+/* ── TIER BADGES ── */
+.tier-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+}
+
+.tier-hot   { background: rgba(224,92,58,0.15); color: var(--hot); }
+.tier-warm  { background: rgba(212,137,10,0.15); color: var(--warm); }
+.tier-watch { background: rgba(90,100,128,0.15); color: var(--watch); }
+.tier-nfp   { background: rgba(155,89,182,0.1);  color: #c39bd3; }
+
+.fgc-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    background: rgba(155,89,182,0.15);
+    color: var(--fgc);
+    margin-left: 6px;
+}
+
+/* ── APPROVALS TABLE ── */
+.approvals-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.approvals-table th {
+    text-align: left;
+    padding: 8px 10px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+}
+
+.approvals-table td {
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+.approval-row:hover td {
+    background: var(--surface2);
+    cursor: pointer;
+}
+
+.approval-centre { font-weight: 500; color: var(--text); }
+
+/* ── NEWS ── */
+.news-section { margin-bottom: 24px; }
+
+.news-section-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.news-item {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.news-item:last-child { border-bottom: none; }
+
+.news-title {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    text-decoration: none;
+    margin-bottom: 6px;
+    line-height: 1.4;
+}
+
+.news-title:hover { color: var(--accent); }
+
+.news-summary {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+.news-meta {
+    font-size: 11px;
+    color: var(--watch);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.news-tag {
+    background: var(--surface2);
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    color: var(--accent2);
+}
+
+/* ── PANEL 2 — OPERATOR SEARCH ── */
+.search-bar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.search-input {
+    flex: 1;
+    min-width: 200px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.search-input:focus { border-color: var(--accent); }
+.search-input::placeholder { color: var(--muted); }
+
+.filter-select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+}
+
+.filter-select:focus { border-color: var(--accent); }
+
+/* ── OPERATOR LIST ── */
+.op-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.op-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.op-row:hover { border-color: var(--accent); background: var(--surface2); }
+.op-row.expanded { border-color: var(--accent); background: var(--surface2); border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+
+.op-row-name {
+    flex: 1;
+    font-weight: 500;
+    font-size: 13px;
+}
+
+.op-row-meta {
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.op-detail {
+    display: none;
+    background: var(--surface2);
+    border: 1px solid var(--accent);
+    border-top: none;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+    padding: 20px;
+    margin-bottom: 2px;
+}
+
+.op-detail.visible { display: block; }
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.detail-block {
+    background: var(--surface);
+    border-radius: 6px;
+    padding: 12px;
+}
+
+.detail-block-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 6px;
+}
+
+.detail-block-value {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.propco-list {
+    margin-top: 12px;
+}
+
+.propco-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+}
+
+.propco-item:last-child { border-bottom: none; }
+
+.centres-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.centre-card {
+    background: var(--surface);
+    border-radius: 6px;
+    padding: 12px;
+    font-size: 12px;
+}
+
+.centre-name {
+    font-weight: 500;
+    margin-bottom: 4px;
+    font-size: 13px;
+}
+
+.centre-meta {
+    color: var(--muted);
+    margin-bottom: 8px;
+}
+
+.centre-links {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.centre-link {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--surface2);
+    color: var(--accent);
+    text-decoration: none;
+    border: 1px solid var(--border);
+}
+
+.centre-link:hover { border-color: var(--accent); }
+
+.result-count {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    font-family: var(--mono);
+}
+
+/* ── LOADING STATE ── */
+.loading {
+    text-align: center;
+    padding: 60px;
+    color: var(--muted);
+}
+
+/* ── HOT BUTTONS ── */
+.hot-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.hot-button {
+    background: linear-gradient(135deg, var(--surface) 0%, rgba(61,126,255,0.05) 100%);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent2);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+}
+
+.hot-button-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent2);
+    margin-bottom: 6px;
+}
+
+.hot-button-text {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.5;
+}
+
+.hot-button-conf {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+    font-family: var(--mono);
+}
+
+/* ── TIME RANGE BUTTONS ── */
+.range-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 4px 12px;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.range-btn:hover { color: var(--text); border-color: var(--accent); }
+.range-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<header class="header">
+    <div class="logo">Kint<span>ell</span></div>
+    <div class="header-meta">ECEC Market Intelligence &bull; Updated 2026-04-15 &bull; 18,223 services tracked</div>
+</header>
+
+<nav class="tabs">
+    <div class="tab active" onclick="showPanel('industry')">Industry Snapshot</div>
+    <div class="tab" onclick="showPanel('operators')">Operator Intelligence</div>
+    <div class="tab" onclick="showPanel('catchment')">Catchment Explorer</div>
+</nav>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- PANEL 1 — INDUSTRY SNAPSHOT                -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="panel active" id="panel-industry">
+
+    <!-- UNIFIED FILTER BAR -->
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:20px">
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:10px">
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);width:64px;flex-shrink:0">State</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap" id="state-filter-btns">
+                <button class="range-btn active" onclick="setStateFilter('',this)">National</button>
+                <button class="range-btn" onclick="setStateFilter('NSW',this)">NSW</button>
+                <button class="range-btn" onclick="setStateFilter('VIC',this)">VIC</button>
+                <button class="range-btn" onclick="setStateFilter('QLD',this)">QLD</button>
+                <button class="range-btn" onclick="setStateFilter('WA',this)">WA</button>
+                <button class="range-btn" onclick="setStateFilter('SA',this)">SA</button>
+                <button class="range-btn" onclick="setStateFilter('TAS',this)">TAS</button>
+                <button class="range-btn" onclick="setStateFilter('ACT',this)">ACT</button>
+                <button class="range-btn" onclick="setStateFilter('NT',this)">NT</button>
+            </div>
+            <div id="state-filter-label" style="font-size:12px;color:var(--accent2);margin-left:4px;white-space:nowrap"></div>
+        </div>
+        <div style="height:1px;background:var(--border);margin-bottom:10px"></div>
+        <div style="display:flex;align-items:center;gap:16px">
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);width:64px;flex-shrink:0">Location</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap" id="aria-filter-btns">
+                <button class="range-btn active" onclick="setAriaFilter('',this)">All</button>
+                <button class="range-btn" onclick="setAriaFilter('major',this)">Major Cities</button>
+                <button class="range-btn" onclick="setAriaFilter('inner',this)">Inner Regional</button>
+                <button class="range-btn" onclick="setAriaFilter('outer',this)">Outer Regional</button>
+                <button class="range-btn" onclick="setAriaFilter('remote',this)">Remote</button>
+                <button class="range-btn" onclick="setAriaFilter('very_remote',this)">Very Remote</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="stat-grid">
+        <div class="stat-card">
+            <div class="stat-label">LDC Services</div>
+            <div class="stat-value">9,693</div>
+            <div class="stat-sub">Active nationally</div>
+            <div id="growth-services" style="margin-top:8px;font-size:11px;color:var(--muted)">Loading...</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Licensed Places</div>
+            <div class="stat-value">736,334</div>
+            <div class="stat-sub">Total capacity</div>
+            <div id="growth-places" style="margin-top:8px;font-size:11px;color:var(--muted)">Loading...</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Exceeding NQS</div>
+            <div class="stat-value">15%</div>
+            <div class="stat-sub">1,479 services</div>
+            <div id="growth-nqs" style="margin-top:8px;font-size:11px;color:var(--muted)">Loading...</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Operators Tracked</div>
+            <div class="stat-value">4,187</div>
+            <div class="stat-sub">758 hot+warm targets</div>
+            <div id="growth-fp" style="margin-top:8px;font-size:11px;color:var(--muted)">Loading...</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Weekly Update</div>
+            <div class="stat-value" style="font-size:16px;">2026-04-15</div>
+            <div class="stat-sub">Next: Tuesday 10am</div>
+            <div id="growth-hist" style="margin-top:8px;font-size:11px;color:var(--muted)">Loading...</div>
+        </div>
+    </div>
+
+    <!-- TREND CHARTS -->
+    <div class="section" style="margin-bottom:24px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+            <div class="section-title" style="margin-bottom:0">Sector Growth — Q3 2013 to Q4 2025</div>
+            <div style="display:flex;gap:12px;align-items:center">
+                <div style="display:flex;gap:6px" id="time-range-btns">
+                    <button class="range-btn" onclick="setRange(4,this)">1Y</button>
+                    <button class="range-btn" onclick="setRange(8,this)">2Y</button>
+                    <button class="range-btn" onclick="setRange(20,this)">5Y</button>
+                    <button class="range-btn active" onclick="setRange(0,this)">All</button>
+                </div>
+                <div style="width:1px;height:20px;background:var(--border)"></div>
+                <div style="display:flex;gap:6px" id="compare-btns">
+                    <button class="range-btn active" onclick="setCompare(1,'QoQ',this)">QoQ</button>
+                    <button class="range-btn" onclick="setCompare(2,'HoH',this)">HoH</button>
+                    <button class="range-btn" onclick="setCompare(4,'YoY',this)">YoY</button>
+                </div>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+            <div>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">Total LDC Services</div>
+                <div id="stat-services-growth" style="font-size:11px;color:var(--accent2);margin-bottom:8px"></div>
+                <canvas id="chart-services" height="120"></canvas>
+            </div>
+            <div>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">Licensed Places</div>
+                <div id="stat-places-growth" style="font-size:11px;color:var(--accent2);margin-bottom:8px"></div>
+                <canvas id="chart-places" height="120"></canvas>
+            </div>
+            <div>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">NQS Rating Trends</div>
+                <canvas id="chart-nqs" height="120"></canvas>
+            </div>
+            <div>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">State Growth (LDC Services)</div>
+                <canvas id="chart-states" height="120"></canvas>
+            </div>
+            <div>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">For-Profit vs NFP (share of all services)</div>
+                <canvas id="chart-mgmt" height="120"></canvas>
+            </div>
+            <div>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">For-Profit % Share</div>
+                <div id="stat-fp-growth" style="font-size:11px;color:var(--accent2);margin-bottom:8px"></div>
+                <canvas id="chart-fp-pct" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="two-col">
+        <div class="section">
+            <div class="section-title">Services by State</div>
+            <div class="state-chart" id="state-chart"></div>
+        </div>
+        <div class="section">
+            <div class="section-title">NQS Rating Distribution</div>
+            <div class="nqs-bar-wrap">
+                <div class="nqs-row">
+                    <div class="nqs-label">Exceeding NQS</div>
+                    <div class="nqs-bar-bg"><div class="nqs-bar-fill" style="width:15%;background:#00c9a7;"></div></div>
+                    <div class="nqs-count">1,479</div>
+                </div>
+                <div class="nqs-row">
+                    <div class="nqs-label">Meeting NQS</div>
+                    <div class="nqs-bar-bg"><div class="nqs-bar-fill" style="width:70%;background:#3d7eff;"></div></div>
+                    <div class="nqs-count">6,791</div>
+                </div>
+                <div class="nqs-row">
+                    <div class="nqs-label">Working Towards</div>
+                    <div class="nqs-bar-bg"><div class="nqs-bar-fill" style="width:8%;background:#d4890a;"></div></div>
+                    <div class="nqs-count">767</div>
+                </div>
+                <div class="nqs-row">
+                    <div class="nqs-label">Sig. Improvement Req.</div>
+                    <div class="nqs-bar-bg"><div class="nqs-bar-fill" style="width:0%;background:#e05c3a;"></div></div>
+                    <div class="nqs-count">8</div>
+                </div>
+                <div class="nqs-row">
+                    <div class="nqs-label">Not Yet Rated</div>
+                    <div class="nqs-bar-bg"><div class="nqs-bar-fill" style="width:7%;background:#5a6480;"></div></div>
+                    <div class="nqs-count">648</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- METRO / REGIONAL BREAKDOWN -->
+    <div class="section" style="margin-bottom:24px">
+        <div style="margin-bottom:16px">
+            <div class="section-title" style="margin-bottom:0">Metro vs Regional Breakdown</div>
+        </div>
+        <div id="aria-breakdown-cards" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px">
+        </div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.8;padding:12px;background:var(--surface2);border-radius:6px">
+            <strong style="color:var(--text)">ARIA+ Remoteness definitions:</strong>&nbsp;&nbsp;
+            <strong style="color:#3d7eff">Major Cities</strong> — pop. centres &ge;100,000 &bull;
+            <strong style="color:#00c9a7">Inner Regional</strong> — reasonably accessible, pop. 1,000&ndash;99,999 &bull;
+            <strong style="color:#d4890a">Outer Regional</strong> — limited accessibility &bull;
+            <strong style="color:#e05c3a">Remote</strong> — very limited service access &bull;
+            <strong style="color:#9b59b6">Very Remote</strong> — extremely isolated communities
+        </div>
+    </div>
+
+    <div class="two-col">
+        <div class="section">
+            <div class="section-title">Top 20 For-Profit Operators (non-listed)</div>
+            <table class="data-table" id="top20-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Operator</th>
+                        <th class="text-center">Centres</th>
+                        <th>States</th>
+                        <th class="text-center">Tier</th>
+                        <th class="text-center">Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+        <tr onclick="jumpToOperator('GREEN LEAVES (WA14) EARLY LEARNING CENTRES PT')" data-states="NSW,QLD,SA,TAS,VIC,WA" style='cursor:pointer'>
+            <td class='rank'>1</td>
+            <td class='op-name'>GREEN LEAVES (WA14) EARLY LEARNING CENTRES PT</td>
+            <td class='text-center'>71</td>
+            <td>NSW, QLD, SA, TAS, VIC, WA</td>
+            <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
+            <td class='text-center'>63</td>
+        </tr>
+        <tr onclick="jumpToOperator('NEST EARLY EDUCATION SERVICES PTY LTD')" data-states="ACT,NSW,SA,VIC,WA" style='cursor:pointer'>
+            <td class='rank'>2</td>
+            <td class='op-name'>NEST EARLY EDUCATION SERVICES PTY LTD</td>
+            <td class='text-center'>75</td>
+            <td>ACT, NSW, SA, VIC, WA</td>
+            <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
+            <td class='text-center'>63</td>
+        </tr>
+        <tr onclick="jumpToOperator('FEL Child Care Centres 1 Pty Ltd')" data-states="ACT,NSW,QLD,VIC,WA" style='cursor:pointer'>
+            <td class='rank'>3</td>
+            <td class='op-name'>FEL Child Care Centres 1 Pty Ltd</td>
+            <td class='text-center'>56</td>
+            <td>ACT, NSW, QLD, VIC, WA</td>
+            <td class='text-center'><span class='tier-badge tier-warm'>WARM</span></td>
+            <td class='text-center'>56</td>
+        </tr>
+        <tr onclick="jumpToOperator('Journey ELC Pty Ltd')" data-states="NT,QLD,VIC" style='cursor:pointer'>
+            <td class='rank'>4</td>
+            <td class='op-name'>Journey ELC Pty Ltd</td>
+            <td class='text-center'>43</td>
+            <td>NT, QLD, VIC</td>
+            <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
+            <td class='text-center'>63</td>
+        </tr>
+        <tr onclick="jumpToOperator('LZ PTY LTD')" data-states="NSW,QLD,SA" style='cursor:pointer'>
+            <td class='rank'>5</td>
+            <td class='op-name'>LZ PTY LTD</td>
+            <td class='text-center'>39</td>
+            <td>NSW, QLD, SA</td>
+            <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
+            <td class='text-center'>63</td>
+        </tr>
+        <tr onclick="jumpToOperator('Kazcorp Holdings Pty Ltd')" data-states="NSW" style='cursor:pointer'>
+            <td class='rank'>6</td>
+            <td class='op-name'>Kazcorp Holdings Pty Ltd</td>
+            <td class='text-center'>45</td>
+            <td>NSW</td>
+            <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
+            <td class='text-center'>75</td>
+        </tr>
+        <tr onclick="jumpToOperator('Evolve Early Education Pty Ltd')" data-states="NSW,QLD,SA,TAS,VIC" style='cursor:pointer'>
+            <td class='rank'>7</td>
+            <td class='op-name'>Evolve Early Education Pty Ltd</td>
+            <td class='text-center'>33</td>
+            <td>NSW, QLD, SA, TAS, VIC</td>
+            <td class='text-center'><span class='tier-badge tier-warm'>WARM</span></td>
+            <td class='text-center'>51</td>
+        </tr>
+        <tr onclick="jumpToOperator('nan')" data-states="ACT,NSW,QLD,VIC,WA" style='cursor:pointer'>
+            <td class='rank'>8</td>
+            <td class='op-name'>nan</td>
+            <td class='text-center'>66</td>
+            <td>ACT, NSW, QLD, VIC, WA</td>
+            <td class='text-center'><span class='tier-badge tier-warm'>WARM</span></td>
+            <td class='text-center'>55</td>
+        </tr>
+        <tr onclick="jumpToOperator('Stepping Stone (S.A.) Childcare & Early Devel')" data-states="SA" style='cursor:pointer'>
+            <td class='rank'>9</td>
+            <td class='op-name'>Stepping Stone (S.A.) Childcare & Early Devel</td>
+            <td class='text-center'>26</td>
+            <td>SA</td>
+            <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
+            <td class='text-center'>68</td>
+        </tr>
+        <tr onclick="jumpToOperator('EDGE EARLY LEARNING SOUTH AUSTRALIA PTY LTD')" data-states="SA" style='cursor:pointer'>
+            <td class='rank'>10</td>
+            <td class='op-name'>EDGE EARLY LEARNING SOUTH AUSTRALIA PTY LTD</td>
+            <td class='text-center'>24</td>
+            <td>SA</td>
+            <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
+            <td class='text-center'>67</td>
+        </tr>
+        <tr onclick="jumpToOperator('Sparrow Group Vic Pty Ltd')" data-states="VIC,WA" style='cursor:pointer'>
+            <td class='rank'>11</td>
+            <td class='op-name'>Sparrow Group Vic Pty Ltd</td>
+            <td class='text-center'>29</td>
+            <td>VIC, WA</td>
+            <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
+            <td class='text-center'>63</td>
+        </tr>
+        <tr onclick="jumpToOperator('Baker Street Childcare Education Pty Ltd')" data-states="NSW,QLD,SA,VIC,WA" style='cursor:pointer'>
+            <td class='rank'>12</td>
+            <td class='op-name'>Baker Street Childcare Education Pty Ltd</td>
+            <td class='text-center'>25</td>
+            <td>NSW, QLD, SA, VIC, WA</td>
+            <td class='text-center'><span class='tier-badge tier-warm'>WARM</span></td>
+            <td class='text-center'>51</td>
+        </tr>
+        <tr onclick="jumpToOperator('The Scholars Group Pty Ltd')" data-states="QLD" style='cursor:pointer'>
+            <td class='rank'>13</td>
+            <td class='op-name'>The Scholars Group Pty Ltd</td>
+            <td class='text-center'>17</td>
+            <td>QLD</td>
+            <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
+            <td class='text-center'>75</td>
+        </tr>
+        <tr onclick="jumpToOperator('INSPIRE O2 EDUCATION HOLDING GROUP PTY LTD')" data-states="VIC" style='cursor:pointer'>
+            <td class='rank'>14</td>
+            <td class='op-name'>INSPIRE O2 EDUCATION HOLDING GROUP PTY LTD</td>
+            <td class='text-center'>15</td>
+            <td>VIC</td>
+            <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
+            <td class='text-center'>83</td>
+        </tr>
+        <tr onclick="jumpToOperator('MMZ Holdings PTY LTD')" data-states="NSW" style='cursor:pointer'>
+            <td class='rank'>15</td>
+            <td class='op-name'>MMZ Holdings PTY LTD</td>
+            <td class='text-center'>21</td>
+            <td>NSW</td>
+            <td class='text-center'><span class='tier-badge tier-warm'>WARM</span></td>
+            <td class='text-center'>55</td>
+        </tr>
+        <tr onclick="jumpToOperator('BUTTERCUPS CHILDCARE PTY LTD')" data-states="WA" style='cursor:pointer'>
+            <td class='rank'>16</td>
+            <td class='op-name'>BUTTERCUPS CHILDCARE PTY LTD</td>
+            <td class='text-center'>20</td>
+            <td>WA</td>
+            <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
+            <td class='text-center'>75</td>
+        </tr>
+        <tr onclick="jumpToOperator('G8 KP Pty Ltd')" data-states="NSW,QLD" style='cursor:pointer'>
+            <td class='rank'>17</td>
+            <td class='op-name'>G8 KP Pty Ltd</td>
+            <td class='text-center'>20</td>
+            <td>NSW, QLD</td>
+            <td class='text-center'><span class='tier-badge tier-warm'>WARM</span></td>
+            <td class='text-center'>58</td>
+        </tr>
+        <tr onclick="jumpToOperator('Little Kindy Pty Ltd')" data-states="NSW,QLD,SA,TAS,VIC,WA" style='cursor:pointer'>
+            <td class='rank'>18</td>
+            <td class='op-name'>Little Kindy Pty Ltd</td>
+            <td class='text-center'>25</td>
+            <td>NSW, QLD, SA, TAS, VIC, WA</td>
+            <td class='text-center'><span class='tier-badge tier-warm'>WARM</span></td>
+            <td class='text-center'>55</td>
+        </tr>
+        <tr onclick="jumpToOperator('EDGE EARLY LEARNING QLD PTY LTD')" data-states="QLD" style='cursor:pointer'>
+            <td class='rank'>19</td>
+            <td class='op-name'>EDGE EARLY LEARNING QLD PTY LTD</td>
+            <td class='text-center'>14</td>
+            <td>QLD</td>
+            <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
+            <td class='text-center'>75</td>
+        </tr>
+        <tr onclick="jumpToOperator('MINDCHAMPS EARLY LEARNING 6 PTY. LIMITED')" data-states="NSW" style='cursor:pointer'>
+            <td class='rank'>20</td>
+            <td class='op-name'>MINDCHAMPS EARLY LEARNING 6 PTY. LIMITED</td>
+            <td class='text-center'>18</td>
+            <td>NSW</td>
+            <td class='text-center'><span class='tier-badge tier-hot'>HOT</span></td>
+            <td class='text-center'>63</td>
+        </tr></tbody>
+            </table>
+        </div>
+        <div class="section">
+            <div class="section-title">Weekly Intelligence Signals</div>
+            <div class="hot-buttons" id="hot-buttons">
+                <div class="hot-button">
+                    <div class="hot-button-label">Signal</div>
+                    <div class="hot-button-text">Loading weekly signals...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Weekly News &bull; 2026-04-15</div>
+        <p style='color:#888;'>No news items this week.</p>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Last 30 Service Approvals</div>
+        
+    <table class='approvals-table'>
+        <thead>
+            <tr>
+                <th>Centre</th>
+                <th>Operator</th>
+                <th>Location</th>
+                <th class='text-center'>Places</th>
+                <th class='text-center'>Approved</th>
+            </tr>
+        </thead>
+        <tbody>
+        <tr class='approval-row' data-operator='Freckles Toowoomba Pty Ltd ATF Frec' data-state='QLD'
+            onclick='jumpToOperator("Freckles Toowoomba Pty Ltd ATF")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Everen Early Learning</td>
+            <td>Freckles Toowoomba Pty Ltd ATF Frec</td>
+            <td>WILSONTON, QLD</td>
+            <td class='text-center'></td>
+            <td class='text-center'>09/04/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='CRIBS, CRADLES & CRAYONS PTY LTD' data-state='NSW'
+            onclick='jumpToOperator("CRIBS, CRADLES & CRAYONS PTY L")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>CRIBS, CRADLES & CRAYONS</td>
+            <td>CRIBS, CRADLES & CRAYONS PTY LTD <span class='tier-badge tier-watch'>WATCH</span></td>
+            <td>CHESTER HILL, NSW</td>
+            <td class='text-center'></td>
+            <td class='text-center'>09/04/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='LITTLE GUMNUTS EARLY LEARNING TWO P' data-state='NSW'
+            onclick='jumpToOperator("LITTLE GUMNUTS EARLY LEARNING ")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Little Gumnuts Wyoming Early Learning Centre</td>
+            <td>LITTLE GUMNUTS EARLY LEARNING TWO P <span class='tier-badge tier-watch'>WATCH</span></td>
+            <td>WYOMING, NSW</td>
+            <td class='text-center'></td>
+            <td class='text-center'>09/04/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='Trustees of The Roman Catholic Chur' data-state='NSW'
+            onclick='jumpToOperator("Trustees of The Roman Catholic")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>St Nicholas Early Education Forster</td>
+            <td>Trustees of The Roman Catholic Chur <span class='tier-badge tier-nfp_excluded'>NFP_EXCLUDED</span></td>
+            <td>FORSTER, NSW</td>
+            <td class='text-center'></td>
+            <td class='text-center'>08/04/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='FIDEM PTY LTD' data-state='VIC'
+            onclick='jumpToOperator("FIDEM PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>CATERPILLAR KIDZ EARLY LEARNING CENTRE AND KINDERGARTEN</td>
+            <td>FIDEM PTY LTD <span class='tier-badge tier-warm'>WARM</span></td>
+            <td>RESERVOIR, VIC</td>
+            <td class='text-center'></td>
+            <td class='text-center'>08/04/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='Trustees of The Roman Catholic Chur' data-state='NSW'
+            onclick='jumpToOperator("Trustees of The Roman Catholic")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>St Nicholas Early Education Kotara South</td>
+            <td>Trustees of The Roman Catholic Chur <span class='tier-badge tier-nfp_excluded'>NFP_EXCLUDED</span></td>
+            <td>Kotara South, NSW</td>
+            <td class='text-center'></td>
+            <td class='text-center'>07/04/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='DALB Holdings PTY LTD' data-state='NSW'
+            onclick='jumpToOperator("DALB Holdings PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Sugarloaf Bay Preschool</td>
+            <td>DALB Holdings PTY LTD <span class='tier-badge tier-hot'>HOT</span></td>
+            <td>Castlecrag, NSW</td>
+            <td class='text-center'></td>
+            <td class='text-center'>07/04/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='AUSSIE KIDZ CHILDCARE AND EDUCATION' data-state='WA'
+            onclick='jumpToOperator("AUSSIE KIDZ CHILDCARE AND EDUC")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Cherish Early Years Learning</td>
+            <td>AUSSIE KIDZ CHILDCARE AND EDUCATION <span class='tier-badge tier-watch'>WATCH</span></td>
+            <td>Byford, WA</td>
+            <td class='text-center'></td>
+            <td class='text-center'>02/04/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='Young Men's Christian Association o' data-state='ACT'
+            onclick='jumpToOperator("Young Men's Christian Associat")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>YMCA Early Learning Centre Strathnairn</td>
+            <td>Young Men's Christian Association o</td>
+            <td>STRATHNAIRN, ACT</td>
+            <td class='text-center'></td>
+            <td class='text-center'>02/04/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='ST CHARLES CCC PTY LTD' data-state='SA'
+            onclick='jumpToOperator("ST CHARLES CCC PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Adelaide Early Learning - Athelstone</td>
+            <td>ST CHARLES CCC PTY LTD <span class='tier-badge tier-hot'>HOT</span></td>
+            <td>ATHELSTONE, SA</td>
+            <td class='text-center'></td>
+            <td class='text-center'>02/04/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='HUMMINGBIRDS EARLY LEARNING CENTRE ' data-state='NSW'
+            onclick='jumpToOperator("HUMMINGBIRDS EARLY LEARNING CE")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Hummingbirds Early Learning Centre</td>
+            <td>HUMMINGBIRDS EARLY LEARNING CENTRE  <span class='tier-badge tier-watch'>WATCH</span></td>
+            <td>WYONG, NSW</td>
+            <td class='text-center'></td>
+            <td class='text-center'>01/04/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='BRIGHT STEPS PTY LTD' data-state='SA'
+            onclick='jumpToOperator("BRIGHT STEPS PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Bright Steps Academy Chiton</td>
+            <td>BRIGHT STEPS PTY LTD <span class='tier-badge tier-hot'>HOT</span></td>
+            <td>CHITON, SA</td>
+            <td class='text-center'></td>
+            <td class='text-center'>31/03/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='BUTTERCUPS CHILDCARE PTY LTD' data-state='WA'
+            onclick='jumpToOperator("BUTTERCUPS CHILDCARE PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Buttercups Childcare and Early Learning Centre Lakelands</td>
+            <td>BUTTERCUPS CHILDCARE PTY LTD <span class='tier-badge tier-hot'>HOT</span></td>
+            <td>LAKELANDS, WA</td>
+            <td class='text-center'></td>
+            <td class='text-center'>31/03/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='EVERGREEN LEARNING PTY LTD' data-state='NSW'
+            onclick='jumpToOperator("EVERGREEN LEARNING PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Little Achievers @ Nepean</td>
+            <td>EVERGREEN LEARNING PTY LTD <span class='tier-badge tier-hot'>HOT</span></td>
+            <td>PENRITH, NSW</td>
+            <td class='text-center'></td>
+            <td class='text-center'>31/03/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='BRIGHT STEPS PTY LTD' data-state='SA'
+            onclick='jumpToOperator("BRIGHT STEPS PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Bright Steps Academy Elizabeth East</td>
+            <td>BRIGHT STEPS PTY LTD <span class='tier-badge tier-hot'>HOT</span></td>
+            <td>ELIZABETH EAST, SA</td>
+            <td class='text-center'></td>
+            <td class='text-center'>31/03/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='MILLBROOK MONTESSORI PTY LTD' data-state='QLD'
+            onclick='jumpToOperator("MILLBROOK MONTESSORI PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Millbrook Montessori</td>
+            <td>MILLBROOK MONTESSORI PTY LTD <span class='tier-badge tier-watch'>WATCH</span></td>
+            <td>EAST TOOWOOMBA, QLD</td>
+            <td class='text-center'></td>
+            <td class='text-center'>27/03/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='THE GROVE ACADEMY - BEXLEY PTY LTD' data-state='NSW'
+            onclick='jumpToOperator("THE GROVE ACADEMY - BEXLEY PTY")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>The Grove Academy - Bankstown</td>
+            <td>THE GROVE ACADEMY - BEXLEY PTY LTD <span class='tier-badge tier-nfp_excluded'>NFP_EXCLUDED</span></td>
+            <td>BANKSTOWN, NSW</td>
+            <td class='text-center'></td>
+            <td class='text-center'>27/03/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='Tillys Play & Education Centre Pty ' data-state='NSW'
+            onclick='jumpToOperator("Tillys Play & Education Centre")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Tillys Play and Education Centre - The Junction</td>
+            <td>Tillys Play & Education Centre Pty  <span class='tier-badge tier-nfp_excluded'>NFP_EXCLUDED</span></td>
+            <td>THE JUNCTION, NSW</td>
+            <td class='text-center'></td>
+            <td class='text-center'>25/03/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='KIDDIWINKS WARRIEWOOD PTY LTD' data-state='NSW'
+            onclick='jumpToOperator("KIDDIWINKS WARRIEWOOD PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Kiddiwinks Play Laugh & Learn St. Ives</td>
+            <td>KIDDIWINKS WARRIEWOOD PTY LTD <span class='tier-badge tier-hot'>HOT</span></td>
+            <td>ST IVES, NSW</td>
+            <td class='text-center'></td>
+            <td class='text-center'>24/03/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='BUILDING BLOCKS WARRAGUL PTY LTD' data-state='VIC'
+            onclick='jumpToOperator("BUILDING BLOCKS WARRAGUL PTY L")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Thrive Early Leaning Centre Drysdale</td>
+            <td>BUILDING BLOCKS WARRAGUL PTY LTD <span class='tier-badge tier-warm'>WARM</span></td>
+            <td>DRYSDALE, VIC</td>
+            <td class='text-center'></td>
+            <td class='text-center'>24/03/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='WILDFLOWERS EARLY LEARNING PTY LTD' data-state='WA'
+            onclick='jumpToOperator("WILDFLOWERS EARLY LEARNING PTY")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>WILDFLOWERS EARLY LEARNING EAST VICTORIA PARK</td>
+            <td>WILDFLOWERS EARLY LEARNING PTY LTD <span class='tier-badge tier-hot'>HOT</span></td>
+            <td>East Victoria Park, WA</td>
+            <td class='text-center'></td>
+            <td class='text-center'>23/03/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='The Trustee for Atherton Childcare ' data-state='QLD'
+            onclick='jumpToOperator("The Trustee for Atherton Child")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Bloom Early Learning Kingaroy</td>
+            <td>The Trustee for Atherton Childcare  <span class='tier-badge tier-nfp_excluded'>NFP_EXCLUDED</span></td>
+            <td>KINGAROY, QLD</td>
+            <td class='text-center'></td>
+            <td class='text-center'>20/03/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='Kindy Australia Group Pty Ltd' data-state='NSW'
+            onclick='jumpToOperator("Kindy Australia Group Pty Ltd")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Glenmore Park Early Learning Centre</td>
+            <td>Kindy Australia Group Pty Ltd <span class='tier-badge tier-hot'>HOT</span></td>
+            <td>GLENMORE PARK, NSW</td>
+            <td class='text-center'></td>
+            <td class='text-center'>19/03/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='Nextgen Early Learning Centre Pty L' data-state='NSW'
+            onclick='jumpToOperator("Nextgen Early Learning Centre ")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>NextGen Early Learning Spring Farm</td>
+            <td>Nextgen Early Learning Centre Pty L <span class='tier-badge tier-hot'>HOT</span></td>
+            <td>SPRING FARM, NSW</td>
+            <td class='text-center'></td>
+            <td class='text-center'>18/03/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='Story House Early Learning No 1 Pty' data-state='QLD'
+            onclick='jumpToOperator("Story House Early Learning No ")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Story House Early Learning Upper Coomera</td>
+            <td>Story House Early Learning No 1 Pty <span class='tier-badge tier-hot'>HOT</span></td>
+            <td>UPPER COOMERA, QLD</td>
+            <td class='text-center'></td>
+            <td class='text-center'>18/03/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='BORONIA BUSINESS ONE EEG PTY LTD' data-state='VIC'
+            onclick='jumpToOperator("BORONIA BUSINESS ONE EEG PTY L")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Boronia Business ONE EEG Pty Ltd</td>
+            <td>BORONIA BUSINESS ONE EEG PTY LTD <span class='tier-badge tier-watch'>WATCH</span></td>
+            <td>BORONIA, VIC</td>
+            <td class='text-center'></td>
+            <td class='text-center'>17/03/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='SUNRISE CHILDREN PTY LTD' data-state='VIC'
+            onclick='jumpToOperator("SUNRISE CHILDREN PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Billy-beet Childcare & Kindergarten Templestowe Lower</td>
+            <td>SUNRISE CHILDREN PTY LTD <span class='tier-badge tier-warm'>WARM</span></td>
+            <td>TEMPLESTOWE LOWER, VIC</td>
+            <td class='text-center'></td>
+            <td class='text-center'>17/03/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='Eden Academy Childcare Pty Ltd' data-state='VIC'
+            onclick='jumpToOperator("Eden Academy Childcare Pty Ltd")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Eden Academy Thomastown</td>
+            <td>Eden Academy Childcare Pty Ltd <span class='tier-badge tier-nfp_excluded'>NFP_EXCLUDED</span></td>
+            <td>THOMASTOWN, VIC</td>
+            <td class='text-center'></td>
+            <td class='text-center'>17/03/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='COVE ELC BLACKWALL PTY LTD' data-state='NSW'
+            onclick='jumpToOperator("COVE ELC BLACKWALL PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Cove Early Learning</td>
+            <td>COVE ELC BLACKWALL PTY LTD <span class='tier-badge tier-watch'>WATCH</span></td>
+            <td>BLACKWALL, NSW</td>
+            <td class='text-center'></td>
+            <td class='text-center'>16/03/2026</td>
+        </tr>
+        <tr class='approval-row' data-operator='B2BASICS PTY LTD' data-state='NSW'
+            onclick='jumpToOperator("B2BASICS PTY LTD")' style='cursor:pointer'>
+            <td class='approval-centre' style='color:var(--accent);text-decoration:underline;text-decoration-style:dotted'>Basics First Early Learning</td>
+            <td>B2BASICS PTY LTD <span class='tier-badge tier-watch'>WATCH</span></td>
+            <td>CANLEY HEIGHTS, NSW</td>
+            <td class='text-center'></td>
+            <td class='text-center'>12/03/2026</td>
+        </tr></tbody>
+    </table>
+    </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- PANEL 2 — OPERATOR INTELLIGENCE            -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="panel" id="panel-operators">
+
+    <div class="search-bar">
+        <input type="text" class="search-input" id="op-search"
+               placeholder="Search by operator name, director, ABN, suburb..."
+               oninput="filterOperators()">
+        <select class="filter-select" id="op-tier" onchange="filterOperators()">
+            <option value="">All tiers</option>
+            <option value="hot">Hot</option>
+            <option value="warm">Warm</option>
+            <option value="watch">Watch</option>
+        </select>
+        <select class="filter-select" id="op-state" onchange="filterOperators()">
+            <option value="">All states</option>
+            <option value="NSW">NSW</option>
+            <option value="VIC">VIC</option>
+            <option value="QLD">QLD</option>
+            <option value="WA">WA</option>
+            <option value="SA">SA</option>
+            <option value="TAS">TAS</option>
+            <option value="ACT">ACT</option>
+            <option value="NT">NT</option>
+        </select>
+        <select class="filter-select" id="op-fgc" onchange="filterOperators()">
+            <option value="">All structures</option>
+            <option value="fgc">Freehold Going Concern</option>
+        </select>
+    </div>
+
+    <div class="result-count" id="op-count">Loading operators...</div>
+    <div class="op-list" id="op-list"></div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- PANEL 3 — CATCHMENT EXPLORER               -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="panel" id="panel-catchment">
+    <div class="section">
+        <div class="section-title">Catchment Explorer</div>
+        <div class="search-bar">
+            <input type="text" class="search-input" id="catch-search"
+                   placeholder="Search by suburb, postcode, or SA2..."
+                   oninput="filterCatchments()">
+        </div>
+        <div id="catchment-results">
+            <p style="color:var(--muted);padding:20px 0;">
+                Enter a suburb or postcode to explore catchment intelligence.
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── STATE FILTER ──
+let currentStateFilter = '';
+
+function setStateFilter(state, el) {
+    currentStateFilter = state;
+    document.querySelectorAll('#state-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
+    if (el) el.classList.add('active');
+
+    applyFilters();
+    updateStatCardsForState(state);
+}
+
+function updateStatCardsForState(state) {
+    if (!state) {
+        // Reset to national - already shown
+        return;
+    }
+    // Filter histData by state
+    const stateKey = state.toLowerCase();
+    const stateData = histData[stateKey];
+    if (!stateData) return;
+
+    // Could update charts here - for now just show note
+    const label = document.getElementById('state-filter-label');
+    if (label) {
+        const latest = stateData[stateData.length - 1] || 0;
+        const prev4  = stateData[stateData.length - 5] || 0;
+        const yoy    = prev4 ? (((latest - prev4) / prev4) * 100).toFixed(1) : 0;
+        label.textContent = state + ': ' + latest.toLocaleString() + ' services  (1Y: ' + (yoy > 0 ? '+' : '') + yoy + '%)';
+    }
+}
+
+
+// ── TAB NAVIGATION ──
+function showPanel(name) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('panel-' + name).classList.add('active');
+    event.target.classList.add('active');
+}
+
+// ── STATE CHART ──
+const stateData = {"labels": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"], "services": [3705, 2139, 1956, 962, 513, 139, 180, 98], "places": [224097, 199992, 172240, 65882, 41847, 9448, 15887, 6901]};
+const histData = {"labels": ["Q3 2013", "Q4 2013", "Q1 2014", "Q2 2014", "Q3 2014", "Q4 2014", "Q1 2015", "Q2 2015", "Q3 2015", "Q4 2015", "Q1 2016", "Q2 2016", "Q3 2016", "Q4 2016", "Q1 2017", "Q2 2017", "Q3 2017", "Q4 2017", "Q1 2018", "Q2 2019", "Q3 2019", "Q4 2019", "Q1 2020", "Q2 2020", "Q3 2020", "Q4 2020", "Q1 2021", "Q2 2021", "Q3 2021", "Q4 2021", "Q1 2022", "Q2 2022", "Q3 2022", "Q4 2022", "Q1 2023", "Q2 2023", "Q3 2023", "Q4 2023", "Q1 2024", "Q2 2024", "Q3 2024", "Q4 2024", "Q1 2025", "Q2 2025", "Q3 2025", "Q4 2025"], "dates": ["2013-09-01", "2013-12-01", "2014-03-01", "2014-06-01", "2014-09-01", "2014-12-01", "2015-03-01", "2015-06-01", "2015-09-01", "2015-12-01", "2016-03-01", "2016-06-01", "2016-09-01", "2016-12-01", "2017-03-01", "2017-06-01", "2017-09-01", "2017-12-01", "2018-03-01", "2019-06-01", "2019-09-01", "2019-12-01", "2020-03-01", "2020-06-01", "2020-09-01", "2020-12-01", "2021-03-01", "2021-06-01", "2021-09-01", "2021-12-01", "2022-03-01", "2022-06-01", "2022-09-01", "2022-12-01", "2023-03-01", "2023-06-01", "2023-09-01", "2023-12-01", "2024-03-01", "2024-06-01", "2024-09-01", "2024-12-01", "2025-03-01", "2025-06-01", "2025-09-01", "2025-12-01"], "services": [6420, 6432, 6454, 6494, 6581, 6620, 6701, 6734, 6805, 6829, 6888, 6934, 6987, 7031, 7132, 7166, 7231, 7300, 7409, 7744, 7817, 7894, 8011, 8035, 8112, 8188, 8277, 8332, 8376, 8441, 8506, 8556, 8610, 8681, 8761, 8855, 8924, 8994, 9067, 9143, 9221, 9323, 9421, 9465, 9520, 9575], "places": [400728, 402861, 406394, 409560, 415141, 418922, 425574, 428294, 433015, 436838, 442642, 447432, 452121, 456494, 466071, 471123, 477052, 483720, 494507, 532861, 540138, 548533, 559570, 562905, 569308, 577169, 586198, 592266, 597823, 604411, 612126, 617545, 622398, 628845, 637004, 645701, 652476, 659848, 667636, 675466, 684658, 694975, 705690, 709801, 716100, 723447], "exceeding": [359, 486, 573, 685, 836, 948, 1026, 1157, 1283, 1388, 1475, 1588, 1698, 1808, 1872, 1964, 2102, 2228, 2249, 2105, 2055, 2026, 2019, 2000, 2021, 2059, 2065, 2005, 1956, 1953, 1923, 1921, 1920, 1896, 1866, 1744, 1730, 1704, 1670, 1612, 1601, 1596, 1582, 1552, 1517, 1506], "meeting": [655, 851, 975, 1135, 1334, 1498, 1635, 1827, 2028, 2196, 2321, 2438, 2580, 2693, 2755, 2837, 2966, 3120, 3156, 3617, 3726, 3857, 3952, 4067, 4101, 4268, 4448, 4708, 4809, 4860, 4887, 4935, 4980, 5217, 5321, 5503, 5614, 5699, 5770, 5922, 6046, 6203, 6296, 6404, 6516, 6656], "working": [990, 1211, 1311, 1430, 1530, 1625, 1691, 1804, 1911, 1933, 1901, 1900, 1869, 1856, 1846, 1800, 1686, 1537, 1507, 1465, 1483, 1441, 1433, 1370, 1338, 1239, 1142, 1045, 1038, 1013, 990, 966, 949, 878, 877, 906, 867, 869, 873, 881, 842, 826, 817, 828, 828, 766], "nfp": [2351, 2343, 2316, 2337, 2116, 2112, 2130, 2131, 2356, 2449, 2454, 2447, 2441, 2433, 2443, 2443, 2450, 2458, 2453, 2440, 2437, 2440, 2459, 2452, 2455, 2453, 2463, 2464, 2462, 2470, 2469, 2470, 2469, 2478, 2485, 2482, 2487, 2486, 2483, 2478, 2468, 2468, 2477, 2478, 2462, 2451], "forprofit": [5731, 5758, 5775, 5829, 5055, 5113, 5196, 5246, 5964, 6295, 6347, 6394, 6451, 6493, 6592, 6620, 6679, 6746, 6845, 7199, 7266, 7341, 7448, 7473, 7548, 7620, 7702, 7757, 7796, 7858, 7922, 7973, 8027, 8095, 8176, 8270, 8337, 8405, 8477, 8551, 8628, 8730, 8821, 8883, 8938, 8985], "nsw": [2628, 2627, 2627, 2649, 2705, 2731, 2761, 2777, 2793, 2790, 2816, 2837, 2869, 2890, 2918, 2936, 2954, 2973, 3017, 3130, 3175, 3197, 3226, 3234, 3262, 3288, 3306, 3320, 3323, 3343, 3360, 3373, 3385, 3407, 3430, 3459, 3480, 3504, 3519, 3543, 3560, 3586, 3605, 3631, 3640, 3660], "vic": [1216, 1220, 1225, 1229, 1233, 1244, 1257, 1259, 1269, 1281, 1294, 1314, 1328, 1343, 1377, 1391, 1420, 1457, 1482, 1573, 1587, 1607, 1639, 1650, 1670, 1691, 1719, 1735, 1757, 1777, 1802, 1818, 1834, 1858, 1877, 1890, 1915, 1924, 1944, 1960, 1984, 2013, 2049, 2063, 2091, 2112], "qld": [1353, 1357, 1366, 1374, 1389, 1389, 1408, 1420, 1427, 1438, 1454, 1459, 1460, 1463, 1479, 1490, 1494, 1501, 1517, 1598, 1609, 1621, 1643, 1642, 1656, 1674, 1698, 1708, 1719, 1731, 1739, 1743, 1752, 1762, 1788, 1818, 1831, 1841, 1860, 1869, 1889, 1907, 1916, 1919, 1930, 1938], "wa": [605, 608, 619, 621, 625, 627, 638, 635, 639, 643, 640, 639, 642, 648, 658, 642, 645, 644, 654, 680, 682, 691, 710, 713, 721, 730, 738, 746, 751, 763, 769, 779, 787, 796, 803, 814, 821, 833, 846, 862, 880, 902, 917, 924, 934, 939], "sa": [318, 318, 317, 319, 321, 319, 321, 322, 347, 346, 349, 352, 352, 351, 356, 361, 370, 372, 380, 395, 397, 407, 417, 418, 423, 423, 429, 430, 433, 434, 439, 445, 449, 453, 456, 464, 467, 478, 477, 485, 487, 491, 505, 508, 507, 509], "major_cities": [4700, 4724, 4749, 4807, 4870, 4941, 4973, 4999, 5041, 5067, 5107, 5152, 5199, 5234, 5308, 5355, 5409, 5460, 5540, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6410, 6454, 6491, 6524, 6582, 6636, 6671, 6685, 6685, 6679, 7043, 7106, 7182, 7246, 7274, 7315, 7351], "inner_regional": [1032, 1025, 1022, 1015, 1036, 1041, 1053, 1057, 1065, 1064, 1079, 1085, 1088, 1099, 1123, 1129, 1133, 1150, 1173, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1280, 1291, 1301, 1316, 1324, 1334, 1340, 1345, 1350, 1346, 1343, 1350, 1365, 1377, 1386, 1394, 1408], "outer_regional": [510, 503, 500, 495, 506, 507, 511, 515, 529, 529, 530, 530, 534, 536, 539, 539, 546, 545, 551, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 560, 560, 562, 565, 570, 573, 575, 576, 580, 586, 593, 596, 600, 611, 617, 621, 622], "remote": [82, 84, 85, 83, 83, 81, 82, 82, 86, 85, 86, 86, 86, 85, 86, 86, 86, 88, 88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 87, 87, 87, 87, 88, 89, 89, 90, 90, 90, 96, 98, 99, 101, 99, 99, 101], "very_remote": [48, 48, 48, 41, 48, 49, 48, 49, 53, 53, 56, 55, 53, 54, 54, 56, 56, 56, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 58, 57, 57, 57, 57, 57, 58, 57, 57, 57, 59, 58, 58, 58, 58, 59, 57]};
+function buildStateChart() {
+    const el = document.getElementById('state-chart');
+    const max = Math.max(...stateData.services);
+    el.innerHTML = stateData.labels.map((s, i) => `
+        <div class="state-row">
+            <div class="state-label">${s}</div>
+            <div class="state-bar-bg">
+                <div class="state-bar-fill" style="width:${Math.round(stateData.services[i]/max*100)}%"></div>
+            </div>
+            <div class="state-count">${stateData.services[i].toLocaleString()}</div>
+        </div>
+    `).join('');
+}
+buildStateChart();
+
+// Populate stat card growth rates from history
+let currentAriaFilter = '';
+
+const ARIA_KEYS = {
+    'major':       'Major Cities of Australia',
+    'inner':       'Inner Regional Australia',
+    'outer':       'Outer Regional Australia',
+    'remote':      'Remote Australia',
+    'very_remote': 'Very Remote Australia',
+};
+
+function applyFilters() {
+    const state = currentStateFilter;
+    const aria  = currentAriaFilter;
+
+    // Filter Top 20 table
+    document.querySelectorAll('#top20-table tr[data-states]').forEach(row => {
+        const rowStates = (row.dataset.states || '').split(',');
+        const ok = (!state || rowStates.includes(state));
+        row.style.display = ok ? '' : 'none';
+    });
+
+    // Filter approvals table
+    document.querySelectorAll('.approval-row').forEach(row => {
+        const rowState = row.dataset.state || '';
+        const ok = (!state || rowState === state);
+        row.style.display = ok ? '' : 'none';
+    });
+
+    // Update label
+    const label = document.getElementById('state-filter-label');
+    if (label) {
+        let parts = [];
+        if (state) parts.push(state);
+        if (aria && ARIA_KEYS[aria]) parts.push(ARIA_KEYS[aria]);
+        if (parts.length) {
+            const sd = state ? histData[state.toLowerCase()] : histData.services;
+            const latest = sd ? sd[sd.length-1] : 0;
+            const prev4  = sd ? sd[sd.length-5] : 0;
+            const yoy    = prev4 ? (((latest-prev4)/prev4)*100).toFixed(1) : '';
+            const sign   = parseFloat(yoy) > 0 ? '+' : '';
+            label.textContent = parts.join(' · ') + (latest ? ': ' + latest.toLocaleString() + ' services' : '') + (yoy ? '  (1Y: ' + sign + yoy + '%)' : '');
+        } else {
+            label.textContent = '';
+        }
+    }
+}
+
+function setAriaFilter(aria, el) {
+    currentAriaFilter = aria;
+    document.querySelectorAll('#aria-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
+    if (el) el.classList.add('active');
+    // Highlight selected ARIA card
+    document.querySelectorAll('.aria-card').forEach(c => {
+        c.style.opacity = (!aria || c.dataset.aria === aria) ? '1' : '0.3';
+    });
+    applyFilters();
+}
+
+function buildAriaCards() {
+    if (!histData || !histData.major_cities) return;
+    const el = document.getElementById('aria-breakdown-cards');
+    if (!el) return;
+    const n = histData.major_cities.length;
+    if (n === 0) return;
+
+    const categories = [
+        { key: 'major', label: 'Major Cities', data: histData.major_cities, color: '#3d7eff' },
+        { key: 'inner', label: 'Inner Regional', data: histData.inner_regional, color: '#00c9a7' },
+        { key: 'outer', label: 'Outer Regional', data: histData.outer_regional, color: '#d4890a' },
+        { key: 'remote', label: 'Remote', data: histData.remote, color: '#e05c3a' },
+        { key: 'very_remote', label: 'Very Remote', data: histData.very_remote, color: '#9b59b6' },
+    ];
+
+    el.innerHTML = categories.map(cat => {
+        const latest = cat.data[n-1] || 0;
+        const prev4  = cat.data[n-5] || 0;
+        const yoy    = prev4 ? (((latest - prev4) / prev4) * 100).toFixed(1) : '—';
+        const sign   = yoy > 0 ? '+' : '';
+        const yoyColor = yoy > 0 ? 'var(--accent2)' : yoy < 0 ? 'var(--hot)' : 'var(--muted)';
+        return `
+        <div class="aria-card stat-card" data-aria="${cat.key}" style="border-top:2px solid ${cat.color}">
+            <div class="stat-label">${cat.label}</div>
+            <div class="stat-value" style="font-size:22px">${latest.toLocaleString()}</div>
+            <div class="stat-sub">LDC services</div>
+            <div style="margin-top:6px;font-size:11px;color:${yoyColor}">
+                1Y: ${yoy === '—' ? '—' : sign + yoy + '%'}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function buildStatGrowths() {
+    if (!histData || !histData.services || histData.services.length < 5) return;
+    const n = histData.services.length;
+
+    function growth(arr, periods) {
+        if (arr.length < periods + 1) return null;
+        const curr = arr[arr.length - 1];
+        const prev = arr[arr.length - 1 - periods];
+        if (!prev) return null;
+        const pct = ((curr - prev) / prev * 100).toFixed(1);
+        const sign = pct > 0 ? '+' : '';
+        const color = pct > 0 ? 'var(--accent2)' : 'var(--hot)';
+        return `<span style="color:${color}">${sign}${pct}%</span>`;
+    }
+
+    function growthLine(arr) {
+        const h = growth(arr, 2);
+        const y = growth(arr, 4);
+        const t = growth(arr, 8);
+        const all = arr.length > 1 ? (() => {
+            const pct = ((arr[arr.length-1] - arr[0]) / arr[0] * 100).toFixed(0);
+            const sign = pct > 0 ? '+' : '';
+            const color = pct > 0 ? 'var(--accent2)' : 'var(--hot)';
+            return `<span style="color:${color}">${sign}${pct}%</span>`;
+        })() : null;
+        let parts = [];
+        if (h) parts.push('6M: ' + h);
+        if (y) parts.push('1Y: ' + y);
+        if (t) parts.push('2Y: ' + t);
+        if (all) parts.push('All: ' + all);
+        return parts.join('&nbsp;&nbsp;');
+    }
+
+    const sEl = document.getElementById('growth-services');
+    const pEl = document.getElementById('growth-places');
+    const nEl = document.getElementById('growth-nqs');
+    const fEl = document.getElementById('growth-fp');
+    const hEl = document.getElementById('growth-hist');
+
+    if (sEl) sEl.innerHTML = growthLine(histData.services);
+    if (pEl) pEl.innerHTML = growthLine(histData.places);
+    if (nEl) {
+        // For NQS % exceeding
+        const excPct = histData.exceeding.map((e, i) => {
+            const total = e + (histData.meeting[i]||0) + (histData.working[i]||0);
+            return total ? +(e/total*100).toFixed(1) : 0;
+        });
+        nEl.innerHTML = growthLine(excPct);
+    }
+    if (fEl) {
+        const fpPct = histData.forprofit.map((fp, i) => {
+            const total = fp + (histData.nfp[i]||0);
+            return total ? +(fp/total*100).toFixed(1) : 0;
+        });
+        fEl.innerHTML = 'For-profit share: ' + growthLine(fpPct);
+    }
+    if (hEl) hEl.innerHTML = histData.labels[0] + ' → ' + histData.labels[histData.labels.length-1] + '&nbsp;&nbsp;' + histData.labels.length + ' quarters';
+}
+
+// Load Chart.js then build trend charts
+
+// ── STATE FILTER ──
+// Load Chart.js then build trend charts
+
+
+// Chart.js loaded statically in <head>
+window.addEventListener('load', function() { buildTrendCharts(); buildStatGrowths(); buildAriaCards(); });
+
+
+// ── HOT BUTTONS (from brief) ──
+const hotButtons = [];
+function buildHotButtons() {
+    const el = document.getElementById('hot-buttons');
+    if (!hotButtons || hotButtons.length === 0) {
+        el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Weekly signals will appear after the next pipeline run.</p>';
+        return;
+    }
+    el.innerHTML = hotButtons.map(b => `
+        <div class="hot-button">
+            <div class="hot-button-label">${b.type || 'Signal'}</div>
+            <div class="hot-button-text">${b.text}</div>
+            <div class="hot-button-conf">Confidence: ${b.confidence || 'observation'}</div>
+        </div>
+    `).join('');
+}
+buildHotButtons();
+
+// ── OPERATOR DATA ──
+let allOperators = [];
+fetch('operators.json')
+    .then(r => r.json())
+    .then(data => {
+        allOperators = data;
+        renderOpList();
+        document.getElementById('op-count').textContent = data.length.toLocaleString() + ' operators';
+    })
+    .catch(e => {
+        document.getElementById('op-count').textContent = 'Error loading operators — open locally or check network';
+    });
+
+function titleSearch(state, address, suburb) {
+    const q = encodeURIComponent((address + ' ' + suburb).trim());
+    const urls = {
+        NSW: `https://www.nswlrs.com.au/land_titles/property_search?q=${q}`,
+        VIC: `https://www.landata.vic.gov.au/property-information?address=${q}`,
+        QLD: `https://www.titlesqld.com.au/title-search?address=${q}`,
+        SA:  `https://www.sailis.sa.gov.au/home/query?address=${q}`,
+        WA:  `https://www0.landgate.wa.gov.au/property-search?address=${q}`,
+        TAS: `https://www.thelist.tas.gov.au/app/content/property?address=${q}`,
+        ACT: `https://actmapi.act.gov.au/actmapi/index.html?viewer=actmapi&address=${q}`,
+    };
+    return urls[state] || `https://www.google.com/search?q=${q}+title+owner`;
+}
+
+function renderOperator(op, idx) {
+    const tierBadge = `<span class="tier-badge tier-${op.tier}">${op.tier.toUpperCase()}</span>`;
+    const fgcBadge  = op.fgc ? `<span class="fgc-badge">FGC</span>` : '';
+    const states    = op.states.join(', ');
+
+    const propcoHtml = op.propco.length > 0 ? `
+        <div class="detail-block" style="grid-column:1/-1">
+            <div class="detail-block-label">Related Entities (PropCo candidates)</div>
+            <div class="propco-list">
+                ${op.propco.map(p => `
+                    <div class="propco-item">
+                        <span style="flex:1;font-weight:500">${p.name}</span>
+                        <span style="color:var(--muted);font-family:var(--mono);font-size:11px">ABN: ${p.abn}</span>
+                        ${p.is_fgc ? '<span class="fgc-badge">FGC</span>' : ''}
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    ` : '';
+
+    const centresHtml = op.centres.map(c => {
+        const ts = titleSearch(c.state, '', c.suburb);
+        const maps = `https://www.google.com/maps/search/${encodeURIComponent(c.suburb + ' ' + c.state)}`;
+        const sb = `https://www.google.com/search?q=site:startingblocks.gov.au+${encodeURIComponent(c.name)}`;
+        const nqsBadge = c.nqs ? `<span style="font-size:10px;color:var(--muted)">${c.nqs.replace(' NQS','').replace('Working Towards','WTN').replace('Exceeding','EXC').replace('Meeting','MNS')}</span>` : '';
+        const kinderBadge = c.kinder ? `<span style="background:rgba(0,201,167,0.1);color:var(--accent2);padding:1px 6px;border-radius:3px;font-size:10px">KINDER</span>` : '';
+        return `
+            <div class="centre-card">
+                <div class="centre-name">${c.name}</div>
+                <div class="centre-meta">${c.suburb}, ${c.state} ${c.postcode} &bull; ${c.places} places ${nqsBadge} ${kinderBadge}</div>
+                <div class="centre-links">
+                    <a href="${ts}" target="_blank" class="centre-link">Title Search</a>
+                    <a href="${maps}" target="_blank" class="centre-link">Maps</a>
+                    <a href="${sb}" target="_blank" class="centre-link">StartingBlocks</a>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    return `
+        <div class="op-row" id="op-row-${idx}" onclick="toggleOperator(${idx})">
+            <div class="op-row-name">${op.legal_name} ${fgcBadge}</div>
+            <div class="op-row-meta">
+                ${tierBadge}
+                <span>${op.n_centres} centres</span>
+                <span>${states}</span>
+                <span style="font-family:var(--mono);font-size:11px">Score: ${op.score}</span>
+            </div>
+        </div>
+        <div class="op-detail" id="op-detail-${idx}">
+            <div class="detail-grid">
+                <div class="detail-block">
+                    <div class="detail-block-label">ABN</div>
+                    <div class="detail-block-value" style="font-family:var(--mono)">${op.abn || '—'}</div>
+                </div>
+                <div class="detail-block">
+                    <div class="detail-block-label">ACN</div>
+                    <div class="detail-block-value" style="font-family:var(--mono)">${op.acn || '—'}</div>
+                </div>
+                <div class="detail-block">
+                    <div class="detail-block-label">Entity Type</div>
+                    <div class="detail-block-value">${op.entity_type || '—'}</div>
+                </div>
+                <div class="detail-block">
+                    <div class="detail-block-label">Reg. State</div>
+                    <div class="detail-block-value">${op.reg_state || '—'}</div>
+                </div>
+                ${propcoHtml}
+            </div>
+            <div class="section-title" style="margin-top:8px">Centres (${op.centres.length})</div>
+            <div class="centres-grid">${centresHtml}</div>
+        </div>
+    `;
+}
+
+let expandedIdx = null;
+function toggleOperator(idx) {
+    const detail = document.getElementById('op-detail-' + idx);
+    const row    = document.getElementById('op-row-' + idx);
+    if (expandedIdx !== null && expandedIdx !== idx) {
+        document.getElementById('op-detail-' + expandedIdx).classList.remove('visible');
+        document.getElementById('op-row-' + expandedIdx).classList.remove('expanded');
+    }
+    detail.classList.toggle('visible');
+    row.classList.toggle('expanded');
+    expandedIdx = detail.classList.contains('visible') ? idx : null;
+}
+
+let filteredOps = [...allOperators];
+
+function filterOperators() {
+    const q     = document.getElementById('op-search').value.toLowerCase();
+    const tier  = document.getElementById('op-tier').value;
+    const state = document.getElementById('op-state').value;
+    const fgc   = document.getElementById('op-fgc').value;
+
+    filteredOps = allOperators.filter(op => {
+        if (tier  && op.tier !== tier) return false;
+        if (state && !op.states.includes(state)) return false;
+        if (fgc   && !op.fgc) return false;
+        if (q) {
+            const searchStr = [
+                op.legal_name,
+                op.abn,
+                op.acn,
+                ...op.states,
+                ...op.propco.map(p => p.name),
+                ...op.centres.map(c => c.suburb),
+            ].join(' ').toLowerCase();
+            if (!searchStr.includes(q)) return false;
+        }
+        return true;
+    });
+
+    renderOpList();
+}
+
+function renderOpList() {
+    const list = document.getElementById('op-list');
+    const count = document.getElementById('op-count');
+    count.textContent = filteredOps.length.toLocaleString() + ' operators';
+    expandedIdx = null;
+
+    if (filteredOps.length === 0) {
+        list.innerHTML = '<p style="color:var(--muted);padding:20px">No operators match your search.</p>';
+        return;
+    }
+
+    // Render first 100 for performance
+    const toRender = filteredOps.slice(0, 100);
+    list.innerHTML = toRender.map((op, i) => renderOperator(op, i)).join('');
+
+    if (filteredOps.length > 100) {
+        list.innerHTML += `<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px">
+            Showing 100 of ${filteredOps.length} — refine your search to see more
+        </div>`;
+    }
+}
+
+// Initial render
+renderOpList();
+
+// Top 20 click-through to Operator Intelligence
+function jumpToOperator(name) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('panel-operators').classList.add('active');
+    document.querySelectorAll('.tab')[1].classList.add('active');
+    document.getElementById('op-search').value = name;
+    filterOperators();
+    window.scrollTo(0, 0);
+}
+
+// CHART.JS TREND CHARTS
+let chartInstances = {};
+let currentRange = 0; // 0 = all
+
+function getSlicedData(arr, n) {
+    if (!n || n === 0) return arr;
+    return arr.slice(-n);
+}
+
+let compareWindow = 1; // 1=QoQ, 2=HoH, 4=YoY
+let compareLabel = 'QoQ';
+
+function setCompare(n, label, el) {
+    compareWindow = n;
+    compareLabel = label;
+    document.querySelectorAll('#compare-btns .range-btn').forEach(b => b.classList.remove('active'));
+    if (el) el.classList.add('active');
+    Object.values(chartInstances).forEach(c => c.destroy());
+    chartInstances = {};
+    buildTrendCharts();
+}
+
+function setRange(n, el) {
+    currentRange = n;
+    document.querySelectorAll('#time-range-btns .range-btn').forEach(b => b.classList.remove('active'));
+    if (el) el.classList.add('active');
+    Object.values(chartInstances).forEach(c => c.destroy());
+    chartInstances = {};
+    buildTrendCharts();
+}
+
+function buildGrowthStat(elId, data, suffix) {
+    if (!data || data.length < 2) return;
+    const first = data[0], last = data[data.length-1];
+    const pct = ((last - first) / first * 100).toFixed(1);
+    const sign = pct > 0 ? '+' : '';
+    const el = document.getElementById(elId);
+    if (el) el.textContent = last.toLocaleString() + suffix + '  (' + sign + pct + '% over period)';
+}
+
+function buildTrendCharts() {
+    if (!histData || !histData.labels || histData.labels.length === 0) return;
+
+    const n = currentRange;
+    const rawLabels = getSlicedData(histData.labels, n);
+    const labels = rawLabels.map((l, i) => i % 4 === 0 ? l : '');
+
+    // Key sector events for annotation
+    const sectorEvents = [
+        { quarter: 'Q3 2013', label: 'NQF Launch', color: 'rgba(61,126,255,0.6)' },
+        { quarter: 'Q1 2018', label: 'NQS Reform', color: 'rgba(61,126,255,0.6)' },
+        { quarter: 'Q2 2020', label: 'COVID', color: 'rgba(224,92,58,0.7)' },
+        { quarter: 'Q3 2022', label: 'CCS Reform', color: 'rgba(0,201,167,0.6)' },
+        { quarter: 'Q3 2023', label: 'Wage +15%', color: 'rgba(155,89,182,0.7)' },
+        { quarter: 'Q1 2026', label: '3-Day Guar.', color: 'rgba(0,201,167,0.6)' },
+    ];
+
+    function getEventIndices(labels) {
+        return sectorEvents.map(ev => {
+            const idx = labels.indexOf(ev.quarter);
+            return idx >= 0 ? { idx, label: ev.label, color: ev.color } : null;
+        }).filter(Boolean);
+    }
+
+    const chartOpts = {
+        responsive: true,
+        maintainAspectRatio: true,
+        interaction: { mode: 'index', intersect: false },
+        hover: { mode: 'index', intersect: false },
+        plugins: {
+            legend: { labels: { color: '#8890a8', font: { size: 10 }, boxWidth: 12 } },
+            tooltip: {
+                backgroundColor: 'rgba(24,28,38,0.95)',
+                borderColor: '#2a2f3f',
+                borderWidth: 1,
+                titleColor: '#e8eaf0',
+                bodyColor: '#8890a8',
+                padding: 10,
+                callbacks: {
+                    title: function(items) {
+                        return items[0].label || '';
+                    },
+                    label: function(ctx) {
+                        const v = ctx.raw;
+                        const arr = ctx.dataset.data;
+                        const i = ctx.dataIndex;
+                        let s = '  ' + ctx.dataset.label + ': ' + v.toLocaleString();
+                        if (i >= compareWindow && arr[i - compareWindow] != null) {
+                            const prev = arr[i - compareWindow];
+                            const chg = ((v - prev) / prev * 100).toFixed(1);
+                            s += '  (' + (chg > 0 ? '+' : '') + chg + '% ' + compareLabel + ')';
+                        }
+                        return s;
+                    },
+                    afterBody: function(items) {
+                        const label = items[0].label;
+                        const ev = sectorEvents.find(e => e.quarter === label);
+                        return ev ? ['', '  ★ ' + ev.label] : [];
+                    }
+                }
+            }
+        },
+        scales: {
+            x: { ticks: { color: '#8890a8', font: { size: 9 }, maxRotation: 45 }, grid: { color: '#2a2f3f' } },
+            y: { ticks: { color: '#8890a8', font: { size: 9 } }, grid: { color: '#2a2f3f' } }
+        }
+    };
+
+    // Event annotation plugin (vertical lines + visible labels)
+    const eventAnnotationPlugin = {
+        id: 'eventLines',
+        afterDraw(chart) {
+            const ctx2 = chart.ctx;
+            const xAxis = chart.scales.x;
+            const yAxis = chart.scales.y;
+            if (!xAxis || !yAxis) return;
+
+            const slicedLabels = getSlicedData(histData.labels, currentRange);
+
+            sectorEvents.forEach((ev, evIdx) => {
+                const idx = slicedLabels.indexOf(ev.quarter);
+                if (idx < 0) return;
+
+                const xPixel = xAxis.getPixelForValue(idx);
+                if (!xPixel || xPixel < xAxis.left || xPixel > xAxis.right) return;
+
+                ctx2.save();
+
+                // Dashed vertical line - more visible
+                ctx2.strokeStyle = ev.color;
+                ctx2.lineWidth = 2;
+                ctx2.setLineDash([5, 4]);
+                ctx2.globalAlpha = 0.8;
+                ctx2.beginPath();
+                ctx2.moveTo(xPixel, yAxis.top + 28);
+                ctx2.lineTo(xPixel, yAxis.bottom);
+                ctx2.stroke();
+                ctx2.setLineDash([]);
+                ctx2.globalAlpha = 1;
+
+                // Label box - stagger vertically to avoid overlap
+                const label = ev.label;
+                ctx2.font = 'bold 10px sans-serif';
+                const tw = ctx2.measureText(label).width;
+                const pad = 5;
+                const bw = tw + pad * 2;
+                const bh = 18;
+                const bx = xPixel - bw / 2;
+                // Stagger: alternate between top positions
+                const by = yAxis.top + (evIdx % 2 === 0 ? 2 : 22);
+
+                // Shadow for readability
+                ctx2.shadowColor = 'rgba(0,0,0,0.8)';
+                ctx2.shadowBlur = 4;
+
+                // Solid background
+                ctx2.fillStyle = 'rgba(15,17,23,0.95)';
+                ctx2.fillRect(bx, by, bw, bh);
+
+                ctx2.shadowBlur = 0;
+
+                // Colored border
+                ctx2.strokeStyle = ev.color;
+                ctx2.lineWidth = 1.5;
+                ctx2.strokeRect(bx, by, bw, bh);
+
+                // Text
+                ctx2.fillStyle = '#ffffff';
+                ctx2.textAlign = 'center';
+                ctx2.textBaseline = 'middle';
+                ctx2.fillText(label, xPixel, by + bh / 2);
+
+                ctx2.restore();
+            });
+        }
+    };
+
+    // COVID + event annotations
+    const events = [
+        { quarter: 'Q1 2020', label: 'COVID', color: 'rgba(224,92,58,0.3)' },
+        { quarter: 'Q1 2018', label: 'NQS reform', color: 'rgba(61,126,255,0.2)' },
+        { quarter: 'Q1 2026', label: '3-Day Guarantee', color: 'rgba(0,201,167,0.2)' },
+    ];
+
+    function makeDataset(label, data, color, fill) {
+        return { label, data: getSlicedData(data, n), borderColor: color,
+                  backgroundColor: fill || 'transparent',
+                  fill: !!fill, tension: 0.3, pointRadius: 0, borderWidth: 2 };
+    }
+
+    // 1. Services
+    buildGrowthStat('stat-services-growth', getSlicedData(histData.services, n), ' services');
+    chartInstances['services'] = new Chart(document.getElementById('chart-services'), {
+        type: 'line', options: chartOpts,
+        plugins: [eventAnnotationPlugin],
+        data: { labels, datasets: [makeDataset('LDC Services', histData.services, '#3d7eff', 'rgba(61,126,255,0.1)')] }
+    });
+
+    // 2. Places
+    buildGrowthStat('stat-places-growth', getSlicedData(histData.places, n), ' places');
+    chartInstances['places'] = new Chart(document.getElementById('chart-places'), {
+        type: 'line', options: chartOpts,
+        plugins: [eventAnnotationPlugin],
+        data: { labels, datasets: [makeDataset('Licensed Places', histData.places, '#00c9a7', 'rgba(0,201,167,0.08)')] }
+    });
+
+    // 3. NQS trends
+    chartInstances['nqs'] = new Chart(document.getElementById('chart-nqs'), {
+        type: 'line', options: chartOpts,
+        plugins: [eventAnnotationPlugin],
+        data: { labels, datasets: [
+            makeDataset('Exceeding', histData.exceeding, '#00c9a7'),
+            makeDataset('Meeting',   histData.meeting,   '#3d7eff'),
+            makeDataset('Working',   histData.working,   '#d4890a'),
+        ] }
+    });
+
+    // 4. State growth
+    chartInstances['states'] = new Chart(document.getElementById('chart-states'), {
+        type: 'line', options: chartOpts,
+        plugins: [eventAnnotationPlugin],
+        data: { labels, datasets: [
+            makeDataset('NSW', histData.nsw, '#3d7eff'),
+            makeDataset('VIC', histData.vic, '#00c9a7'),
+            makeDataset('QLD', histData.qld, '#d4890a'),
+            makeDataset('WA',  histData.wa,  '#e05c3a'),
+            makeDataset('SA',  histData.sa,  '#9b59b6'),
+        ] }
+    });
+
+    // 5. For-profit vs NFP absolute
+    chartInstances['mgmt'] = new Chart(document.getElementById('chart-mgmt'), {
+        type: 'line', options: chartOpts,
+        data: { labels, datasets: [
+            makeDataset('For-Profit', histData.forprofit, '#3d7eff'),
+            makeDataset('NFP',        histData.nfp,       '#8890a8'),
+        ] }
+    });
+
+    // 6. For-profit % share
+    const fpPct = histData.forprofit.map((fp, i) => {
+        const total = fp + (histData.nfp[i] || 0);
+        return total ? +(fp / total * 100).toFixed(1) : 0;
+    });
+    const fpPctSliced = getSlicedData(fpPct, n);
+    const fpLast = fpPctSliced[fpPctSliced.length-1];
+    const fpFirst = fpPctSliced[0];
+    const fpEl = document.getElementById('stat-fp-growth');
+    if (fpEl && fpLast) fpEl.textContent = fpLast + '% for-profit  (' + (fpLast - fpFirst).toFixed(1) + 'pp change over period)';
+
+    const fpOpts = JSON.parse(JSON.stringify(chartOpts));
+    fpOpts.scales.y.ticks.callback = v => v + '%';
+    chartInstances['fp-pct'] = new Chart(document.getElementById('chart-fp-pct'), {
+        type: 'line', options: fpOpts,
+        data: { labels, datasets: [makeDataset('For-Profit %', fpPct, '#3d7eff', 'rgba(61,126,255,0.08)')] }
+    });
+}
+
+// Catchment placeholder
+function filterCatchments() {
+    const q = document.getElementById('catch-search').value;
+    document.getElementById('catchment-results').innerHTML =
+        q.length > 1
+        ? '<p style="color:var(--muted);padding:20px 0">Catchment Explorer will be fully interactive in the next release. Use the Operator Intelligence panel to find centres in a specific suburb.</p>'
+        : '<p style="color:var(--muted);padding:20px 0">Enter a suburb or postcode to explore catchment intelligence.</p>';
+}
+</script>
+</body>
+</html> 
