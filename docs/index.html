@@ -2,9 +2,6 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="cache-control" content="no-cache" />
-<meta http-equiv="expires" content="0" />
-<meta http-equiv="pragma" content="no-cache" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kintell — ECEC Market Intelligence</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -641,13 +638,12 @@ body {
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
 <header class="header">
     <div class="logo">Kint<span>ell</span></div>
-    <div class="header-meta">ECEC Market Intelligence &bull; Updated 2026-04-15 &bull; 18,223 services tracked</div>
+    <div class="header-meta">ECEC Market Intelligence &bull; Updated 2026-04-16 &bull; 18,223 services tracked</div>
 </header>
 
 <nav class="tabs">
@@ -719,7 +715,7 @@ body {
         </div>
         <div class="stat-card">
             <div class="stat-label">Weekly Update</div>
-            <div class="stat-value" style="font-size:16px;">2026-04-15</div>
+            <div class="stat-value" style="font-size:16px;">2026-04-16</div>
             <div class="stat-sub">Next: Tuesday 10am</div>
             <div id="growth-hist" style="margin-top:8px;font-size:11px;color:var(--muted)">Loading...</div>
         </div>
@@ -1018,7 +1014,7 @@ body {
     </div>
 
     <div class="section">
-        <div class="section-title">Weekly News &bull; 2026-04-15</div>
+        <div class="section-title">Weekly News &bull; 2026-04-16</div>
         <p style='color:#888;'>No news items this week.</p>
     </div>
 
@@ -1345,29 +1341,27 @@ function setStateFilter(state, el) {
     currentStateFilter = state;
     document.querySelectorAll('#state-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
     if (el) el.classList.add('active');
-
     applyFilters();
-    updateStatCardsForState(state);
+    rebuildChartsForFilter();
+}
+
+// Maps ARIA key → histData series key
+const ARIA_SERIES = {
+    'major':       'major_cities',
+    'inner':       'inner_regional',
+    'outer':       'outer_regional',
+    'remote':      'remote',
+    'very_remote': 'very_remote',
+};
+
+function rebuildChartsForFilter() {
+    Object.values(chartInstances).forEach(c => c.destroy());
+    chartInstances = {};
+    buildTrendCharts();
 }
 
 function updateStatCardsForState(state) {
-    if (!state) {
-        // Reset to national - already shown
-        return;
-    }
-    // Filter histData by state
-    const stateKey = state.toLowerCase();
-    const stateData = histData[stateKey];
-    if (!stateData) return;
-
-    // Could update charts here - for now just show note
-    const label = document.getElementById('state-filter-label');
-    if (label) {
-        const latest = stateData[stateData.length - 1] || 0;
-        const prev4  = stateData[stateData.length - 5] || 0;
-        const yoy    = prev4 ? (((latest - prev4) / prev4) * 100).toFixed(1) : 0;
-        label.textContent = state + ': ' + latest.toLocaleString() + ' services  (1Y: ' + (yoy > 0 ? '+' : '') + yoy + '%)';
-    }
+    // Kept for compatibility
 }
 
 
@@ -1400,60 +1394,62 @@ buildStateChart();
 // Populate stat card growth rates from history
 let currentAriaFilter = '';
 
+function setAriaFilter(aria, el) {
+    currentAriaFilter = aria;
+    document.querySelectorAll('#aria-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
+    if (el) el.classList.add('active');
+    document.querySelectorAll('.aria-card').forEach(c => {
+        c.style.opacity = (!aria || c.dataset.aria === aria) ? '1' : '0.3';
+    });
+    applyFilters();
+    rebuildChartsForFilter();
+}
+
+// ARIA label → key mapping for row data attributes
 const ARIA_KEYS = {
-    'major':       'Major Cities of Australia',
-    'inner':       'Inner Regional Australia',
-    'outer':       'Outer Regional Australia',
-    'remote':      'Remote Australia',
-    'very_remote': 'Very Remote Australia',
+    'major':      'Major Cities of Australia',
+    'inner':      'Inner Regional Australia',
+    'outer':      'Outer Regional Australia',
+    'remote':     'Remote Australia',
+    'very_remote':'Very Remote Australia',
 };
 
 function applyFilters() {
     const state = currentStateFilter;
     const aria  = currentAriaFilter;
+    const ariaLabel = aria ? ARIA_KEYS[aria] : '';
 
     // Filter Top 20 table
     document.querySelectorAll('#top20-table tr[data-states]').forEach(row => {
         const rowStates = (row.dataset.states || '').split(',');
-        const ok = (!state || rowStates.includes(state));
-        row.style.display = ok ? '' : 'none';
+        const stateOk = !state || rowStates.includes(state);
+        row.style.display = stateOk ? '' : 'none';
     });
 
     // Filter approvals table
     document.querySelectorAll('.approval-row').forEach(row => {
         const rowState = row.dataset.state || '';
-        const ok = (!state || rowState === state);
-        row.style.display = ok ? '' : 'none';
+        const stateOk  = !state || rowState === state;
+        row.style.display = stateOk ? '' : 'none';
     });
 
-    // Update label
+    // Update state label
     const label = document.getElementById('state-filter-label');
     if (label) {
         let parts = [];
         if (state) parts.push(state);
-        if (aria && ARIA_KEYS[aria]) parts.push(ARIA_KEYS[aria]);
-        if (parts.length) {
-            const sd = state ? histData[state.toLowerCase()] : histData.services;
-            const latest = sd ? sd[sd.length-1] : 0;
-            const prev4  = sd ? sd[sd.length-5] : 0;
+        if (ariaLabel) parts.push(ariaLabel);
+        if (parts.length > 0) {
+            const stateData = state ? histData[state.toLowerCase()] : histData.services;
+            const latest = stateData ? stateData[stateData.length-1] : 0;
+            const prev4  = stateData ? stateData[stateData.length-5] : 0;
             const yoy    = prev4 ? (((latest-prev4)/prev4)*100).toFixed(1) : '';
-            const sign   = parseFloat(yoy) > 0 ? '+' : '';
+            const sign   = yoy > 0 ? '+' : '';
             label.textContent = parts.join(' · ') + (latest ? ': ' + latest.toLocaleString() + ' services' : '') + (yoy ? '  (1Y: ' + sign + yoy + '%)' : '');
         } else {
             label.textContent = '';
         }
     }
-}
-
-function setAriaFilter(aria, el) {
-    currentAriaFilter = aria;
-    document.querySelectorAll('#aria-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
-    if (el) el.classList.add('active');
-    // Highlight selected ARIA card
-    document.querySelectorAll('.aria-card').forEach(c => {
-        c.style.opacity = (!aria || c.dataset.aria === aria) ? '1' : '0.3';
-    });
-    applyFilters();
 }
 
 function buildAriaCards() {
@@ -1548,15 +1544,8 @@ function buildStatGrowths() {
     if (hEl) hEl.innerHTML = histData.labels[0] + ' → ' + histData.labels[histData.labels.length-1] + '&nbsp;&nbsp;' + histData.labels.length + ' quarters';
 }
 
-// Load Chart.js then build trend charts
-
-// ── STATE FILTER ──
-// Load Chart.js then build trend charts
-
-
 // Chart.js loaded statically in <head>
 window.addEventListener('load', function() { buildTrendCharts(); buildStatGrowths(); buildAriaCards(); });
-
 
 // ── HOT BUTTONS (from brief) ──
 const hotButtons = [];
@@ -1803,6 +1792,25 @@ function buildTrendCharts() {
     const rawLabels = getSlicedData(histData.labels, n);
     const labels = rawLabels.map((l, i) => i % 4 === 0 ? l : '');
 
+    // Resolve active data series based on state/ARIA filter
+    const state = currentStateFilter ? currentStateFilter.toLowerCase() : '';
+    const aria  = currentAriaFilter;
+    const ariaSeriesKey = aria ? ARIA_SERIES[aria] : null;
+
+    // Primary services series: state → state series, ARIA → ARIA series, else national
+    let primaryServices = histData.services;
+    let primaryLabel    = 'LDC Services (National)';
+    let primaryColor    = '#3d7eff';
+    if (state && histData[state]) {
+        primaryServices = histData[state];
+        primaryLabel    = 'LDC Services (' + currentStateFilter + ')';
+        primaryColor    = '#3d7eff';
+    } else if (ariaSeriesKey && histData[ariaSeriesKey]) {
+        primaryServices = histData[ariaSeriesKey];
+        primaryLabel    = 'LDC Services (' + ARIA_KEYS[aria] + ')';
+        primaryColor    = '#00c9a7';
+    }
+
     // Key sector events for annotation
     const sectorEvents = [
         { quarter: 'Q3 2013', label: 'NQF Launch', color: 'rgba(61,126,255,0.6)' },
@@ -1946,15 +1954,15 @@ function buildTrendCharts() {
                   fill: !!fill, tension: 0.3, pointRadius: 0, borderWidth: 2 };
     }
 
-    // 1. Services
-    buildGrowthStat('stat-services-growth', getSlicedData(histData.services, n), ' services');
+    // 1. Services — uses filtered primary series
+    buildGrowthStat('stat-services-growth', getSlicedData(primaryServices, n), ' services');
     chartInstances['services'] = new Chart(document.getElementById('chart-services'), {
         type: 'line', options: chartOpts,
         plugins: [eventAnnotationPlugin],
-        data: { labels, datasets: [makeDataset('LDC Services', histData.services, '#3d7eff', 'rgba(61,126,255,0.1)')] }
+        data: { labels, datasets: [makeDataset(primaryLabel, primaryServices, primaryColor, 'rgba(61,126,255,0.1)')] }
     });
 
-    // 2. Places
+    // 2. Places — national only (no per-state places history available)
     buildGrowthStat('stat-places-growth', getSlicedData(histData.places, n), ' places');
     chartInstances['places'] = new Chart(document.getElementById('chart-places'), {
         type: 'line', options: chartOpts,
@@ -1973,16 +1981,23 @@ function buildTrendCharts() {
         ] }
     });
 
-    // 4. State growth
+    // 4. State growth — highlight selected state if filtered
+    const stateColors = { nsw:'#3d7eff', vic:'#00c9a7', qld:'#d4890a', wa:'#e05c3a', sa:'#9b59b6' };
+    function stateDataset(label, key, color) {
+        const dimmed = state && state !== key;
+        return { label, data: getSlicedData(histData[key], n), borderColor: dimmed ? color + '33' : color,
+                  backgroundColor: 'transparent', fill: false, tension: 0.3,
+                  pointRadius: 0, borderWidth: dimmed ? 1 : (state === key ? 3 : 2) };
+    }
     chartInstances['states'] = new Chart(document.getElementById('chart-states'), {
         type: 'line', options: chartOpts,
         plugins: [eventAnnotationPlugin],
         data: { labels, datasets: [
-            makeDataset('NSW', histData.nsw, '#3d7eff'),
-            makeDataset('VIC', histData.vic, '#00c9a7'),
-            makeDataset('QLD', histData.qld, '#d4890a'),
-            makeDataset('WA',  histData.wa,  '#e05c3a'),
-            makeDataset('SA',  histData.sa,  '#9b59b6'),
+            stateDataset('NSW', 'nsw', '#3d7eff'),
+            stateDataset('VIC', 'vic', '#00c9a7'),
+            stateDataset('QLD', 'qld', '#d4890a'),
+            stateDataset('WA',  'wa',  '#e05c3a'),
+            stateDataset('SA',  'sa',  '#9b59b6'),
         ] }
     });
 
@@ -2024,4 +2039,4 @@ function filterCatchments() {
 }
 </script>
 </body>
-</html> 
+</html>

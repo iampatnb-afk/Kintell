@@ -1333,29 +1333,27 @@ function setStateFilter(state, el) {{
     currentStateFilter = state;
     document.querySelectorAll('#state-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
     if (el) el.classList.add('active');
-
     applyFilters();
-    updateStatCardsForState(state);
+    rebuildChartsForFilter();
+}}
+
+// Maps ARIA key → histData series key
+const ARIA_SERIES = {{
+    'major':       'major_cities',
+    'inner':       'inner_regional',
+    'outer':       'outer_regional',
+    'remote':      'remote',
+    'very_remote': 'very_remote',
+}};
+
+function rebuildChartsForFilter() {{
+    Object.values(chartInstances).forEach(c => c.destroy());
+    chartInstances = {{}};
+    buildTrendCharts();
 }}
 
 function updateStatCardsForState(state) {{
-    if (!state) {{
-        // Reset to national - already shown
-        return;
-    }}
-    // Filter histData by state
-    const stateKey = state.toLowerCase();
-    const stateData = histData[stateKey];
-    if (!stateData) return;
-
-    // Could update charts here - for now just show note
-    const label = document.getElementById('state-filter-label');
-    if (label) {{
-        const latest = stateData[stateData.length - 1] || 0;
-        const prev4  = stateData[stateData.length - 5] || 0;
-        const yoy    = prev4 ? (((latest - prev4) / prev4) * 100).toFixed(1) : 0;
-        label.textContent = state + ': ' + latest.toLocaleString() + ' services  (1Y: ' + (yoy > 0 ? '+' : '') + yoy + '%)';
-    }}
+    // Kept for compatibility
 }}
 
 
@@ -1392,11 +1390,11 @@ function setAriaFilter(aria, el) {{
     currentAriaFilter = aria;
     document.querySelectorAll('#aria-filter-btns .range-btn').forEach(b => b.classList.remove('active'));
     if (el) el.classList.add('active');
-    // Highlight selected ARIA card
     document.querySelectorAll('.aria-card').forEach(c => {{
         c.style.opacity = (!aria || c.dataset.aria === aria) ? '1' : '0.3';
     }});
     applyFilters();
+    rebuildChartsForFilter();
 }}
 
 // ARIA label → key mapping for row data attributes
@@ -1538,14 +1536,8 @@ function buildStatGrowths() {{
     if (hEl) hEl.innerHTML = histData.labels[0] + ' → ' + histData.labels[histData.labels.length-1] + '&nbsp;&nbsp;' + histData.labels.length + ' quarters';
 }}
 
-// Load Chart.js then build trend charts
-
-// ── STATE FILTER ──
-// Load Chart.js then build trend charts
-const chartScript = document.createElement('script');
-chartScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js';
-chartScript.onload = function() {{ buildTrendCharts(); buildStatGrowths(); buildAriaCards(); }};
-document.head.appendChild(chartScript);
+// Chart.js loaded statically in <head>
+window.addEventListener('load', function() {{ buildTrendCharts(); buildStatGrowths(); buildAriaCards(); }});
 
 // ── HOT BUTTONS (from brief) ──
 const hotButtons = {json.dumps(brief.get('hot_buttons', []))};
@@ -1792,6 +1784,25 @@ function buildTrendCharts() {{
     const rawLabels = getSlicedData(histData.labels, n);
     const labels = rawLabels.map((l, i) => i % 4 === 0 ? l : '');
 
+    // Resolve active data series based on state/ARIA filter
+    const state = currentStateFilter ? currentStateFilter.toLowerCase() : '';
+    const aria  = currentAriaFilter;
+    const ariaSeriesKey = aria ? ARIA_SERIES[aria] : null;
+
+    // Primary services series: state → state series, ARIA → ARIA series, else national
+    let primaryServices = histData.services;
+    let primaryLabel    = 'LDC Services (National)';
+    let primaryColor    = '#3d7eff';
+    if (state && histData[state]) {{
+        primaryServices = histData[state];
+        primaryLabel    = 'LDC Services (' + currentStateFilter + ')';
+        primaryColor    = '#3d7eff';
+    }} else if (ariaSeriesKey && histData[ariaSeriesKey]) {{
+        primaryServices = histData[ariaSeriesKey];
+        primaryLabel    = 'LDC Services (' + ARIA_KEYS[aria] + ')';
+        primaryColor    = '#00c9a7';
+    }}
+
     // Key sector events for annotation
     const sectorEvents = [
         {{ quarter: 'Q3 2013', label: 'NQF Launch', color: 'rgba(61,126,255,0.6)' }},
@@ -1935,15 +1946,15 @@ function buildTrendCharts() {{
                   fill: !!fill, tension: 0.3, pointRadius: 0, borderWidth: 2 }};
     }}
 
-    // 1. Services
-    buildGrowthStat('stat-services-growth', getSlicedData(histData.services, n), ' services');
+    // 1. Services — uses filtered primary series
+    buildGrowthStat('stat-services-growth', getSlicedData(primaryServices, n), ' services');
     chartInstances['services'] = new Chart(document.getElementById('chart-services'), {{
         type: 'line', options: chartOpts,
         plugins: [eventAnnotationPlugin],
-        data: {{ labels, datasets: [makeDataset('LDC Services', histData.services, '#3d7eff', 'rgba(61,126,255,0.1)')] }}
+        data: {{ labels, datasets: [makeDataset(primaryLabel, primaryServices, primaryColor, 'rgba(61,126,255,0.1)')] }}
     }});
 
-    // 2. Places
+    // 2. Places — national only (no per-state places history available)
     buildGrowthStat('stat-places-growth', getSlicedData(histData.places, n), ' places');
     chartInstances['places'] = new Chart(document.getElementById('chart-places'), {{
         type: 'line', options: chartOpts,
@@ -1962,16 +1973,23 @@ function buildTrendCharts() {{
         ] }}
     }});
 
-    // 4. State growth
+    // 4. State growth — highlight selected state if filtered
+    const stateColors = {{ nsw:'#3d7eff', vic:'#00c9a7', qld:'#d4890a', wa:'#e05c3a', sa:'#9b59b6' }};
+    function stateDataset(label, key, color) {{
+        const dimmed = state && state !== key;
+        return {{ label, data: getSlicedData(histData[key], n), borderColor: dimmed ? color + '33' : color,
+                  backgroundColor: 'transparent', fill: false, tension: 0.3,
+                  pointRadius: 0, borderWidth: dimmed ? 1 : (state === key ? 3 : 2) }};
+    }}
     chartInstances['states'] = new Chart(document.getElementById('chart-states'), {{
         type: 'line', options: chartOpts,
         plugins: [eventAnnotationPlugin],
         data: {{ labels, datasets: [
-            makeDataset('NSW', histData.nsw, '#3d7eff'),
-            makeDataset('VIC', histData.vic, '#00c9a7'),
-            makeDataset('QLD', histData.qld, '#d4890a'),
-            makeDataset('WA',  histData.wa,  '#e05c3a'),
-            makeDataset('SA',  histData.sa,  '#9b59b6'),
+            stateDataset('NSW', 'nsw', '#3d7eff'),
+            stateDataset('VIC', 'vic', '#00c9a7'),
+            stateDataset('QLD', 'qld', '#d4890a'),
+            stateDataset('WA',  'wa',  '#e05c3a'),
+            stateDataset('SA',  'sa',  '#9b59b6'),
         ] }}
     }});
 
