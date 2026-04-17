@@ -638,13 +638,35 @@ body {
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ── ABR SEARCH LINK ── */
+.abr-search-link {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: linear-gradient(135deg, var(--surface), var(--surface2));
+    transition: all 0.2s ease;
+    display: inline-block;
+}
+
+.abr-search-link:hover {
+    color: var(--accent-bright);
+    border-color: var(--accent);
+    background: linear-gradient(135deg, var(--surface2), var(--surface));
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
 </style>
 </head>
 <body>
 
 <header class="header">
     <div class="logo">Kint<span>ell</span></div>
-    <div class="header-meta">ECEC Market Intelligence &bull; Updated 2026-04-16 &bull; 18,223 services tracked</div>
+    <div class="header-meta">ECEC Market Intelligence &bull; Updated 2026-04-17 &bull; 18,223 services tracked</div>
 </header>
 
 <nav class="tabs">
@@ -710,7 +732,7 @@ body {
         </div>
         <div class="stat-card">
             <div class="stat-label">New Approvals (30d)</div>
-            <div class="stat-value">25</div>
+            <div class="stat-value">23</div>
             <div class="stat-sub">New LDC services approved</div>
         </div>
         <div class="stat-card">
@@ -722,7 +744,7 @@ body {
         <div class="stat-card">
             <div class="stat-label">Formative Centres</div>
             <div class="stat-value">6.8%</div>
-            <div class="stat-sub">659 approved in last 18 months</div>
+            <div class="stat-sub">658 approved in last 18 months</div>
         </div>
     </div>
 
@@ -1032,7 +1054,7 @@ body {
     </div>
 
     <div class="section">
-        <div class="section-title">Weekly News &bull; 2026-04-16</div>
+        <div class="section-title">Weekly News &bull; 2026-04-17</div>
         <p style='color:#888;'>No news items this week.</p>
     </div>
 
@@ -1676,7 +1698,9 @@ function renderOperator(op, idx) {
             <div class="detail-grid">
                 <div class="detail-block">
                     <div class="detail-block-label">ABN</div>
-                    <div class="detail-block-value" style="font-family:var(--mono)">${op.abn || '—'}</div>
+                    <div class="detail-block-value" style="font-family:var(--mono)">
+                        ${op.abn ? op.abn : `<a href="https://abr.business.gov.au/Search/Index?SearchText=${encodeURIComponent(op.legal_name.replace(/\s+(pty|ltd|limited|proprietary|group|holdings)$/gi, '').replace(/[^\w\s]/g, '').trim())}" target="_blank" class="abr-search-link" title="Search ABR for ${op.legal_name}">🔍 Search ABR →</a>`}
+                    </div>
                 </div>
                 <div class="detail-block">
                     <div class="detail-block-label">ACN</div>
