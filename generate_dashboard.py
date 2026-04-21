@@ -16,6 +16,7 @@ Run: python generate_dashboard.py
 import json
 import os
 import re
+import shutil
 from pathlib import Path
 from datetime import date, datetime, timedelta
 from collections import Counter, defaultdict
@@ -30,6 +31,7 @@ PROPERTY   = BASE_DIR / "property_owners.json"
 BRIEF      = DATA_DIR / "weekly_brief.json"
 CATCHMENT  = BASE_DIR / "leads_catchment.json"
 HISTORY    = DATA_DIR / "sector_history.json"
+SA2_HISTORY = DATA_DIR / "sa2_history.json"
 
 DOCS_DIR.mkdir(exist_ok=True)
 
@@ -44,6 +46,305 @@ def load_json(path, default=None):
         return default or []
 
 
+def _make_location_desc(record, catchment):
+    """Generate a 1-2 sentence location description from SA2 data fields."""
+    state_names = {
+        "NSW": "New South Wales", "VIC": "Victoria", "QLD": "Queensland",
+        "WA": "Western Australia", "SA": "South Australia", "TAS": "Tasmania",
+        "ACT": "the Australian Capital Territory", "NT": "the Northern Territory",
+    }
+    state = str(record.get("state", "") or "").strip().upper()
+    state_full = state_names.get(state, state)
+    irsd_label = str(catchment.get("irsd_label", "") or "").replace("_", " ")
+    pop_cagr = catchment.get("pop_0_4_cagr")
+    pop_label = catchment.get("pop_growth_label", "")
+    supply_tier = str(catchment.get("supply_tier", "") or "").replace("_", " ")
+    sa2_name = str(catchment.get("sa2_name", "") or "").title()
+
+    # Sentence 1: location context
+    s1 = f"SA2 area in {state_full}."
+
+    # Sentence 2: demand and supply characterisation
+    demand_desc = ""
+    if pop_cagr is not None:
+        if pop_cagr >= 3.0:
+            demand_desc = f"rapidly growing under-5 population (+{pop_cagr:.1f}% p.a.)"
+        elif pop_cagr >= 1.0:
+            demand_desc = f"growing under-5 population (+{pop_cagr:.1f}% p.a.)"
+        elif pop_cagr >= -1.0:
+            demand_desc = f"stable under-5 population ({pop_cagr:+.1f}% p.a.)"
+        else:
+            demand_desc = f"declining under-5 population ({pop_cagr:.1f}% p.a.)"
+
+    seifa_desc = irsd_label.capitalize() if irsd_label else ""
+    supply_desc = f"{supply_tier} childcare market" if supply_tier else ""
+
+    parts = [p for p in [seifa_desc, demand_desc, supply_desc] if p]
+    s2 = (". ".join(parts[:2]) + ".") if parts else ""
+
+    return (s1 + " " + s2).strip()
+
+
+def build_catchments_json(catchments, docs_dir, snap=None):
+    """
+    Group catchments by SA2 and write docs/catchments.json.
+
+    ALL catchment-level metrics are computed from the FULL SA2 universe
+    using services_snapshot.csv — not just our target operators.
+    Target operators are stored separately in 'services[]'.
+
+    snap = services_snapshot rows (all 18,223 LDC services).
+    """
+    import math
+    import pandas as pd
+
+    KINDER_TERMS = ["kindergarten", "kinder", "kindy"]
+    NFP_KW = [
+        "incorporated", " inc ", "association", "community", "council", "church",
+        "diocese", "parish", "ymca", "salvation", "catholic", "anglican", "uniting",
+        "baptist", "lutheran", "presbyterian", "limited by guarantee", "cooperative",
+        "co-operative", "neighbourhood", "aboriginal", "indigenous",
+    ]
+
+    # ── Postcode → SA2 concordance ──
+    pc_to_sa2 = {}
+    conc_path = BASE_DIR / "abs_data" / "postcode_to_sa2_concordance.csv"
+    if conc_path.exists():
+        try:
+            conc = pd.read_csv(conc_path, dtype=str)
+            for _, row in conc.iterrows():
+                pc   = str(row.get("POSTCODE", "") or "").strip().zfill(4)
+                code = str(row.get("SA2_CODE",  "") or "").strip()
+                if pc and code and code != "nan":
+                    pc_to_sa2[pc] = code
+            print(f"  Concordance: {len(pc_to_sa2):,} postcodes")
+        except Exception as e:
+            print(f"  WARNING concordance: {e}")
+
+    # ── Group ALL LDC services by SA2 from snapshot ──
+    sa2_all_centres = {}
+    if snap and pc_to_sa2:
+        for row in snap:
+            if str(row.get("long_day_care","")).strip().upper() != "YES":
+                continue
+            pc_raw = str(row.get("postcode","") or "")
+            try:
+                pc = str(int(float(pc_raw))).zfill(4)
+            except Exception:
+                pc = pc_raw.strip().zfill(4)
+            sa2 = pc_to_sa2.get(pc)
+            if not sa2:
+                continue
+
+            places = 0
+            try:
+                places = int(float(str(row.get("numberofapprovedplaces","0") or "0")))
+            except Exception:
+                pass
+
+            svc_name    = str(row.get("servicename","") or "").strip()
+            provider    = str(row.get("providerlegalname","") or "")
+            provider_lo = provider.lower()
+            nqs         = str(row.get("overallrating","") or "").strip()
+
+            # NFP detection — keyword on legal name
+            is_nfp = any(kw in provider_lo for kw in NFP_KW)
+
+            # Kinder detection — name-based (primary) + ACECQA flags (supplement)
+            name_lo = svc_name.lower()
+            name_has_kinder = any(t in name_lo for t in KINDER_TERMS)
+            acecqa_kinder = (
+                str(row.get("preschool/kindergarten_-_stand_alone","")).upper() == "YES" or
+                str(row.get("preschool/kindergarten_-_part_of_a_school","")).upper() == "YES"
+            )
+            has_kinder = name_has_kinder or acecqa_kinder
+            # Source label for display
+            if has_kinder:
+                if name_has_kinder and acecqa_kinder:
+                    kinder_source = "ACECQA verified"
+                elif name_has_kinder:
+                    kinder_source = "name-based — ACECQA unverified"
+                else:
+                    kinder_source = "ACECQA"
+            else:
+                kinder_source = None
+
+            # Approval date from snapshot
+            appr_date = ""
+            for dc in ["serviceapprovalgranteddate", "approval date", "approvaldate"]:
+                val = str(row.get(dc, "") or "").strip()
+                if val and val.lower() != "nan":
+                    appr_date = val
+                    break
+
+            if sa2 not in sa2_all_centres:
+                sa2_all_centres[sa2] = []
+            sa2_all_centres[sa2].append({
+                "service_name":    svc_name,
+                "approved_places": places,
+                "nqs_rating":      nqs,
+                "is_nfp":          is_nfp,
+                "has_kinder":      has_kinder,
+                "kinder_source":   kinder_source,
+                "approval_date":   appr_date,
+            })
+
+        print(f"  SA2 centre groups: {len(sa2_all_centres):,} SA2s from snapshot")
+
+    # ── Helper: CCS pricing insight ──
+    def _ccs_insight(ccs_rate, irsd_decile):
+        if ccs_rate is None:
+            return None
+        pct = round(ccs_rate * 100)
+        if ccs_rate >= 0.80:
+            level = "High CCS dependency"
+            msg = (f"~{pct}% of families at median income receive high subsidy. "
+                   "Pricing above the CCS hourly cap sharply increases out-of-pocket "
+                   "costs — enrolment risk is acute. New entrants must price carefully.")
+        elif ccs_rate >= 0.60:
+            level = "Moderate CCS dependency"
+            msg = (f"~{pct}% subsidy rate at median income. Fee positioning relative "
+                   "to the CCS hourly cap matters but catchment has some income buffer.")
+        else:
+            level = "Low CCS dependency"
+            msg = (f"Affluent catchment (~{pct}% subsidy at median income). "
+                   "Families can absorb above-cap pricing but expect premium quality.")
+        return {"level": level, "message": msg}
+
+    # ── Helper: NQS quality distribution ──
+    def _nqs_quality(centres):
+        if not centres:
+            return None
+        exc = sum(1 for c in centres if "Exceeding" in (c.get("nqs_rating") or ""))
+        mtg = sum(1 for c in centres if c.get("nqs_rating","") == "Meeting NQS")
+        wtn = sum(1 for c in centres if "Working Towards" in (c.get("nqs_rating") or ""))
+        sir = sum(1 for c in centres if "Significant" in (c.get("nqs_rating") or ""))
+        unr = len(centres) - exc - mtg - wtn - sir
+        rated = exc + mtg + wtn + sir
+        score = round((exc*100 + mtg*75 + wtn*50) / rated, 1) if rated > 0 else None
+        return {
+            "exceeding": exc, "meeting": mtg,
+            "working_towards": wtn, "sir": sir, "unrated": unr,
+            "total": len(centres),
+            "quality_score": score,
+            "stress_count": wtn + sir,
+            "stress_pct": round((wtn + sir) / len(centres) * 100, 1),
+        }
+
+    # ── Helper: centre size profile ──
+    def _size_profile(centres):
+        pl = [c["approved_places"] for c in centres if (c.get("approved_places") or 0) > 0]
+        if not pl:
+            return None
+        return {
+            "largest":      max(pl),
+            "smallest":     min(pl),
+            "average":      round(sum(pl) / len(pl)),
+            "band_u50":     sum(1 for p in pl if p < 50),
+            "band_50_99":   sum(1 for p in pl if 50 <= p < 100),
+            "band_100_149": sum(1 for p in pl if 100 <= p < 150),
+            "band_150plus": sum(1 for p in pl if p >= 150),
+        }
+
+    # ── Build SA2 map ──
+    sa2_map = {}
+    for record in catchments:
+        c = record.get('catchment', {})
+        sa2_code = c.get('sa2_code')
+        if not sa2_code:
+            continue
+
+        # Use ALL centres in SA2 (from snapshot) for catchment-level stats
+        # Sort by approval_date descending (most recent first)
+        def _parse_date(d):
+            for fmt in ["%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"]:
+                try:
+                    from datetime import datetime
+                    return datetime.strptime(str(d), fmt)
+                except Exception:
+                    pass
+            from datetime import datetime
+            return datetime.min
+        all_centres = sorted(
+            sa2_all_centres.get(sa2_code, []),
+            key=lambda c: _parse_date(c.get("approval_date", "")),
+            reverse=True
+        )
+        kinder_centres  = [x for x in all_centres if x.get("has_kinder")]
+        kinder_places   = sum(x.get("approved_places",0) for x in kinder_centres)
+        nfp_centres     = [x for x in all_centres if x.get("is_nfp")]
+        total_c         = len(all_centres)
+        total_pl        = sum(x.get("approved_places",0) for x in all_centres)
+        nfp_ratio       = round(len(nfp_centres)/total_c, 3) if total_c > 0 else None
+        kinder_ratio    = round(len(kinder_centres)/total_c, 3) if total_c > 0 else None
+        supply_ratio    = round(total_pl / c["pop_0_4"], 3) if c.get("pop_0_4") else c.get("supply_ratio")
+
+        if sa2_code not in sa2_map:
+            sa2_map[sa2_code] = {
+                'sa2_code':             sa2_code,
+                'sa2_name':             c.get('sa2_name'),
+                'pop_0_4':              c.get('pop_0_4'),
+                'pop_0_4_cagr':         c.get('pop_0_4_cagr'),
+                'pop_growth_label':     c.get('pop_growth_label'),
+                'median_income_annual': c.get('median_income_weekly_annual'),
+                'income_cagr':          c.get('income_cagr'),
+                'est_ccs_rate':         c.get('est_ccs_rate'),
+                'est_gap_fee_per_day':  c.get('est_gap_fee_per_day'),
+                'fee_sensitivity':      c.get('fee_sensitivity'),
+                'irsd_decile':          c.get('irsd_decile'),
+                'irsd_label':           c.get('irsd_label'),
+                # Supply — from full SA2 snapshot universe
+                'total_centres':        total_c or c.get('total_centres'),
+                'total_licensed_places': total_pl or c.get('total_licensed_places'),
+                'nfp_ratio':            nfp_ratio if nfp_ratio is not None else c.get('nfp_ratio'),
+                'kinder_ratio':         kinder_ratio if kinder_ratio is not None else c.get('kinder_ratio'),
+                'kinder_count':         len(kinder_centres),
+                'kinder_places':        kinder_places,
+                'supply_ratio':         supply_ratio,
+                'supply_tier':          c.get('supply_tier'),
+                # Enriched analytics — all from full SA2 universe
+                'nqs_quality':          _nqs_quality(all_centres),
+                'size_profile':         _size_profile(all_centres),
+                'ccs_insight':          _ccs_insight(c.get('est_ccs_rate'), c.get('irsd_decile')),
+                # Slim competing centres list for display
+                'competing_centres':    all_centres,
+                # Generated fields
+                'location_description': _make_location_desc(record, c),
+                'unemployment_rate':    None,
+                'services': [],
+            }
+
+        sa2_map[sa2_code]['services'].append({
+            'service_name':      record.get('service_name', ''),
+            'operator_name':     record.get('operator_name', ''),
+            'suburb':            record.get('suburb', ''),
+            'postcode':          str(record.get('postcode', '') or ''),
+            'state':             record.get('state', ''),
+            'approved_places':   record.get('approved_places'),
+            'overall_rating':    record.get('overall_rating', ''),
+            'priority_tier':     record.get('priority_tier', ''),
+            'score':             record.get('score'),
+            'is_nfp':            record.get('is_nfp', False),
+            'has_kinder':        record.get('has_kinder', False),
+            'service_appr_num':  record.get('service_approval_number', ''),
+        })
+
+    def _sanitise(obj):
+        if isinstance(obj, dict):
+            return {k: _sanitise(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [_sanitise(v) for v in obj]
+        if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+            return None
+        return obj
+
+    grouped = [_sanitise(g) for g in sa2_map.values()]
+    out_path = docs_dir / 'catchments.json'
+    with open(out_path, 'w', encoding='utf-8') as f:
+        json.dump(grouped, f, ensure_ascii=False)
+    print(f"  Catchments JSON: {out_path.name} ({len(grouped):,} SA2 areas, "
+          f"{sum(len(g['services']) for g in grouped):,} services)")
+    return grouped
 def load_snapshot():
     if not SNAP_FILE.exists():
         return []
@@ -320,6 +621,14 @@ def generate():
     print("=== Kintell Dashboard Generator ===")
     today = str(date.today())
 
+    # Auto-copy sa2_history.json from data/ to docs/ for browser fetch()
+    if SA2_HISTORY.exists():
+        dest = DOCS_DIR / "sa2_history.json"
+        shutil.copy(SA2_HISTORY, dest)
+        print(f"  Copied sa2_history.json → docs/ ({SA2_HISTORY.stat().st_size:,} bytes)")
+    else:
+        print(f"  WARNING: {SA2_HISTORY} not found — run build_sa2_history.py first")
+
     # Load data
     print("Loading data...")
     snap       = load_snapshot()
@@ -327,13 +636,17 @@ def generate():
     hot        = load_json(HOT, [])
     property_d = load_json(PROPERTY, {})
     brief      = load_json(BRIEF, {})
-
+    catchments = load_json(CATCHMENT, [])
+    
     print(f"  Snapshot: {len(snap):,} services")
     history    = load_json(HISTORY, {})
     hist_data  = history.get("history", [])
     print(f"  History: {len(hist_data)} quarters ({hist_data[0]['quarter'] if hist_data else 'none'} → {hist_data[-1]['quarter'] if hist_data else 'none'})")
     print(f"  Operators: {len(operators):,}")
     print(f"  Property data: {len(property_d.get('operators',[]))} enriched")
+
+    # Build catchments.json — SA2-grouped, written to docs/ for fetch() load
+    build_catchments_json(catchments, DOCS_DIR, snap=snap)
 
     # Compute stats
     stats       = compute_sector_stats(snap)
@@ -1059,6 +1372,316 @@ body {{
 ::-webkit-scrollbar {{ width: 6px; }}
 ::-webkit-scrollbar-track {{ background: var(--bg); }}
 ::-webkit-scrollbar-thumb {{ background: var(--border); border-radius: 3px; }}
+
+/* ── ABR SEARCH LINK ── */
+.abr-search-link {{
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: linear-gradient(135deg, var(--surface), var(--surface2));
+    transition: all 0.2s ease;
+    display: inline-block;
+}}
+
+.abr-search-link:hover {{
+    color: var(--accent-bright);
+    border-color: var(--accent);
+    background: linear-gradient(135deg, var(--surface2), var(--surface));
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}}
+
+/* ── CATCHMENT CARDS ── */
+.catchment-card {{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+}}
+
+.catchment-header h3 {{
+    margin: 0 0 4px 0;
+    color: var(--text);
+    font-size: 18px;
+    font-weight: 600;
+}}
+
+.sa2-code {{
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 400;
+    font-family: var(--mono);
+}}
+
+.catchment-summary {{
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 16px;
+}}
+
+.catchment-metrics {{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+    padding: 16px;
+    background: var(--surface2);
+    border-radius: 6px;
+}}
+
+.metric {{
+    text-align: center;
+}}
+
+.metric-label {{
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}}
+
+.metric-value {{
+    color: var(--text);
+    font-size: 20px;
+    font-weight: 600;
+    font-family: var(--mono);
+    margin-bottom: 4px;
+}}
+
+.metric-trend {{
+    color: var(--muted);
+    font-size: 11px;
+}}
+
+.metric-trend.declining {{ color: #ff6b6b; }}
+.metric-trend.growing {{ color: #51cf66; }}
+.metric-trend.stable {{ color: var(--muted); }}
+
+.section-header {{
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}}
+
+.market-metrics {{
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 400;
+    text-transform: none;
+}}
+
+/* ── TREND SECTION ── */
+.trend-section {{
+    background: var(--surface2);
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 20px;
+}}
+
+.mini-chart {{
+    margin: 12px 0;
+}}
+
+.trend-chart {{
+    width: 100%;
+    height: 60px;
+    background: var(--bg);
+    border-radius: 4px;
+    margin-bottom: 8px;
+}}
+
+.chart-legend {{
+    display: flex;
+    gap: 16px;
+    font-size: 11px;
+    color: var(--muted);
+    justify-content: center;
+}}
+
+.legend-line {{
+    display: inline-block;
+    width: 20px;
+    height: 2px;
+    margin-right: 4px;
+    vertical-align: middle;
+}}
+
+.legend-line.solid {{ background: var(--accent); }}
+.legend-line.dashed {{ 
+    background: linear-gradient(to right, var(--accent2) 50%, transparent 50%);
+    background-size: 4px 2px;
+}}
+
+.trend-summary {{
+    display: flex;
+    gap: 20px;
+    font-size: 12px;
+    color: var(--muted);
+    justify-content: center;
+}}
+
+/* ── OPERATORS SECTION ── */
+.operators-section {{
+    background: var(--surface2);
+    border-radius: 6px;
+    padding: 16px;
+}}
+
+.operators-list {{
+    display: grid;
+    gap: 8px;
+}}
+
+.operator-row {{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}}
+
+.operator-row:hover {{
+    border-color: var(--accent);
+    transform: translateY(-1px);
+}}
+
+.operator-summary {{
+    padding: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}}
+
+.operator-name {{
+    color: var(--text);
+    font-weight: 500;
+    font-size: 14px;
+}}
+
+.operator-stats {{
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    font-size: 12px;
+    color: var(--muted);
+}}
+
+.market-share {{
+    font-weight: 500;
+    color: var(--accent);
+}}
+
+.nqs-indicator {{
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+}}
+
+.nqs-indicator.nqs-exceeding-nqs {{ background: #51cf66; color: #000; }}
+.nqs-indicator.nqs-meeting-nqs {{ background: #339af0; color: #fff; }}
+.nqs-indicator.nqs-working-towards-nqs {{ background: #ffd43b; color: #000; }}
+.nqs-indicator.nqs-not-rated {{ background: var(--border); color: var(--muted); }}
+
+.operator-details {{
+    padding: 0 12px;
+    max-height: 0;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}}
+
+.operator-row[data-expanded="true"] .operator-details {{
+    max-height: 500px;
+    padding: 0 12px 12px 12px;
+}}
+
+.performance-metrics {{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+    padding: 12px;
+    background: var(--surface2);
+    border-radius: 4px;
+    margin-bottom: 12px;
+}}
+
+.metric-small {{
+    text-align: center;
+}}
+
+.metric-small span:first-child {{
+    display: block;
+    color: var(--muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}}
+
+.metric-small span:last-child {{
+    display: block;
+    color: var(--text);
+    font-weight: 600;
+    font-size: 14px;
+}}
+
+.score {{
+    color: var(--accent) !important;
+}}
+
+.centres-list {{
+    display: grid;
+    gap: 6px;
+}}
+
+.centre-item {{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    background: var(--bg);
+    border-radius: 4px;
+    font-size: 12px;
+}}
+
+.centre-name {{
+    flex: 1;
+    color: var(--text);
+    margin-right: 8px;
+}}
+
+.centre-places {{
+    color: var(--muted);
+    font-family: var(--mono);
+    margin-right: 8px;
+}}
+
+.centre-rating {{
+    padding: 2px 4px;
+    border-radius: 2px;
+    font-size: 9px;
+    font-weight: 500;
+    text-transform: uppercase;
+}}
+
+.no-data {{
+    color: var(--muted);
+    text-align: center;
+    padding: 20px;
+    font-size: 12px;
+}}
 </style>
 </head>
 <body>
@@ -1388,6 +2011,54 @@ function showPanel(name) {{
 // ── STATE CHART ──
 const stateData = {json.dumps(state_stats)};
 const histData = {json.dumps(hist_js)};
+
+// ── CATCHMENT DATA — loaded via fetch same as operators.json ──
+let allCatchments = [];
+let catchmentsReady = false;
+let sa2HistoryData = {{}};  // keyed by sa2_code for O(1) lookup
+
+fetch('sa2_history.json')
+    .then(r => r.ok ? r.json() : Promise.reject('not found'))
+    .then(data => {{
+        // Build lookup: sa2_code → {{quarters, dates, places, services, supply_ratio}}
+        (data.sa2s || []).forEach(sa2 => {{
+            sa2HistoryData[sa2.sa2_code] = sa2;
+        }});
+        console.log('SA2 history loaded: ' + Object.keys(sa2HistoryData).length + ' SA2s');
+    }})
+    .catch(e => console.warn('sa2_history.json not available — Panel 3 will show current data only'));
+
+// Show a loading indicator in Panel 3 immediately while data fetches
+document.addEventListener('DOMContentLoaded', function() {{
+    const results = document.getElementById('catchment-results');
+    if (results) results.innerHTML = '<p style="color:var(--muted);padding:20px 0;">⏳ Loading catchment data…</p>';
+}});
+
+fetch('catchments.json')
+    .then(r => {{
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+    }})
+    .then(data => {{
+        allCatchments = data;
+        catchmentsReady = true;
+        console.log('Catchments loaded: ' + data.length + ' SA2 areas');
+        // Clear the loading message
+        const results = document.getElementById('catchment-results');
+        const q = document.getElementById('catch-search');
+        if (q && q.value.trim().length >= 2) {{
+            // User already has a search typed — run it immediately
+            filterCatchments();
+        }} else if (results) {{
+            results.innerHTML = '<p style="color:var(--muted);padding:20px 0;">Enter a suburb or postcode to explore catchment intelligence.</p>';
+        }}
+    }})
+    .catch(e => {{
+        catchmentsReady = false;
+        console.warn('catchments.json load failed:', e);
+        const results = document.getElementById('catchment-results');
+        if (results) results.innerHTML = '<p style="color:var(--hot);padding:20px 0;">Could not load catchment data. Check that catchments.json exists in docs/.</p>';
+    }});
 function buildStateChart() {{
     const el = document.getElementById('state-chart');
     const max = Math.max(...stateData.services);
@@ -1666,6 +2337,7 @@ function renderOperator(op, idx) {{
                     <a href="${{ts}}" target="_blank" class="centre-link">Title Search</a>
                     <a href="${{maps}}" target="_blank" class="centre-link">Maps</a>
                     <a href="${{sb}}" target="_blank" class="centre-link">StartingBlocks</a>
+                    <a onclick="jumpToCatchment('${{c.suburb}}','${{c.postcode}}')" class="centre-link" style="cursor:pointer;color:var(--accent2)">Catchment →</a>
                 </div>
             </div>
         `;
@@ -1685,7 +2357,9 @@ function renderOperator(op, idx) {{
             <div class="detail-grid">
                 <div class="detail-block">
                     <div class="detail-block-label">ABN</div>
-                    <div class="detail-block-value" style="font-family:var(--mono)">${{op.abn || '—'}}</div>
+                    <div class="detail-block-value" style="font-family:var(--mono)">
+                        ${{op.abn ? op.abn : `<a href="https://abr.business.gov.au/Search/Index?SearchText=${{encodeURIComponent(op.legal_name.replace(/\\s+(pty|ltd|limited|proprietary|group|holdings)$/gi, '').replace(/[^\\w\\s]/g, '').trim())}}" target="_blank" class="abr-search-link" title="Search ABR for ${{op.legal_name}}">🔍 Search ABR →</a>`}}
+                    </div>
                 </div>
                 <div class="detail-block">
                     <div class="detail-block-label">ACN</div>
@@ -1959,9 +2633,12 @@ function buildTrendCharts() {{
 
     // COVID + event annotations
     const events = [
-        {{ quarter: 'Q1 2020', label: 'COVID', color: 'rgba(224,92,58,0.3)' }},
-        {{ quarter: 'Q1 2018', label: 'NQS reform', color: 'rgba(61,126,255,0.2)' }},
-        {{ quarter: 'Q1 2026', label: '3-Day Guarantee', color: 'rgba(0,201,167,0.2)' }},
+        {{ quarter: 'Q3 2013', label: 'NQF Launch',    color: 'rgba(61,126,255,0.35)' }},
+        {{ quarter: 'Q1 2018', label: 'NQS Reform',    color: 'rgba(61,126,255,0.35)' }},
+        {{ quarter: 'Q2 2020', label: 'COVID',         color: 'rgba(224,92,58,0.45)' }},
+        {{ quarter: 'Q3 2022', label: 'CCS Reform',    color: 'rgba(0,201,167,0.35)' }},
+        {{ quarter: 'Q3 2023', label: 'Wage +15%',     color: 'rgba(155,89,182,0.45)' }},
+        {{ quarter: 'Q1 2026', label: '3-Day Guar.',   color: 'rgba(0,201,167,0.35)' }},
     ];
 
     function makeDataset(label, data, color, fill) {{
@@ -2140,14 +2817,746 @@ function buildConcentrationChart() {{
     }}).join('');
 }}
 
-// Catchment placeholder
+// ── PANEL 3 — CATCHMENT EXPLORER ──
+// Search by suburb, postcode, or SA2 name → renders SA2-level charts
+
+var _lastCatchmentMatches = [];
+
 function filterCatchments() {{
-    const q = document.getElementById('catch-search').value;
-    document.getElementById('catchment-results').innerHTML =
-        q.length > 1
-        ? '<p style="color:var(--muted);padding:20px 0">Catchment Explorer will be fully interactive in the next release. Use the Operator Intelligence panel to find centres in a specific suburb.</p>'
-        : '<p style="color:var(--muted);padding:20px 0">Enter a suburb or postcode to explore catchment intelligence.</p>';
+    const q = document.getElementById('catch-search').value.trim().toLowerCase();
+    const results = document.getElementById('catchment-results');
+
+    if (q.length < 2) {{
+        results.innerHTML = '<p style="color:var(--muted);padding:20px 0;">Enter a suburb or postcode to explore catchment intelligence.</p>';
+        return;
+    }}
+
+    if (!allCatchments || allCatchments.length === 0) {{
+        results.innerHTML = '<p style="color:var(--muted);padding:20px 0;">⏳ Catchment data still loading — results will appear automatically once ready.</p>';
+        return;
+    }}
+
+    // Match on suburb, postcode, SA2 name or SA2 code from the services list
+    const matches = allCatchments.filter(sa2 => {{
+        if ((sa2.sa2_name || '').toLowerCase().includes(q)) return true;
+        if ((sa2.sa2_code || '').includes(q)) return true;
+        return (sa2.services || []).some(s =>
+            (s.suburb || '').toLowerCase().includes(q) ||
+            (s.postcode || '').includes(q) ||
+            (s.service_name || '').toLowerCase().includes(q)
+        );
+    }});
+
+    _lastCatchmentMatches = matches;
+
+    if (matches.length === 0) {{
+        results.innerHTML = '<p style="color:var(--muted);padding:20px 0;">No catchments found for <strong>' + q + '</strong>. Try a suburb name or postcode.</p>';
+        return;
+    }}
+
+    // 1 match → show full detail immediately; 2-5 → show summary list
+    const limited = matches.slice(0, 5);
+    if (limited.length === 1) {{
+        results.innerHTML = renderCatchmentDetail(limited[0]);
+        buildCatchmentCharts(limited[0]);
+    }} else {{
+        results.innerHTML = limited.map((sa2, i) => renderCatchmentSummaryRow(sa2, i)).join('');
+    }}
 }}
+
+function selectCatchment(idx) {{
+    const sa2 = _lastCatchmentMatches[idx];
+    if (!sa2) return;
+    document.getElementById('catchment-results').innerHTML = renderCatchmentDetail(sa2);
+    buildCatchmentCharts(sa2);
+}}
+
+function renderCatchmentSummaryRow(sa2, idx) {{
+    const tier = sa2.supply_tier || 'unknown';
+    const tierColor = {{ oversupplied: 'var(--hot)', supplied: 'var(--warm)', balanced: 'var(--accent2)', undersupplied: 'var(--accent)' }}[tier] || 'var(--muted)';
+    const pop = sa2.pop_0_4 ? sa2.pop_0_4.toLocaleString() : 'n/a';
+    const ratio = sa2.supply_ratio ? sa2.supply_ratio.toFixed(2) + 'x' : 'n/a';
+    const suburbs = [...new Set((sa2.services || []).map(s => s.suburb).filter(Boolean))].slice(0, 3).join(', ');
+    return `
+    <div onclick="selectCatchment(${{idx}})" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:10px;cursor:pointer;transition:border-color 0.2s"
+         onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+                <div style="font-weight:600;font-size:14px">${{sa2.sa2_name || 'Unknown SA2'}}</div>
+                <div style="color:var(--muted);font-size:12px;margin-top:2px">${{suburbs}} &bull; ${{(sa2.services||[]).length}} target services</div>
+            </div>
+            <div style="display:flex;gap:16px;align-items:center">
+                <div style="text-align:right">
+                    <div style="font-size:11px;color:var(--muted)">Under-5 pop</div>
+                    <div style="font-weight:600">${{pop}}</div>
+                </div>
+                <div style="text-align:right">
+                    <div style="font-size:11px;color:var(--muted)">Supply ratio</div>
+                    <div style="font-weight:600">${{ratio}}</div>
+                </div>
+                <div style="padding:4px 10px;border-radius:4px;font-size:11px;font-weight:600;background:${{tierColor}}22;color:${{tierColor}};text-transform:uppercase">${{tier}}</div>
+            </div>
+        </div>
+    </div>`;
+}}
+
+function renderCatchmentDetail(sa2) {{
+    const tier = sa2.supply_tier || 'unknown';
+    const tierColor = {{ oversupplied: 'var(--hot)', supplied: 'var(--warm)', balanced: 'var(--accent2)', undersupplied: 'var(--accent)' }}[tier] || 'var(--muted)';
+    const popCagr = sa2.pop_0_4_cagr;
+    const popTrend = popCagr == null ? '' : (popCagr >= 1 ? '▲' : popCagr <= -1 ? '▼' : '→') + ' ' + (popCagr > 0 ? '+' : '') + popCagr.toFixed(1) + '% p.a.';
+    const popColor = popCagr == null ? 'var(--muted)' : popCagr >= 1 ? 'var(--accent2)' : popCagr <= -1 ? 'var(--hot)' : 'var(--muted)';
+
+    // Kinder — from full SA2 universe (name-based + ACECQA)
+    const kinderCount  = sa2.kinder_count || 0;
+    const kinderPlaces = sa2.kinder_places || 0;
+    const kinderStr    = sa2.total_centres ? kinderCount + ' of ' + sa2.total_centres : 'n/a';
+
+    // NFP
+    const nfpCount = sa2.nfp_ratio && sa2.total_centres ? Math.round(sa2.nfp_ratio * sa2.total_centres) : null;
+    const nfpStr   = nfpCount != null
+        ? nfpCount + ' of ' + sa2.total_centres + ' (' + Math.round(sa2.nfp_ratio*100) + '%)'
+        : 'n/a';
+
+    // NQS quality block
+    const nqs = sa2.nqs_quality || {{}};
+    const nqsTotal = nqs.total || 1;
+    function nqsBar(count, color) {{
+        const pct = Math.round(count/nqsTotal*100);
+        return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+            <div style="width:110px;font-size:11px;color:var(--muted)">${{count}} centres (${{pct}}%)</div>
+            <div style="flex:1;height:7px;background:var(--surface);border-radius:3px;overflow:hidden">
+                <div style="width:${{pct}}%;height:100%;background:${{color}};border-radius:3px"></div>
+            </div></div>`;
+    }}
+    const nqsHtml = nqs.total ? `
+        <div style="margin-bottom:6px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+                <span style="font-size:11px;font-weight:600">Quality score: ${{nqs.quality_score != null ? nqs.quality_score + '/100' : 'n/a'}}</span>
+                <span style="font-size:11px;color:${{nqs.stress_pct > 20 ? 'var(--hot)' : nqs.stress_pct > 10 ? 'var(--warm)' : 'var(--accent2)'}}">
+                    Regulatory stress: ${{nqs.stress_pct}}% (${{nqs.stress_count}} centres)
+                </span>
+            </div>
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:4px">Exceeding NQS</div>
+            ${{nqsBar(nqs.exceeding, '#00c9a7')}}
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:4px">Meeting NQS</div>
+            ${{nqsBar(nqs.meeting, '#3d7eff')}}
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:4px">Working Towards</div>
+            ${{nqsBar(nqs.working_towards, '#d4890a')}}
+            ${{nqs.sir > 0 ? '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--hot);margin-bottom:4px">Sig. Improvement Required</div>' + nqsBar(nqs.sir, '#e05c3a') : ''}}
+            ${{nqs.unrated > 0 ? '<div style="font-size:11px;color:var(--muted);margin-top:4px">' + nqs.unrated + ' not yet rated</div>' : ''}}
+        </div>` : '<div style="color:var(--muted);font-size:11px">NQS data unavailable</div>';
+
+    // Size profile block
+    const sp = sa2.size_profile || null;
+    const spHtml = sp ? `
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px">
+            <div><div style="font-size:10px;color:var(--muted)">Largest</div><div style="font-size:16px;font-weight:600">${{sp.largest}} pl</div></div>
+            <div><div style="font-size:10px;color:var(--muted)">Average</div><div style="font-size:16px;font-weight:600">${{sp.average}} pl</div></div>
+            <div><div style="font-size:10px;color:var(--muted)">Smallest</div><div style="font-size:16px;font-weight:600">${{sp.smallest}} pl</div></div>
+        </div>
+        <div style="font-size:11px;color:var(--muted)">
+            &lt;50pl: ${{sp.band_u50}} &nbsp;·&nbsp; 50–99: ${{sp.band_50_99}} &nbsp;·&nbsp; 100–149: ${{sp.band_100_149}} &nbsp;·&nbsp; 150+: ${{sp.band_150plus}}
+        </div>` : '<div style="color:var(--muted);font-size:11px">Size data unavailable</div>';
+
+    // CCS insight
+    const ccs = sa2.ccs_insight || null;
+    const ccsColor = ccs ? (ccs.level.includes('High') ? 'var(--hot)' : ccs.level.includes('Low') ? 'var(--accent2)' : 'var(--warm)') : 'var(--muted)';
+    const ccsHtml = ccs ? `
+        <div style="border-left:3px solid ${{ccsColor}};padding-left:12px">
+            <div style="font-size:12px;font-weight:600;color:${{ccsColor}};margin-bottom:4px">${{ccs.level}}</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.5">${{ccs.message}}</div>
+            ${{sa2.est_gap_fee_per_day ? `<div style="font-size:11px;color:var(--muted);margin-top:6px">Est. gap fee at median income: <strong style="color:var(--text)">$` + sa2.est_gap_fee_per_day.toFixed(0) + `/day</strong></div>` : ''}}
+        </div>` : '';
+
+    // Target services
+    const targetServices = (sa2.services || []);
+    const nqsBadgeColor = {{ 'Exceeding NQS': '#00c9a7', 'Meeting NQS': '#3d7eff', 'Working Towards NQS': '#d4890a', 'Significant Improvement Required': '#e05c3a' }};
+    const targetRows = targetServices.map((s, idx) => {{
+        const tier2     = s.priority_tier || '';
+        const typeLabel = s.is_nfp ? 'NFP' : 'For-Profit';
+        const typeColor = s.is_nfp ? 'var(--accent2)' : 'var(--warm)';
+        const kinderTag = s.has_kinder ? '<span style="background:rgba(0,201,167,0.1);color:var(--accent2);padding:1px 6px;border-radius:3px;font-size:10px;margin-left:4px">KINDER</span>' : '';
+        const nqsRating = s.overall_rating || '';
+        const nqsColor  = nqsBadgeColor[nqsRating] || 'var(--muted)';
+        const nqsBg     = nqsRating.includes('Working') ? 'rgba(212,137,10,0.15)' :
+                          nqsRating.includes('Significant') ? 'rgba(224,92,58,0.15)' :
+                          nqsRating.includes('Exceeding') ? 'rgba(0,201,167,0.12)' :
+                          nqsRating.includes('Meeting') ? 'rgba(61,126,255,0.12)' : 'var(--surface2)';
+        const nqsTag    = nqsRating ? `<span style="background:${{nqsBg}};color:${{nqsColor}};padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600">${{nqsRating.replace(' NQS','').replace('Significant Improvement Required','⚠ SIR')}}</span>` : '';
+        const warnTag   = (nqsRating.includes('Working') || nqsRating.includes('Significant'))
+            ? '<div style="font-size:10px;color:var(--hot);margin-top:3px">⚠ Poor quality rating — elevated enrolment and compliance risk</div>' : '';
+        return `
+        <div id="svc-card-${{idx}}" data-svcname="${{(s.service_name||'').replace(/"/g,'&quot;')}}"
+             style="padding:10px 12px;background:var(--bg);border-radius:6px;margin-bottom:6px;border:1px solid transparent;transition:border-color 0.2s"
+             onmouseenter="highlightEventByIdx(${{idx}}, true)"
+             onmouseleave="highlightEventByIdx(${{idx}}, false)">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div style="flex:1">
+                    <div style="font-size:13px;font-weight:500;color:var(--text)">${{s.service_name || ''}}</div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:2px">
+                        ${{s.operator_name || ''}} &bull; ${{s.suburb || ''}}, ${{s.state || ''}}
+                        &bull; <span style="color:${{typeColor}}">${{typeLabel}}</span>
+                        ${{kinderTag}}
+                        ${{s.service_appr_num ? '&bull; <span style="font-family:var(--mono);font-size:10px">' + s.service_appr_num + '</span>' : ''}}
+                    </div>
+                    ${{warnTag}}
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;margin-left:12px">
+                    <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${{s.approved_places || ''}} pl</span>
+                    ${{nqsTag}}
+                    ${{tier2 ? '<span class="tier-badge tier-' + tier2 + '">' + tier2.toUpperCase() + '</span>' : ''}}
+                </div>
+            </div>
+        </div>`;
+    }}).join('');
+
+    return `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:24px">
+        <!-- Header -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+            <div>
+                <div style="font-size:18px;font-weight:600">${{sa2.sa2_name || 'Unknown SA2'}}</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:2px;font-family:var(--mono)">SA2 ${{sa2.sa2_code || ''}}</div>
+            </div>
+            <div style="padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;background:${{tierColor}}22;color:${{tierColor}};text-transform:uppercase;letter-spacing:.05em">${{tier}}</div>
+        </div>
+        ${{sa2.location_description ? `<div style="font-size:12px;color:var(--muted);margin-bottom:20px;line-height:1.5">${{sa2.location_description}}</div>` : ''}}
+
+        <!-- 6 stat cards -->
+        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:24px">
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px">
+                <div class="stat-label">Under-5 Pop</div>
+                <div class="stat-value" style="font-size:20px">${{sa2.pop_0_4 ? sa2.pop_0_4.toLocaleString() : 'n/a'}}</div>
+                <div style="font-size:10px;color:${{popColor}};margin-top:3px">${{popTrend}}</div>
+            </div>
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px">
+                <div class="stat-label">Supply Ratio</div>
+                <div class="stat-value" style="font-size:20px">${{sa2.supply_ratio ? sa2.supply_ratio.toFixed(2) + 'x' : 'n/a'}}</div>
+                <div style="font-size:10px;color:var(--muted);margin-top:3px">places per child &lt;5</div>
+            </div>
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px">
+                <div class="stat-label">Median Income</div>
+                <div class="stat-value" style="font-size:20px">${{sa2.median_income_annual ? '$' + Math.round(sa2.median_income_annual/1000) + 'k' : 'n/a'}}</div>
+                <div style="font-size:10px;color:var(--muted);margin-top:3px">CCS ~${{sa2.est_ccs_rate ? Math.round(sa2.est_ccs_rate*100) + '%' : 'n/a'}}</div>
+            </div>
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px">
+                <div class="stat-label">SEIFA (IRSD)</div>
+                <div class="stat-value" style="font-size:20px">${{sa2.irsd_decile ? sa2.irsd_decile + '/10' : 'n/a'}}</div>
+                <div style="font-size:10px;color:var(--muted);margin-top:3px">${{(sa2.irsd_label || '').replace('_',' ')}}</div>
+            </div>
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px">
+                <div class="stat-label">Kinder-Approved</div>
+                <div class="stat-value" style="font-size:20px">${{kinderStr}}</div>
+                <div style="font-size:10px;color:var(--muted);margin-top:3px">${{kinderPlaces ? kinderPlaces.toLocaleString() + ' places' : ''}}</div>
+            </div>
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px">
+                <div class="stat-label">Unemployment</div>
+                <div class="stat-value" style="font-size:20px;color:var(--muted)">—</div>
+                <div style="font-size:10px;color:var(--muted);margin-top:3px">data pending</div>
+            </div>
+        </div>
+
+        <!-- Top row: 3 small charts -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px">
+            <div>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px">Median Income (Annual)</div>
+                <canvas id="chart-catch-income" height="100"></canvas>
+            </div>
+            <div>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px">Under-5 Population</div>
+                <canvas id="chart-catch-pop" height="100"></canvas>
+            </div>
+            <div>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px">Centre Count</div>
+                <canvas id="chart-catch-centres" height="100"></canvas>
+            </div>
+        </div>
+
+        <!-- Large combined chart: Licensed Places + Supply Ratio -->
+        <div id="combined-chart-wrapper" style="margin-bottom:24px">
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px">
+                Licensed Places (left) &amp; Supply Ratio (right) &nbsp;—&nbsp;
+                ▲ centre entry &nbsp; ▼ exit &nbsp; hover annotation for centre names
+            </div>
+            <canvas id="chart-catch-combined" height="160"></canvas>
+            <div id="catch-event-tooltip" style="display:none;position:fixed;background:var(--surface);border:1px solid var(--accent2);border-radius:6px;padding:10px 14px;font-size:11px;color:var(--text);pointer-events:none;z-index:200;max-width:300px;box-shadow:0 4px 20px rgba(0,0,0,0.5)"></div>
+            <div style="margin-top:8px;padding:8px 12px;background:var(--surface2);border-radius:6px;font-size:11px;color:var(--muted);line-height:1.5">
+                <strong style="color:var(--text)">Note:</strong> A rising supply ratio indicates <em>increasing competition pressure</em>, not opportunity.
+                Thresholds: &lt;0.55x balanced · 0.55–1.0x supplied · &gt;1.0x oversupplied
+            </div>
+        </div>
+
+        <!-- Analytics: 3-column grid -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">
+            <!-- NQS Quality -->
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:16px">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:12px">NQS Quality — All ${{sa2.total_centres || ''}} Centres</div>
+                ${{nqsHtml}}
+            </div>
+            <!-- Centre Size Profile -->
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:16px">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:12px">Centre Size Profile</div>
+                ${{spHtml}}
+                ${{sp && sa2.total_licensed_places ? '<div style="font-size:11px;color:var(--muted);margin-top:10px">Total: ' + sa2.total_licensed_places.toLocaleString() + ' licensed places across ' + sa2.total_centres + ' centres</div>' : ''}}
+            </div>
+            <!-- CCS Pricing Insight -->
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:16px">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:12px">Fee &amp; Subsidy Dynamics</div>
+                ${{ccsHtml}}
+                <div style="font-size:10px;color:var(--muted);margin-top:10px;font-style:italic">Actual daily fees: Phase 2 (CareforKids data)</div>
+            </div>
+        </div>
+
+        <!-- Supply Landscape -->
+        <div style="margin-bottom:24px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:16px">
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px">Supply Landscape</div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+                <div><div style="font-size:11px;color:var(--muted)">Total centres</div><div style="font-size:18px;font-weight:600;margin-top:2px">${{sa2.total_centres || 'n/a'}}</div></div>
+                <div><div style="font-size:11px;color:var(--muted)">Licensed places</div><div style="font-size:18px;font-weight:600;margin-top:2px">${{sa2.total_licensed_places ? sa2.total_licensed_places.toLocaleString() : 'n/a'}}</div></div>
+                <div><div style="font-size:11px;color:var(--muted)">NFP</div><div style="font-size:15px;font-weight:600;margin-top:2px">${{nfpStr}}</div></div>
+                <div>
+                    <div style="font-size:11px;color:var(--muted)">Kinder</div>
+                    <div style="font-size:15px;font-weight:600;margin-top:2px">${{kinderCount}} centres · ${{kinderPlaces}} places</div>
+                    <div style="font-size:10px;color:var(--muted);margin-top:2px;font-style:italic">Name-based detection — ACECQA flags may undercount</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Target Services -->
+        ${{targetServices.length > 0 ? `
+        <div>
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px">
+                Target Services in this SA2 (${{targetServices.length}}) — hover to highlight on chart
+            </div>
+            ${{targetRows}}
+        </div>` : ''}}
+    </div>`;
+}}
+
+// Highlight chart event lines when hovering service cards
+var _highlightedService = null;
+
+function highlightEvent(svcName, on, cardIdx) {{
+    _highlightedService = on ? svcName : null;
+    const card = document.getElementById('svc-card-' + cardIdx);
+    if (card) card.style.borderColor = on ? 'var(--accent2)' : 'transparent';
+    Object.values(catchmentChartInstances).forEach(c => {{ try {{ c.update('none'); }} catch(e) {{}} }});
+}}
+function highlightEventByIdx(cardIdx, on) {{
+    const card = document.getElementById('svc-card-' + cardIdx);
+    const svcName = card ? card.dataset.svcname : '';
+    highlightEvent(svcName, on, cardIdx);
+}}
+
+// ── Sticky chart: fixes combined chart to top of viewport when scrolled past ──
+(function() {{
+    var _stickyActive = false;
+    var _chartPlaceholder = null;
+
+    function updateStickyChart() {{
+        const wrapper = document.getElementById('combined-chart-wrapper');
+        if (!wrapper) return;
+        const panel = document.getElementById('panel-catchment');
+        if (!panel || !panel.classList.contains('active')) return;
+
+        const wrapperTop = wrapper.getBoundingClientRect().top;
+
+        if (!_stickyActive && wrapperTop < -10) {{
+            // Chart has scrolled above viewport — make it sticky
+            const h = wrapper.offsetHeight;
+            // Insert placeholder to preserve layout space
+            if (!_chartPlaceholder) {{
+                _chartPlaceholder = document.createElement('div');
+                _chartPlaceholder.id = 'chart-sticky-placeholder';
+                wrapper.parentNode.insertBefore(_chartPlaceholder, wrapper);
+            }}
+            _chartPlaceholder.style.height = h + 'px';
+            _chartPlaceholder.style.display = 'block';
+
+            wrapper.style.position = 'fixed';
+            wrapper.style.top = '60px';
+            wrapper.style.left = '50%';
+            wrapper.style.transform = 'translateX(-50%)';
+            wrapper.style.width = '90%';
+            wrapper.style.maxWidth = '1400px';
+            wrapper.style.zIndex = '50';
+            wrapper.style.background = 'var(--surface)';
+            wrapper.style.border = '1px solid var(--accent2)';
+            wrapper.style.borderRadius = '0 0 var(--radius) var(--radius)';
+            wrapper.style.padding = '12px 24px';
+            wrapper.style.maxHeight = '300px';
+            wrapper.style.boxShadow = '0 8px 32px rgba(0,0,0,0.6)';
+            _stickyActive = true;
+
+            // Resize charts to fit sticky height
+            Object.values(catchmentChartInstances).forEach(c => {{
+                try {{ c.resize(); }} catch(e) {{}}
+            }});
+
+        }} else if (_stickyActive) {{
+            // Use placeholder position to decide when to release
+            const ph = document.getElementById('chart-sticky-placeholder');
+            const phTop = ph ? ph.getBoundingClientRect().top : wrapperTop;
+            if (phTop >= -10) {{
+                // Scrolled back up — restore normal position
+                wrapper.style.position = '';
+                wrapper.style.top = '';
+                wrapper.style.left = '';
+                wrapper.style.right = '';
+                wrapper.style.transform = '';
+                wrapper.style.width = '';
+                wrapper.style.maxWidth = '';
+                wrapper.style.zIndex = '';
+                wrapper.style.background = '';
+                wrapper.style.border = '';
+                wrapper.style.borderRadius = '';
+                wrapper.style.padding = '';
+                wrapper.style.maxHeight = '';
+                wrapper.style.boxShadow = '';
+                if (_chartPlaceholder) {{
+                    _chartPlaceholder.style.display = 'none';
+                }}
+                _stickyActive = false;
+
+                Object.values(catchmentChartInstances).forEach(c => {{ try {{ c.resize(); }} catch(e) {{}} }});
+            }}
+        }}
+    }}
+
+    window.addEventListener('scroll', updateStickyChart, {{ passive: true }});
+}})();
+
+// Destroy previous catchment charts before rebuilding
+var catchmentChartInstances = {{}};
+
+function buildCatchmentCharts(sa2) {{
+    Object.values(catchmentChartInstances).forEach(c => {{ try {{ c.destroy(); }} catch(e) {{}} }});
+    catchmentChartInstances = {{}};
+
+    const hist = sa2HistoryData[sa2.sa2_code] || null;
+    const hasHist = hist && hist.quarters && hist.quarters.length > 0;
+
+    if (!hasHist) {{
+        ['chart-catch-income','chart-catch-pop','chart-catch-centres','chart-catch-combined'].forEach(id => {{
+            const el = document.getElementById(id);
+            if (el) el.parentElement.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:16px 0">Run build_sa2_history.py to enable trend charts</div>';
+        }});
+        return;
+    }}
+
+    const qs = hist.quarters;
+
+    // ── Shared opts ──
+    function makeOpts(yLabel, extra) {{
+        return {{
+            responsive: true, maintainAspectRatio: true, spanGaps: true,
+            interaction: {{ mode: 'index', intersect: false }},
+            plugins: {{
+                legend: {{ display: true, labels: {{ color: '#8890a8', font: {{ size: 10 }}, boxWidth: 12 }} }},
+                tooltip: {{ backgroundColor: 'rgba(24,28,38,0.95)', titleColor: '#e8eaf0', bodyColor: '#8890a8', borderColor: '#2a2f3f', borderWidth: 1 }}
+            }},
+            scales: {{
+                x: {{ ticks: {{ color: '#8890a8', font: {{ size: 9 }}, maxTicksLimit: 8 }}, grid: {{ color: 'rgba(255,255,255,0.04)' }} }},
+                y: {{ ticks: {{ color: '#8890a8', font: {{ size: 9 }} }}, grid: {{ color: 'rgba(255,255,255,0.04)' }},
+                      title: {{ display: !!yLabel, text: yLabel||'', color: '#8890a8', font: {{ size: 9 }} }} }},
+                ...(extra || {{}})
+            }}
+        }};
+    }}
+
+    function makeLine(label, data, color, fill, yAxisID) {{
+        const ds = {{ label, data, borderColor: color,
+                      backgroundColor: fill || 'transparent',
+                      fill: !!fill, tension: 0, pointRadius: 0,
+                      borderWidth: 2, spanGaps: true }};
+        if (yAxisID) ds.yAxisID = yAxisID;
+        return ds;
+    }}
+
+    function trimNulls(labels, data) {{
+        let start = 0;
+        while (start < data.length && data[start] == null) start++;
+        return {{ labels: labels.slice(start), data: data.slice(start) }};
+    }}
+
+    // ── Per-quarter event map (combine multiple events) ──
+    const eventMap = {{}};
+    (hist.centre_events || []).forEach(e => {{
+        if (!eventMap[e.quarter]) eventMap[e.quarter] = {{ new_centres:0, removed_centres:0, places_change:0, new_names:[], removed_names:[] }};
+        eventMap[e.quarter].new_centres     += e.new_centres || 0;
+        eventMap[e.quarter].removed_centres += e.removed_centres || 0;
+        eventMap[e.quarter].places_change   += e.places_change || 0;
+        eventMap[e.quarter].new_names        = eventMap[e.quarter].new_names.concat(e.new_names || []);
+        eventMap[e.quarter].removed_names    = eventMap[e.quarter].removed_names.concat(e.removed_names || []);
+    }});
+
+    // ── Compact event plugin for small charts (tiny ▲▼ tick at bottom) ──
+    function makeCompactPlugin(labels) {{
+        return {{
+            id: 'compactEv_' + Math.random(),
+            afterDraw(chart) {{
+                const ctx = chart.ctx;
+                labels.forEach((q, i) => {{
+                    const ev = eventMap[q];
+                    if (!ev || (ev.new_centres === 0 && ev.removed_centres === 0)) return;
+                    const meta = chart.getDatasetMeta(0);
+                    if (!meta?.data[i]) return;
+                    const x = meta.data[i].x;
+                    const isEntry = ev.new_centres > 0;
+                    ctx.save();
+                    ctx.strokeStyle = isEntry ? 'rgba(0,201,167,0.35)' : 'rgba(224,92,58,0.35)';
+                    ctx.lineWidth = 1; ctx.setLineDash([2,3]);
+                    ctx.beginPath();
+                    ctx.moveTo(x, chart.chartArea.top);
+                    ctx.lineTo(x, chart.chartArea.bottom - 8);
+                    ctx.stroke();
+                    ctx.fillStyle = isEntry ? 'rgba(0,201,167,0.7)' : 'rgba(224,92,58,0.7)';
+                    ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+                    ctx.fillText(isEntry ? '▲' : '▼', x, chart.chartArea.bottom - 2);
+                    ctx.restore();
+                }});
+            }}
+        }};
+    }}
+
+    // ── Full annotation plugin for combined chart with hover tooltip ──
+    function makeFullPlugin(labels) {{
+        return {{
+            id: 'fullEv',
+            afterDraw(chart) {{
+                const ctx = chart.ctx;
+                labels.forEach((q, i) => {{
+                    const ev = eventMap[q];
+                    if (!ev || (ev.new_centres === 0 && ev.removed_centres === 0)) return;
+                    const meta = chart.getDatasetMeta(0);
+                    if (!meta?.data[i]) return;
+                    const x = meta.data[i].x;
+                    const top = chart.chartArea.top;
+                    const bot = chart.chartArea.bottom;
+                    const isEntry = ev.new_centres > 0;
+                    const isHigh = _highlightedService &&
+                        (ev.new_names || []).concat(ev.removed_names || [])
+                        .some(n => n === _highlightedService);
+                    const baseAlpha = isHigh ? 0.95 : 0.55;
+                    const lineColor = isEntry
+                        ? `rgba(0,201,167,${{baseAlpha}})`
+                        : `rgba(224,92,58,${{baseAlpha}})`;
+                    const textColor = isEntry
+                        ? `rgba(0,201,167,${{Math.min(1, baseAlpha + 0.2)}})`
+                        : `rgba(224,92,58,${{Math.min(1, baseAlpha + 0.2)}})`;
+                    ctx.save();
+                    ctx.strokeStyle = lineColor;
+                    ctx.lineWidth = isHigh ? 2 : 1;
+                    ctx.setLineDash(isHigh ? [] : [3,2]);
+                    ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bot); ctx.stroke();
+                    // Arrow + count + places
+                    const arrow = isEntry ? '▲' : '▼';
+                    const count = isEntry ? ev.new_centres : ev.removed_centres;
+                    const plSign = ev.places_change >= 0 ? '+' : '';
+                    ctx.fillStyle = textColor;
+                    ctx.font = 'bold 11px monospace'; ctx.textAlign = 'center';
+                    ctx.fillText(arrow + count, x, top + 13);
+                    ctx.font = '9px monospace';
+                    ctx.fillText(plSign + ev.places_change + 'pl', x, top + 24);
+                    ctx.restore();
+                }});
+            }},
+            // Show tooltip on mousemove
+            afterEvent(chart, args) {{
+                const e = args.event;
+                if (e.type !== 'mousemove' && e.type !== 'mouseout') return;
+                const tooltip = document.getElementById('catch-event-tooltip');
+                if (!tooltip) return;
+                if (e.type === 'mouseout') {{ tooltip.style.display = 'none'; return; }}
+                const ca = chart.chartArea;
+                if (e.x < ca.left || e.x > ca.right) {{ tooltip.style.display = 'none'; return; }}
+                // Find nearest event quarter
+                let best = null, bestDist = 20;
+                labels.forEach((q, i) => {{
+                    const ev = eventMap[q];
+                    if (!ev || (ev.new_centres === 0 && ev.removed_centres === 0)) return;
+                    const meta = chart.getDatasetMeta(0);
+                    if (!meta?.data[i]) return;
+                    const dist = Math.abs(meta.data[i].x - e.x);
+                    if (dist < bestDist) {{ bestDist = dist; best = {{ q, ev }}; }}
+                }});
+                if (!best) {{ tooltip.style.display = 'none'; return; }}
+                const ev = best.ev;
+                let html = `<div style="font-weight:600;color:var(--accent2);margin-bottom:6px">${{best.q}}</div>`;
+                if (ev.new_names && ev.new_names.length > 0) {{
+                    html += `<div style="color:var(--accent2);font-size:10px;margin-bottom:3px">▲ Entered (${{ev.new_centres}})</div>`;
+                    ev.new_names.forEach(n => {{ html += `<div style="color:var(--text);padding-left:8px">${{n}}</div>`; }});
+                }}
+                if (ev.removed_names && ev.removed_names.length > 0) {{
+                    html += `<div style="color:var(--hot);font-size:10px;margin-top:4px;margin-bottom:3px">▼ Exited (${{ev.removed_centres}})</div>`;
+                    ev.removed_names.forEach(n => {{ html += `<div style="color:var(--muted);padding-left:8px">${{n}}</div>`; }});
+                }}
+                tooltip.innerHTML = html;
+                tooltip.style.display = 'block';
+                // Position tooltip away from data
+                const canvasRect = chart.canvas.getBoundingClientRect();
+                const tipX = e.x + ca.left + 10;
+                tooltip.style.left = (canvasRect.left + window.scrollX + tipX) + 'px';
+                tooltip.style.top  = (canvasRect.top  + window.scrollY + ca.top + 10) + 'px';
+            }}
+        }};
+    }}
+
+    // ── Chart 1 (small): Median Income ──
+    const incEl = document.getElementById('chart-catch-income');
+    if (incEl) {{
+        const incData = qs.map((q, i) => hist.income?.[i] ?? null);
+        if (incData.some(v => v != null)) {{
+            catchmentChartInstances['income'] = new Chart(incEl, {{
+                type: 'line', options: makeOpts('$ Annual'),
+                plugins: [makeCompactPlugin(qs)],
+                data: {{ labels: qs, datasets: [{{
+                    label: 'Median Income', data: incData,
+                    borderColor: '#d4890a', backgroundColor: 'transparent',
+                    fill: false, tension: 0, pointRadius: 3,
+                    pointBackgroundColor: '#d4890a', borderWidth: 2, spanGaps: true
+                }}] }}
+            }});
+        }} else {{
+            incEl.parentElement.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:16px 0">Income data unavailable</div>';
+        }}
+    }}
+
+    // ── Chart 2 (small): Under-5 Population ──
+    const popEl = document.getElementById('chart-catch-pop');
+    if (popEl) {{
+        const t = trimNulls(qs, hist.pop_0_4);
+        catchmentChartInstances['pop'] = new Chart(popEl, {{
+            type: 'line', options: makeOpts('Children'),
+            plugins: [makeCompactPlugin(t.labels)],
+            data: {{ labels: t.labels, datasets: [makeLine('Under-5 Pop', t.data, '#00c9a7', 'rgba(0,201,167,0.08)')] }}
+        }});
+    }}
+
+    // ── Chart 3 (small): Centre Count ──
+    const centresEl = document.getElementById('chart-catch-centres');
+    if (centresEl) {{
+        const t = trimNulls(qs, hist.services);
+        catchmentChartInstances['centres'] = new Chart(centresEl, {{
+            type: 'line', options: makeOpts('Centres'),
+            plugins: [makeCompactPlugin(t.labels)],
+            data: {{ labels: t.labels, datasets: [makeLine('Centres', t.data, '#e05c3a', 'rgba(224,92,58,0.08)')] }}
+        }});
+    }}
+
+    // ── Large combined chart: Licensed Places + Supply Ratio (dual Y) ──
+    // Supply ratio recalculated using sa2.pop_0_4 (same source as stat card)
+    // Back-calculates historical SA2 pop using CAGR for each quarter
+    const combEl = document.getElementById('chart-catch-combined');
+    if (combEl) {{
+        const tPlaces = trimNulls(qs, hist.places);
+        // Recalculate supply ratio using correct SA2 population
+        const currentPop  = sa2.pop_0_4 || 0;
+        const cagr        = sa2.pop_0_4_cagr != null ? sa2.pop_0_4_cagr / 100 : 0;
+        const currentYear = new Date().getFullYear() + (new Date().getMonth() >= 9 ? 0.75 : 0.25);
+        const correctedRatio = tPlaces.labels.map((q, i) => {{
+            const places = tPlaces.data[i];
+            if (places == null) return null;
+            // Parse quarter year fraction
+            const parts = q.split(' ');
+            const qn = parseInt(parts[0].replace('Q',''));
+            const yr = parseInt(parts[1]);
+            const fracYr = yr + [0,0.25,0.5,0.75][qn-1];
+            const yearsBack = currentYear - fracYr;
+            const histPop = currentPop > 0 && cagr !== 0
+                ? currentPop / Math.pow(1 + cagr, yearsBack)
+                : currentPop;
+            return histPop > 0 ? +(places / histPop).toFixed(3) : null;
+        }});
+
+        // Align labels
+        const tRatio    = trimNulls(tPlaces.labels, correctedRatio);
+        const allLabels = tPlaces.labels;
+        const ratioAl   = allLabels.map((q, i) => correctedRatio[i] != null ? correctedRatio[i] : null);
+
+        const combOpts = makeOpts('');
+        combOpts.scales.y  = {{ position: 'left',  ticks: {{ color: '#3d7eff', font: {{ size: 9 }} }}, grid: {{ color: 'rgba(255,255,255,0.04)' }}, title: {{ display: true, text: 'Licensed Places', color: '#3d7eff', font: {{ size: 9 }} }} }};
+        combOpts.scales.y2 = {{ position: 'right', ticks: {{ color: ctx => {{ const v = ctx.tick.value; return v > 1.0 ? '#e05c3a' : v > 0.55 ? '#d4890a' : '#00c9a7'; }}, font: {{ size: 9 }}, callback: v => v.toFixed(2) + 'x' }}, grid: {{ drawOnChartArea: false }}, title: {{ display: true, text: 'Supply Ratio', color: '#d4890a', font: {{ size: 9 }} }} }};
+
+        catchmentChartInstances['combined'] = new Chart(combEl, {{
+            type: 'line',
+            options: combOpts,
+            plugins: [makeFullPlugin(allLabels)],
+            data: {{ labels: allLabels, datasets: [
+                {{ label: 'Licensed Places', data: tPlaces.data,
+                   borderColor: '#3d7eff', backgroundColor: 'rgba(61,126,255,0.06)',
+                   fill: true, tension: 0, pointRadius: 0, borderWidth: 2,
+                   spanGaps: true, yAxisID: 'y' }},
+                {{ label: 'Supply Ratio', data: ratioAl,
+                   borderColor: '#d4890a', backgroundColor: 'transparent',
+                   fill: false, tension: 0, pointRadius: 0, borderWidth: 2,
+                   spanGaps: true, yAxisID: 'y2',
+                   segment: {{
+                       borderColor: ctx => {{
+                           const v = ctx.p1.parsed.y;
+                           if (v == null) return '#d4890a';
+                           return v > 1.0 ? '#e05c3a' : v > 0.55 ? '#d4890a' : '#00c9a7';
+                       }}
+                   }} }},
+            ] }}
+        }});
+    }}
+}}
+
+// Toggle operator details
+function toggleOperatorDetails(event, index) {{
+    event.stopPropagation();
+    const details = document.getElementById('op-details-' + index);
+    const row = document.getElementById('op-row-' + index);
+    
+    if (details && row) {{
+        const isExpanded = row.getAttribute('data-expanded') === 'true';
+        row.setAttribute('data-expanded', (!isExpanded).toString());
+    }}
+}}
+
+function searchOperator(operatorName) {{
+    // Jump to Panel 2 and search for operator
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('panel-operators').classList.add('active');
+    document.querySelectorAll('.tab')[1].classList.add('active');
+    document.getElementById('op-search').value = operatorName;
+    filterOperators();
+    window.scrollTo(0, 0);
+}}
+
+function jumpToCatchment(suburb, postcode) {{
+    // Jump to Panel 3 and search for catchment by suburb or postcode
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('panel-catchment').classList.add('active');
+    document.querySelectorAll('.tab')[2].classList.add('active');
+    const searchTerm = suburb || postcode || '';
+    document.getElementById('catch-search').value = searchTerm;
+    filterCatchments();
+    window.scrollTo(0, 0);
+}}
+
+// Enhanced operator row interaction
+document.addEventListener('click', function(e) {{
+    // Handle operator row clicks for expansion
+    if (e.target.closest('.operator-summary')) {{
+        const row = e.target.closest('.operator-row');
+        if (row) {{
+            const isExpanded = row.getAttribute('data-expanded') === 'true';
+            
+            // Collapse all other rows first
+            document.querySelectorAll('.operator-row[data-expanded="true"]').forEach(r => {{
+                if (r !== row) r.setAttribute('data-expanded', 'false');
+            }});
+            
+            // Toggle current row
+            row.setAttribute('data-expanded', (!isExpanded).toString());
+        }}
+    }}
+}});
 </script>
 </body>
 </html>"""

@@ -3148,34 +3148,6 @@ function buildCatchmentCharts(sa2) {
             return histPop > 0 ? +(places / histPop).toFixed(3) : null;
         });
 
-        // Threshold band plugin — colour zones on supply ratio axis
-        const thresholdPlugin = {
-            id: 'thresholds',
-            beforeDraw(chart) {
-                const ctx = chart.ctx;
-                const y2  = chart.scales['y2'];
-                if (!y2) return;
-                const left  = chart.chartArea.left;
-                const right = chart.chartArea.right;
-                const zones = [
-                    { min: 0,    max: 0.55, color: 'rgba(0,201,167,0.04)'  },
-                    { min: 0.55, max: 1.0,  color: 'rgba(212,137,10,0.04)' },
-                    { min: 1.0,  max: 999,  color: 'rgba(224,92,58,0.04)'  },
-                ];
-                zones.forEach(z => {
-                    const yTop = y2.getPixelForValue(z.max);
-                    const yBot = y2.getPixelForValue(z.min);
-                    if (yTop > chart.chartArea.bottom || yBot < chart.chartArea.top) return;
-                    const top = Math.max(yTop, chart.chartArea.top);
-                    const bot = Math.min(yBot, chart.chartArea.bottom);
-                    ctx.save();
-                    ctx.fillStyle = z.color;
-                    ctx.fillRect(left, top, right - left, bot - top);
-                    ctx.restore();
-                });
-            }
-        };
-
         // Align labels
         const tRatio    = trimNulls(tPlaces.labels, correctedRatio);
         const allLabels = tPlaces.labels;
@@ -3183,21 +3155,28 @@ function buildCatchmentCharts(sa2) {
 
         const combOpts = makeOpts('');
         combOpts.scales.y  = { position: 'left',  ticks: { color: '#3d7eff', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.04)' }, title: { display: true, text: 'Licensed Places', color: '#3d7eff', font: { size: 9 } } };
-        combOpts.scales.y2 = { position: 'right', ticks: { color: '#9b59b6', font: { size: 9 }, callback: v => v.toFixed(2) + 'x' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Supply Ratio', color: '#9b59b6', font: { size: 9 } } };
+        combOpts.scales.y2 = { position: 'right', ticks: { color: ctx => { const v = ctx.tick.value; return v > 1.0 ? '#e05c3a' : v > 0.55 ? '#d4890a' : '#00c9a7'; }, font: { size: 9 }, callback: v => v.toFixed(2) + 'x' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Supply Ratio', color: '#d4890a', font: { size: 9 } } };
 
         catchmentChartInstances['combined'] = new Chart(combEl, {
             type: 'line',
             options: combOpts,
-            plugins: [thresholdPlugin, makeFullPlugin(allLabels)],
+            plugins: [makeFullPlugin(allLabels)],
             data: { labels: allLabels, datasets: [
                 { label: 'Licensed Places', data: tPlaces.data,
                    borderColor: '#3d7eff', backgroundColor: 'rgba(61,126,255,0.06)',
                    fill: true, tension: 0, pointRadius: 0, borderWidth: 2,
                    spanGaps: true, yAxisID: 'y' },
                 { label: 'Supply Ratio', data: ratioAl,
-                   borderColor: '#9b59b6', backgroundColor: 'transparent',
+                   borderColor: '#d4890a', backgroundColor: 'transparent',
                    fill: false, tension: 0, pointRadius: 0, borderWidth: 2,
-                   spanGaps: true, yAxisID: 'y2' },
+                   spanGaps: true, yAxisID: 'y2',
+                   segment: {
+                       borderColor: ctx => {
+                           const v = ctx.p1.parsed.y;
+                           if (v == null) return '#d4890a';
+                           return v > 1.0 ? '#e05c3a' : v > 0.55 ? '#d4890a' : '#00c9a7';
+                       }
+                   } },
             ] }
         });
     }
