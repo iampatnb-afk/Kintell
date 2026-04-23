@@ -1,0 +1,2189 @@
+<!DOCTYPE html>
+<!-- operator.html v4 -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kintell — Operator</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a1f26;
+    --panel-2: #232933;
+    --panel-3: #2a313c;
+    --border: #2d343f;
+    --text: #e6e8eb;
+    --text-dim: #9aa4b1;
+    --text-mute: #6b7684;
+    --accent: #4a9eff;
+    --green: #4ade80;
+    --green-bg: #14301e;
+    --amber: #fbbf24;
+    --amber-bg: #2f2310;
+    --red: #f87171;
+    --red-bg: #2e1414;
+    --purple: #a78bfa;
+    --purple-bg: #1f1a2e;
+    --grey: #94a3b8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ── App header (hidden in embed) ────────────────────────────── */
+  header.app {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: 16px;
+  }
+  header.app h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  header.app .breadcrumb { color: var(--text-mute); font-size: 13px; }
+  header.app .right { margin-left: auto; display: flex; gap: 12px; font-size: 13px; }
+  body.embed header.app { display: none; }
+
+  main {
+    padding: 18px 24px 60px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  body.embed main { padding: 8px 16px 28px; }
+
+  /* ── States ─────────────────────────────────────────────────── */
+  .state-msg {
+    text-align: center; padding: 60px 20px;
+    color: var(--text-mute); font-size: 14px;
+  }
+  .state-msg.error {
+    color: var(--red); background: var(--red-bg);
+    border: 1px solid #5c2626; border-radius: 8px;
+    padding: 24px; margin: 40px 0;
+  }
+
+  /* ── Operator header ────────────────────────────────────────── */
+  .op-header {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 26px;
+    margin-bottom: 18px;
+  }
+  .op-title-row {
+    display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap;
+  }
+  .op-name {
+    font-size: 26px; font-weight: 600; line-height: 1.2;
+    margin: 0;
+  }
+  .op-canonical {
+    color: var(--text-mute);
+    font-size: 12px;
+    margin-top: 2px;
+  }
+  .op-canonical b { color: var(--text-dim); font-weight: 500; }
+
+  .pencil-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-mute);
+    cursor: pointer;
+    padding: 3px 7px;
+    border-radius: 4px;
+    font-size: 14px;
+    align-self: center;
+  }
+  .pencil-btn:hover {
+    color: var(--accent);
+    border-color: var(--border);
+    background: var(--panel-2);
+  }
+  .rename-form {
+    display: flex; gap: 6px; align-items: center;
+  }
+  .rename-form input {
+    background: var(--panel-2);
+    border: 1px solid var(--accent);
+    color: var(--text);
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 20px;
+    font-weight: 600;
+    min-width: 380px;
+    outline: none;
+  }
+  .rename-form .hint {
+    color: var(--text-mute); font-size: 11px;
+    font-weight: 400;
+  }
+  .rename-form .actions {
+    display: flex; gap: 6px;
+  }
+  .btn-mini {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .btn-mini.save  { background: var(--green-bg); border-color: #1e5134; color: var(--green); }
+  .btn-mini.save:hover  { background: #1a4128; }
+  .btn-mini.cancel:hover { background: var(--panel-3); }
+
+  .op-ownership {
+    color: var(--text-dim); font-size: 13px; margin-top: 6px;
+  }
+  .op-ownership .sep { color: var(--text-mute); margin: 0 6px; }
+
+  /* Scale chip row */
+  .scale-strip {
+    display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px;
+  }
+  .chip {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 12px 6px;
+    display: flex; flex-direction: column;
+    min-width: 96px;
+  }
+  .chip .n {
+    font-size: 18px; font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .chip .l {
+    font-size: 10px; color: var(--text-mute);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  /* External tools row */
+  .ext-tools {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px;
+  }
+  .ext-tools a {
+    font-size: 12px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 4px 10px; border-radius: 3px;
+  }
+  .ext-tools a:hover { color: var(--accent); text-decoration: none; }
+
+  /* ── Section cards ──────────────────────────────────────────── */
+  .section-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  .op-section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px 14px;
+    margin-bottom: 14px;
+  }
+  .op-section h3 {
+    margin: 0 0 10px 0;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 700;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+  }
+  .op-section h3 .note {
+    float: right;
+    font-size: 10px;
+    color: var(--text-mute);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+  }
+  .placeholder {
+    color: var(--text-mute); font-size: 13px;
+    font-style: italic;
+    padding: 6px 0;
+  }
+  .placeholder .will-show {
+    display: block;
+    margin-top: 6px;
+    color: var(--text-dim); font-style: normal;
+    font-size: 12px;
+  }
+
+  .fact {
+    display: flex; justify-content: space-between;
+    padding: 4px 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: 13px;
+  }
+  .fact:last-child { border-bottom: none; }
+  .fact b { font-variant-numeric: tabular-nums; color: var(--text); }
+  .fact .k { color: var(--text-dim); }
+
+  /* NQS bars */
+  .nqs-stack {
+    display: flex; height: 22px; border-radius: 4px; overflow: hidden;
+    background: var(--panel-3); margin: 6px 0 10px;
+  }
+  .nqs-stack > div {
+    font-size: 11px; line-height: 22px; text-align: center;
+    color: #0c1116; font-weight: 600;
+    padding: 0 2px; min-width: 0;
+  }
+  .nqs-stack .nqs-excellent   { background: #22c55e; }
+  .nqs-stack .nqs-exceeding   { background: #4ade80; }
+  .nqs-stack .nqs-meeting     { background: #86efac; }
+  .nqs-stack .nqs-working     { background: #fbbf24; }
+  .nqs-stack .nqs-significant { background: #f87171; color: #fff; }
+  .nqs-stack .nqs-provisional { background: #94a3b8; }
+  .nqs-stack .nqs-notrated    { background: #475569; color: var(--text); }
+
+  .nqs-legend {
+    display: flex; flex-wrap: wrap; gap: 8px 14px;
+    font-size: 11px; color: var(--text-dim);
+  }
+  .nqs-legend .lk { display: flex; align-items: center; gap: 4px; }
+  .nqs-legend .sw { width: 10px; height: 10px; border-radius: 2px; }
+
+  /* Growth grid */
+  .growth-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  }
+  .growth-cell {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 10px 12px;
+  }
+  .growth-cell .label {
+    font-size: 10px;
+    color: var(--text-mute);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .growth-cell .since {
+    font-size: 11px; color: var(--text-mute);
+    margin-top: 1px;
+  }
+  .growth-cell .big {
+    font-size: 22px; font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    margin: 6px 0 2px;
+  }
+  .growth-cell .sub {
+    font-size: 11px; color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Structural bars */
+  .struct-bar {
+    margin: 8px 0 14px;
+  }
+  .struct-bar .top {
+    display: flex; justify-content: space-between;
+    font-size: 12px; color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+  .struct-bar .top b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .struct-bar .stack {
+    display: flex; height: 14px;
+    background: var(--panel-3);
+    border-radius: 3px; overflow: hidden;
+  }
+  .struct-bar .stack > div {
+    font-size: 10px; line-height: 14px; text-align: center;
+    color: #0c1116; font-weight: 600;
+  }
+
+  /* Tables */
+  .op-section .tbl-title {
+    display: flex; align-items: baseline; gap: 10px;
+    margin-bottom: 8px;
+  }
+  .op-section .tbl-title h3 { margin: 0; }
+  table.op-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  table.op-table th {
+    text-align: left;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    font-weight: 700;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  table.op-table th:hover { color: var(--text); }
+  table.op-table th.active { color: var(--accent); }
+  table.op-table th.active::after {
+    content: " ↓";
+    font-size: 9px;
+  }
+  table.op-table th.active.asc::after { content: " ↑"; }
+  table.op-table td {
+    padding: 7px 10px;
+    border-bottom: 1px dashed var(--border);
+    vertical-align: top;
+  }
+  table.op-table tr:hover td { background: var(--panel-2); }
+  table.op-table td.num {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+  }
+  table.op-table td.tight { white-space: nowrap; }
+  table.op-table tr.is-parent td { background: rgba(74,158,255,0.05); }
+  table.op-table tr.is-parent td:first-child { border-left: 2px solid var(--accent); }
+
+  .entity-name b { color: var(--text); font-weight: 500; }
+  .entity-name .star { color: var(--amber); margin-right: 4px; }
+  .entity-name .parent-tag {
+    background: var(--panel-3);
+    color: var(--accent);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .entity-flags {
+    display: flex; gap: 4px; flex-wrap: wrap;
+  }
+  .entity-flags .f {
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--panel-3);
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+  }
+  .entity-flags .f.notional { color: var(--purple); background: var(--purple-bg); }
+  .entity-flags .f.propco   { color: var(--amber);  background: var(--amber-bg); }
+  .entity-flags .f.opco     { color: var(--green);  background: var(--green-bg); }
+
+  .nqs-pill {
+    display: inline-block;
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 3px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .nqs-pill.exceeding    { background: var(--green-bg); color: var(--green); }
+  .nqs-pill.meeting      { background: rgba(74,222,128,0.15); color: #a7f3b8; }
+  .nqs-pill.working      { background: var(--amber-bg); color: var(--amber); }
+  .nqs-pill.significant  { background: var(--red-bg); color: var(--red); }
+  .nqs-pill.provisional  { background: var(--panel-3); color: var(--text-dim); }
+  .nqs-pill.notrated     { background: var(--panel-3); color: var(--text-mute); font-style: italic; }
+
+  .brand-chip {
+    font-size: 11px; color: var(--purple);
+    background: var(--purple-bg); border: 1px solid #352957;
+    padding: 0 6px; border-radius: 3px; font-weight: 500;
+  }
+  .brand-chip.none {
+    color: var(--text-mute);
+    background: var(--panel-3);
+    border-color: var(--border);
+    font-style: italic;
+    font-weight: 400;
+  }
+
+  /* Notes */
+  .notes-empty {
+    color: var(--text-mute);
+    font-style: italic;
+    padding: 10px 0;
+    font-size: 13px;
+  }
+  .notes-empty small {
+    display: block; margin-top: 4px; color: var(--text-mute);
+    font-size: 11px; font-style: normal;
+  }
+
+  /* Responsive */
+  @media (max-width: 960px) {
+    .section-row { grid-template-columns: 1fr; }
+    .growth-grid { grid-template-columns: 1fr; }
+    .rename-form input { min-width: 200px; }
+  }
+
+  /* ─── v2 additions ───────────────────────────────────────── */
+
+  /* Clickable NQS bucket rows */
+  .nqs-bucket {
+    border-bottom: 1px dashed var(--border);
+  }
+  .nqs-bucket:last-child { border-bottom: none; }
+  .nqs-bucket .bucket-head {
+    display: flex; justify-content: space-between;
+    padding: 6px 0;
+    cursor: pointer;
+    user-select: none;
+    font-size: 13px;
+  }
+  .nqs-bucket .bucket-head:hover { color: var(--text); }
+  .nqs-bucket .bucket-head .k { color: var(--text-dim); }
+  .nqs-bucket .bucket-head b { font-variant-numeric: tabular-nums; color: var(--text); }
+  .nqs-bucket .bucket-head .chev {
+    color: var(--text-mute); margin-left: 6px; font-size: 11px;
+    transition: transform 0.15s;
+    display: inline-block;
+  }
+  .nqs-bucket.open .bucket-head .chev { transform: rotate(90deg); }
+  .nqs-bucket .bucket-body {
+    display: none;
+    padding: 4px 0 8px 12px;
+    font-size: 12px;
+  }
+  .nqs-bucket.open .bucket-body { display: block; }
+  .bucket-centre {
+    display: grid;
+    grid-template-columns: 1fr 120px 50px;
+    gap: 8px;
+    padding: 3px 0;
+    color: var(--text-dim);
+  }
+  .bucket-centre b { color: var(--text); font-weight: 500; }
+  .bucket-centre .loc { color: var(--text-mute); font-size: 11px; }
+  .bucket-centre .num {
+    text-align: right; font-variant-numeric: tabular-nums;
+  }
+
+  /* Places-over-time chart */
+  .timeline-card {
+    margin-bottom: 14px;
+  }
+  .timeline-svg {
+    width: 100%;
+    display: block;
+    background: var(--panel-2);
+    border-radius: 5px;
+    padding: 4px 0;
+  }
+  .timeline-svg .axis-text { fill: var(--text-mute); font-size: 10px; }
+  .timeline-svg .gridline { stroke: var(--border); stroke-width: 1; }
+  .timeline-svg .cum-line {
+    stroke: var(--accent);
+    stroke-width: 2;
+    fill: none;
+  }
+  .timeline-svg .cum-area {
+    fill: var(--accent);
+    fill-opacity: 0.10;
+  }
+  .timeline-svg .pt-greenfield { fill: var(--green); stroke: var(--bg); stroke-width: 1; }
+  .timeline-svg .pt-acquired   { fill: var(--amber); stroke: var(--bg); stroke-width: 1; }
+
+  .timeline-legend {
+    display: flex; gap: 16px; margin-top: 8px;
+    font-size: 11px; color: var(--text-dim);
+  }
+  .timeline-legend .dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    margin-right: 5px; vertical-align: middle;
+  }
+  .timeline-legend .dot.g { background: var(--green); }
+  .timeline-legend .dot.a { background: var(--amber); }
+
+  /* Histograms — places-band, generic horizontal */
+  .hist {
+    display: grid;
+    grid-template-columns: 80px 1fr 60px;
+    gap: 8px;
+    margin-top: 4px;
+    font-size: 12px;
+  }
+  .hist .lbl { color: var(--text-dim); padding: 3px 0; }
+  .hist .track {
+    background: var(--panel-3);
+    border-radius: 3px; height: 18px; overflow: hidden;
+    position: relative;
+  }
+  .hist .fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+  }
+  .hist .val {
+    text-align: right; font-variant-numeric: tabular-nums;
+    padding: 3px 0;
+    color: var(--text);
+  }
+
+  /* Dual state share bars */
+  .share-bar {
+    margin: 10px 0 6px;
+  }
+  .share-bar .top {
+    display: flex; justify-content: space-between;
+    font-size: 12px; color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+  .share-bar .top b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .share-bar .stack {
+    display: flex; height: 18px;
+    background: var(--panel-3);
+    border-radius: 3px; overflow: hidden;
+  }
+  .share-bar .stack > div {
+    font-size: 10px; line-height: 18px; text-align: center;
+    color: #0c1116; font-weight: 700;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  /* Valuation card bar */
+  .val-bar {
+    position: relative;
+    background: var(--panel-3);
+    border-radius: 6px;
+    height: 44px;
+    overflow: hidden;
+    margin: 14px 0 8px;
+  }
+  .val-bar .range {
+    position: absolute;
+    top: 0; bottom: 0;
+    background: linear-gradient(90deg,
+      rgba(74,222,128,0.18),
+      rgba(74,222,128,0.36));
+    border-left: 2px solid var(--green);
+    border-right: 2px solid var(--green);
+    display: flex; align-items: center;
+    padding: 0 10px;
+    color: var(--text); font-weight: 600;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  .val-bar .range .low   { font-size: 12px; color: var(--text-dim); margin-right: auto; }
+  .val-bar .range .high  { font-size: 12px; color: var(--text-dim); margin-left: auto; }
+  .val-bar .range .mid   { font-size: 15px; font-variant-numeric: tabular-nums; }
+  .val-note {
+    color: var(--text-mute); font-size: 11px; font-style: italic;
+    margin-top: 6px;
+  }
+  .val-source {
+    color: var(--text-mute); font-size: 11px;
+    margin-top: 2px;
+  }
+
+  /* Collapsible table wrapper */
+  .op-section.collapsible > .tbl-title {
+    cursor: pointer; user-select: none;
+  }
+  .op-section.collapsible > .tbl-title::after {
+    content: "▸"; margin-left: auto; color: var(--text-mute);
+    transition: transform 0.15s;
+    display: inline-block;
+  }
+  .op-section.collapsible.open > .tbl-title::after {
+    transform: rotate(90deg);
+  }
+  .op-section.collapsible > .collapsible-body {
+    display: none;
+    margin-top: 10px;
+  }
+  .op-section.collapsible.open > .collapsible-body {
+    display: block;
+  }
+  .op-section.collapsible > .tbl-title {
+    display: flex; align-items: center; gap: 10px; margin: 0;
+  }
+
+  /* Stale rating tint on centre rows */
+  table.op-table td.rating-stale {
+    color: var(--amber);
+  }
+  table.op-table td.rating-stale::after {
+    content: " ⚠";
+    color: var(--amber);
+  }
+
+  /* Acquisition split mini chart */
+  .acq-split {
+    display: flex; height: 22px;
+    background: var(--panel-3);
+    border-radius: 3px; overflow: hidden;
+    margin: 6px 0 10px;
+  }
+  .acq-split > div {
+    font-size: 11px; line-height: 22px; text-align: center;
+    color: #0c1116; font-weight: 600;
+  }
+  .acq-split .green { background: var(--green); }
+  .acq-split .amber { background: var(--amber); }
+
+  /* ─── v3 additions ──────────────────────────────────────── */
+
+  /* NQS donut chart */
+  .nqs-donut-wrap {
+    display: flex; align-items: center; justify-content: center;
+    gap: 24px; flex-wrap: wrap;
+    margin: 6px 0 12px;
+  }
+  .nqs-donut { display: block; }
+  .donut-wedge { cursor: pointer; transition: opacity 0.15s; }
+  .donut-wedge:hover { opacity: 0.82; }
+  .donut-wedge.w-exceeding    { fill: #4ade80; }
+  .donut-wedge.w-meeting      { fill: #86efac; }
+  .donut-wedge.w-working      { fill: #fbbf24; }
+  .donut-wedge.w-significant  { fill: #f87171; }
+  .donut-wedge.w-provisional  { fill: #94a3b8; }
+  .donut-wedge.w-notrated     { fill: #475569; }
+  .donut-wedge.w-excellent    { fill: #22c55e; }
+  .donut-wedge.w-empty        { fill: var(--panel-3); }
+
+  /* Warn pill used on not-rated centres older than 12 months */
+  .warn-pill {
+    display: inline-block;
+    font-size: 10px; font-weight: 600;
+    color: var(--amber);
+    background: var(--amber-bg);
+    border: 1px solid #5c4310;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 6px;
+  }
+
+  /* Bucket rows — rearranged for rating date column */
+  .bucket-centre {
+    display: grid;
+    grid-template-columns: 1fr 130px 160px 50px;
+    gap: 8px;
+    padding: 3px 0;
+    color: var(--text-dim);
+    align-items: baseline;
+  }
+  .bucket-centre .rating-col {
+    color: var(--text-mute); font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+  .bucket-centre.bucket-zero {
+    color: var(--text-mute); font-style: italic;
+    grid-template-columns: 1fr;
+    padding: 2px 0;
+  }
+
+  /* Inline chip (used for state chip row on Brownfield card) */
+  .chip-inline {
+    display: inline-block;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  .chip-inline b {
+    color: var(--text); font-variant-numeric: tabular-nums;
+    margin-left: 4px;
+  }
+
+  /* Native <details> styling for disclosure lists */
+  details.full-list summary {
+    cursor: pointer;
+    color: var(--text-dim);
+    font-size: 12px;
+    padding: 6px 0;
+    user-select: none;
+    list-style: none;
+  }
+  details.full-list summary::before {
+    content: "▸";
+    display: inline-block;
+    color: var(--text-mute);
+    margin-right: 6px;
+    transition: transform 0.15s;
+  }
+  details.full-list[open] summary::before {
+    transform: rotate(90deg);
+  }
+</style>
+</head>
+
+<body>
+
+<header class="app">
+  <h1>Kintell</h1>
+  <span class="breadcrumb">/ Ownership / Operator</span>
+  <div class="right">
+    <a href="review.html">← back to review</a>
+  </div>
+</header>
+
+<main>
+  <div id="loading" class="state-msg">Loading…</div>
+  <div id="error"   class="state-msg error" style="display:none;"></div>
+  <div id="content" style="display:none;"></div>
+</main>
+
+<script>
+/* ──────────────────────────────────────────────────────────────────
+   operator.html v4
+   v4: parseAustralianToIso now recognises the "Mon YYYY" format
+       that ACECQA uses for rating_issued_date (e.g. "Feb 2023").
+       Fixes the Quality card's per-centre rating-date column
+       which previously showed "rating date not ingested" across
+       every row despite the data being present. Also adopts the
+       v5 payload fields: due_soon_count (18-month window) and
+       stale_rating_count (now 2-year threshold, was 3).
+   v3: Donut NQS chart; all canonical NQS ratings permanent rows
+       (including "(not rated)"); rating dates on expanded rated
+       buckets; opening date + >12mo flag on expanded not-rated
+       bucket; Mon-YYYY date format on the timeline; State Share
+       with count+percentage on both bars; brownfield terminology
+       throughout; new Brownfield geography card with state chips,
+       suburbs-with-multiple summary, and collapsible full list;
+       new Remoteness distribution placeholder (5-band ABS).
+   ────────────────────────────────────────────────────────────────── */
+
+const API = "";
+
+let payload = null;            // whole response
+let sortState = {              // column + dir per table
+  entities: { col: "services_count", dir: "desc" },
+  services: { col: "service_name",   dir: "asc"  },
+};
+
+// ── URL params ────────────────────────────────────────────────────
+const params = new URLSearchParams(location.search);
+const GID   = parseInt(params.get("id"), 10);
+const EMBED = params.get("embed") === "1";
+if (EMBED) document.body.classList.add("embed");
+
+// ── Helpers ──────────────────────────────────────────────────────
+function htmlEscape(s) {
+  if (s == null) return "";
+  return String(s).replace(/[&<>"]/g,
+    c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+}
+function fmtN(n) {
+  if (n == null) return "—";
+  return Number(n).toLocaleString();
+}
+function pct(num, den, digits=0) {
+  if (!den) return "—";
+  return (100 * num / den).toFixed(digits) + "%";
+}
+async function api(path, opts={}) {
+  const r = await fetch(API + path, {
+    ...opts,
+    headers: { "Content-Type": "application/json", ...(opts.headers||{}) }
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+function urlGoogleSite(name, site) {
+  return "https://www.google.com/search?q=" +
+    encodeURIComponent(`"${name}" site:${site}`);
+}
+function urlGoogle(name, extra="") {
+  return "https://www.google.com/search?q=" +
+    encodeURIComponent(`${name} ${extra}`.trim());
+}
+function urlAbn(name) {
+  return "https://abr.business.gov.au/Search/Run?searchText=" +
+    encodeURIComponent(name);
+}
+function guessDomain(name) {
+  if (!name) return "";
+  return String(name)
+    .replace(/\b(pty|ltd|proprietary|limited|llc|inc|corp|co)\b/gi, "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toLowerCase() + ".com.au";
+}
+
+// NQS rating bucket helpers
+const NQS_CLASSES = {
+  "Excellent":                         "excellent",
+  "Exceeding NQS":                     "exceeding",
+  "Meeting NQS":                       "meeting",
+  "Working Towards NQS":               "working",
+  "Significant Improvement Required":  "significant",
+  "Provisional — Not Yet Assessed":    "provisional",
+  "(not rated)":                       "notrated",
+};
+function nqsClass(label) {
+  return NQS_CLASSES[label] || "notrated";
+}
+
+// v4: date helpers
+// Accept DD/MM/YYYY, YYYY-MM-DD, or "Mon YYYY" ("Feb 2023", "Sep 2025").
+// Mon YYYY maps to the first of the month.
+// Returns ISO YYYY-MM-DD, or null on unparseable input.
+const MON_NUM = {
+  Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06",
+  Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12",
+};
+function parseAustralianToIso(s) {
+  if (!s) return null;
+  const str = String(s).trim();
+  const m1 = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(str);
+  if (m1) return `${m1[3]}-${m1[2]}-${m1[1]}`;
+  const m2 = /^(\d{4})-(\d{2})-(\d{2})/.exec(str);
+  if (m2) return m2[0];
+  // v4: Mon YYYY → first of month. Accept any case ("feb 2023", "FEB 2023").
+  const m3 = /^([A-Za-z]{3})\s+(\d{4})\b/.exec(str);
+  if (m3) {
+    const mon = m3[1].charAt(0).toUpperCase() + m3[1].slice(1).toLowerCase();
+    const mm = MON_NUM[mon];
+    if (mm) return `${m3[2]}-${mm}-01`;
+  }
+  return null;
+}
+// Format ISO or Aus date as "Apr 2026"
+const MON_SHORT = ["Jan","Feb","Mar","Apr","May","Jun",
+                   "Jul","Aug","Sep","Oct","Nov","Dec"];
+function formatMonYYYY(s) {
+  const iso = parseAustralianToIso(s);
+  if (!iso) return "—";
+  const [y, m] = iso.split("-");
+  const mi = parseInt(m, 10) - 1;
+  if (mi < 0 || mi > 11) return "—";
+  return `${MON_SHORT[mi]} ${y}`;
+}
+// Format a Date object as Mon YYYY
+function formatDateMonYYYY(d) {
+  if (!d || isNaN(d)) return "—";
+  return `${MON_SHORT[d.getMonth()]} ${d.getFullYear()}`;
+}
+// Is the approval older than 12 months?
+function isOlderThan12Months(dateStr) {
+  const iso = parseAustralianToIso(dateStr);
+  if (!iso) return false;
+  const d = new Date(iso);
+  if (isNaN(d)) return false;
+  const cutoff = new Date();
+  cutoff.setFullYear(cutoff.getFullYear() - 1);
+  return d < cutoff;
+}
+
+// ── Fetch + render ───────────────────────────────────────────────
+async function load() {
+  if (!GID) {
+    showError("Missing ?id=&lt;group_id&gt; in the URL. " +
+              "Example: operator.html?id=1887");
+    return;
+  }
+  try {
+    const r = await api(`/api/operator/${GID}`);
+    if (!r.ok) { showError(r.msg || "Request failed"); return; }
+    payload = r;
+    render();
+  } catch (e) {
+    showError("Load failed: " + (e.message || e));
+  }
+}
+
+function showError(msg) {
+  document.getElementById("loading").style.display = "none";
+  const el = document.getElementById("error");
+  el.innerHTML = msg;
+  el.style.display = "";
+}
+
+function render() {
+  document.getElementById("loading").style.display = "none";
+  const el = document.getElementById("content");
+  el.style.display = "";
+  el.innerHTML = [
+    renderHeader(),
+    renderQuality(),                                                 // v3: donut + permanent buckets
+    renderPlacesTimelineCard(),                                      // Mon-YYYY axis
+    renderSectionRow(renderGrowthSection(), renderAcquisition()),    // Greenfield vs Brownfield
+    renderBrownfieldGeography(),                                     // v3 new
+    renderSectionRow(renderCatchment(), renderCompetitive()),
+    renderSectionRow(renderStateShare(), renderPlacesBandCard()),    // state share now count+%
+    renderRemoteness(),                                              // v3 new
+    renderSectionRow(renderStructural(), renderSoftSpots()),
+    renderOpportunities(),
+    renderValuation(),
+    renderEntitiesTable(),
+    renderCentresTable(),
+    renderNotes(),
+  ].join("");
+
+  wireRename();
+  wireTableSorts();
+  wireNqsBuckets();
+  wireCollapsibles();
+}
+
+function renderSectionRow(a, b) {
+  return `<div class="section-row">${a}${b}</div>`;
+}
+
+// ── Header ───────────────────────────────────────────────────────
+function renderHeader() {
+  const g = payload.group;
+  const sc = payload.scale;
+  const effective = g.effective_name;
+  const canonical = g.canonical_name;
+  const showCanonical = (g.display_name && canonical && canonical !== effective);
+
+  const ownership = g.ownership_type || "not classified";
+  const parent    = g.parent_entity
+    ? htmlEscape(g.parent_entity.legal_name) +
+      (g.parent_entity.is_notional ? " <i>(notional)</i>" : "")
+    : "<i>no parent entity nominated</i>";
+
+  const chips = [
+    { n: fmtN(sc.services),         l: "centres" },
+    { n: fmtN(sc.approved_places),  l: "approved places" },
+    { n: fmtN(sc.state_count),      l: sc.state_count === 1 ? "state" : "states" },
+    { n: fmtN(sc.entities),         l: "entities" },
+    { n: fmtN(sc.brand_count),      l: sc.brand_count === 1 ? "brand" : "brands" },
+    { n: sc.services
+         ? fmtN(Math.round(sc.approved_places / sc.services))
+         : "—",
+      l: "avg places / centre" },
+  ];
+  const chipHtml = chips.map(c => `
+    <div class="chip"><span class="n">${c.n}</span><span class="l">${c.l}</span></div>
+  `).join("");
+
+  // External tools row
+  const site = guessDomain(effective);
+  const tools = [
+    { label: `acecqa: ${htmlEscape(effective)}`,
+      href: urlGoogleSite(effective, "acecqa.gov.au") },
+    { label: "ABR",
+      href: urlAbn(effective) },
+    { label: "ASIC",
+      href: urlGoogleSite(effective, "connectonline.asic.gov.au") },
+    { label: "starting blocks",
+      href: urlGoogleSite(effective, "startingblocks.gov.au") },
+    { label: "google",
+      href: urlGoogle(effective, "childcare") },
+    { label: `site: ${site}`,
+      href: "https://" + site },
+  ];
+
+  return `
+  <div class="op-header">
+    <div class="op-title-row">
+      <div id="name-block">
+        <h2 class="op-name" id="op-name-h">${htmlEscape(effective)}</h2>
+        ${showCanonical
+          ? `<div class="op-canonical">canonical: <b>${htmlEscape(canonical)}</b></div>`
+          : `<div class="op-canonical">canonical name (not yet renamed)</div>`}
+      </div>
+      <button class="pencil-btn" id="btn-rename" title="Rename this group">✎ edit name</button>
+    </div>
+
+    <div class="op-ownership">
+      ownership: <b>${htmlEscape(ownership)}</b>
+      <span class="sep">·</span>
+      parent: ${parent}
+    </div>
+
+    <div class="scale-strip">
+      ${chipHtml}
+    </div>
+
+    <div class="ext-tools">
+      ${tools.map(t => `
+        <a href="${t.href}" target="_blank" rel="noopener">${t.label}</a>
+      `).join("")}
+    </div>
+  </div>
+  `;
+}
+
+// ── Rename flow ──────────────────────────────────────────────────
+function wireRename() {
+  const btn = document.getElementById("btn-rename");
+  if (!btn) return;
+  btn.addEventListener("click", openRenameForm);
+}
+
+function openRenameForm() {
+  const g = payload.group;
+  const block = document.getElementById("name-block");
+  const current = g.display_name || "";
+  block.innerHTML = `
+    <form class="rename-form" onsubmit="return false;">
+      <input id="rename-input" type="text" value="${htmlEscape(current)}"
+             placeholder="${htmlEscape(g.canonical_name)}" autocomplete="off">
+      <div class="actions">
+        <button class="btn-mini save"   id="rename-save">save</button>
+        <button class="btn-mini cancel" id="rename-cancel">cancel</button>
+      </div>
+      <span class="hint">Enter to save, Esc to cancel. Empty clears back to canonical.</span>
+    </form>
+    <div class="op-canonical">canonical: <b>${htmlEscape(g.canonical_name)}</b></div>
+  `;
+  document.getElementById("btn-rename").style.display = "none";
+  const input = document.getElementById("rename-input");
+  input.focus();
+  input.select();
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); saveRename(); }
+    if (e.key === "Escape") { e.preventDefault(); cancelRename(); }
+  });
+  document.getElementById("rename-save"  ).addEventListener("click", saveRename);
+  document.getElementById("rename-cancel").addEventListener("click", cancelRename);
+}
+
+function cancelRename() {
+  // Simplest: just re-render
+  render();
+}
+
+async function saveRename() {
+  const val = document.getElementById("rename-input").value;
+  const saveBtn = document.getElementById("rename-save");
+  if (saveBtn) saveBtn.disabled = true;
+  try {
+    const r = await api(`/api/group/${payload.group.group_id}/rename`, {
+      method: "POST",
+      body: JSON.stringify({ display_name: val, actor: "patrick" }),
+    });
+    if (!r.ok) {
+      alert("Rename failed: " + (r.msg || "unknown"));
+      if (saveBtn) saveBtn.disabled = false;
+      return;
+    }
+    // Merge returned group into payload and re-render
+    payload.group = Object.assign({}, payload.group, r.group);
+    render();
+  } catch (e) {
+    alert("Rename error: " + (e.message || e));
+    if (saveBtn) saveBtn.disabled = false;
+  }
+}
+
+// ── Quality section (v3: donut chart, permanent buckets, dates) ─
+const NQS_CANONICAL = [
+  "Excellent",
+  "Exceeding NQS",
+  "Meeting NQS",
+  "Working Towards NQS",
+  "Significant Improvement Required",
+  "Provisional — Not Yet Assessed",
+  "(not rated)",
+];
+
+function renderNqsDonut(segments, total) {
+  // segments = [{rating, count, cls}], only positive counts
+  const W = 220, H = 220;
+  const cx = W / 2, cy = H / 2;
+  const outerR = 90, innerR = 58;
+
+  if (total === 0 || segments.length === 0) {
+    return `
+      <svg class="nqs-donut" viewBox="0 0 ${W} ${H}" width="220" height="220">
+        <circle class="donut-wedge w-empty" cx="${cx}" cy="${cy}" r="${outerR}"/>
+        <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="var(--panel)"/>
+        <text x="${cx}" y="${cy+4}" text-anchor="middle"
+              fill="var(--text-mute)" font-size="12">no data</text>
+      </svg>`;
+  }
+
+  // Special case: one segment takes everything → full ring
+  if (segments.length === 1) {
+    const seg = segments[0];
+    return `
+      <svg class="nqs-donut" viewBox="0 0 ${W} ${H}" width="220" height="220">
+        <circle class="donut-wedge w-${seg.cls}"
+                data-bucket="${htmlEscape(seg.rating)}"
+                cx="${cx}" cy="${cy}" r="${outerR}">
+          <title>${htmlEscape(seg.rating)}: ${seg.count} (100%)</title>
+        </circle>
+        <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="var(--panel)"/>
+        <text x="${cx}" y="${cy - 6}" text-anchor="middle"
+              fill="var(--text-dim)" font-size="10"
+              font-weight="700" letter-spacing="0.08em">TOTAL</text>
+        <text x="${cx}" y="${cy + 20}" text-anchor="middle"
+              fill="var(--text)" font-size="28" font-weight="600">${total}</text>
+      </svg>`;
+  }
+
+  let startAngle = -Math.PI / 2;
+  const wedges = [];
+  for (const seg of segments) {
+    const fraction = seg.count / total;
+    const endAngle = startAngle + fraction * 2 * Math.PI;
+    const largeArc = fraction > 0.5 ? 1 : 0;
+    const x1 = cx + outerR * Math.cos(startAngle);
+    const y1 = cy + outerR * Math.sin(startAngle);
+    const x2 = cx + outerR * Math.cos(endAngle);
+    const y2 = cy + outerR * Math.sin(endAngle);
+    const x3 = cx + innerR * Math.cos(endAngle);
+    const y3 = cy + innerR * Math.sin(endAngle);
+    const x4 = cx + innerR * Math.cos(startAngle);
+    const y4 = cy + innerR * Math.sin(startAngle);
+    const d = [
+      `M ${x1.toFixed(2)} ${y1.toFixed(2)}`,
+      `A ${outerR} ${outerR} 0 ${largeArc} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`,
+      `L ${x3.toFixed(2)} ${y3.toFixed(2)}`,
+      `A ${innerR} ${innerR} 0 ${largeArc} 0 ${x4.toFixed(2)} ${y4.toFixed(2)}`,
+      "Z",
+    ].join(" ");
+    // Label at midpoint, inside donut ring
+    const midAngle = (startAngle + endAngle) / 2;
+    const labelR = (outerR + innerR) / 2;
+    const lx = cx + labelR * Math.cos(midAngle);
+    const ly = cy + labelR * Math.sin(midAngle);
+    wedges.push({ d, lx, ly, seg, fraction });
+    startAngle = endAngle;
+  }
+
+  const wedgeSvg = wedges.map(w => `
+    <path class="donut-wedge w-${w.seg.cls}"
+          data-bucket="${htmlEscape(w.seg.rating)}"
+          d="${w.d}">
+      <title>${htmlEscape(w.seg.rating)}: ${w.seg.count} (${(w.fraction*100).toFixed(0)}%)</title>
+    </path>
+    ${w.fraction >= 0.06 ? `
+      <text x="${w.lx.toFixed(1)}" y="${(w.ly+4).toFixed(1)}"
+            text-anchor="middle" font-size="11" font-weight="700"
+            fill="#0c1116" pointer-events="none">${w.seg.count}</text>` : ""}
+  `).join("");
+
+  return `
+    <svg class="nqs-donut" viewBox="0 0 ${W} ${H}" width="220" height="220">
+      ${wedgeSvg}
+      <text x="${cx}" y="${cy - 6}" text-anchor="middle"
+            fill="var(--text-dim)" font-size="10"
+            font-weight="700" letter-spacing="0.08em">TOTAL</text>
+      <text x="${cx}" y="${cy + 20}" text-anchor="middle"
+            fill="var(--text)" font-size="28" font-weight="600">${total}</text>
+    </svg>`;
+}
+
+function renderQuality() {
+  const nqs = payload.nqs_profile;
+  const sc = payload.scale;
+  const q = payload.quality || {};
+  const services = payload.services || [];
+  const total = nqs.total || 0;
+
+  // v3: build ALL canonical buckets always (even zero count)
+  const present = new Map();
+  for (const r of (nqs.by_rating || [])) present.set(r.rating, r.count);
+  const allBuckets = NQS_CANONICAL.map(rating => ({
+    rating,
+    count: present.get(rating) || 0,
+    cls: nqsClass(rating),
+  }));
+  // Also include any ratings returned that aren't in canonical list
+  for (const [k, v] of present.entries()) {
+    if (!NQS_CANONICAL.includes(k)) {
+      allBuckets.push({ rating: k, count: v, cls: nqsClass(k) });
+    }
+  }
+
+  // Donut segments: only positives
+  const donutSegs = allBuckets.filter(b => b.count > 0);
+  const donut = renderNqsDonut(donutSegs, total);
+
+  // Legend (donut colour swatches with count)
+  const legendColor = (cls) => ({
+    excellent: "#22c55e", exceeding: "#4ade80", meeting: "#86efac",
+    working: "#fbbf24", significant: "#f87171",
+    provisional: "#94a3b8", notrated: "#475569",
+  }[cls] || "#94a3b8");
+  const legend = allBuckets.filter(b => b.count > 0).map(b => `
+    <span class="lk">
+      <span class="sw" style="background:${legendColor(b.cls)};"></span>
+      ${htmlEscape(b.rating)} — <b>${b.count}</b>
+    </span>
+  `).join("");
+
+  // Clickable rows — ALL canonical buckets, permanent
+  const buckets = allBuckets.map(b => {
+    const isNotRated = (b.rating === "(not rated)");
+    const rows = services.filter(
+      svc => svc.is_active && (svc.nqs || "(not rated)") === b.rating
+    );
+    let centreRows;
+    if (rows.length === 0) {
+      centreRows = `<div class="bucket-centre bucket-zero">No centres in this bucket.</div>`;
+    } else if (isNotRated) {
+      // v3: show opening date + >12mo flag instead of rating date
+      centreRows = rows.map(svc => {
+        const olderThan12 = isOlderThan12Months(svc.approval_granted_date);
+        return `
+          <div class="bucket-centre">
+            <div><b>${htmlEscape(svc.service_name || "")}</b></div>
+            <div class="loc">${htmlEscape(svc.suburb || "")} ${htmlEscape(svc.state || "")}</div>
+            <div class="rating-col">opened ${formatMonYYYY(svc.approval_granted_date)}${
+              olderThan12 ? ' <span class="warn-pill">⚠ &gt;12 months</span>' : ''
+            }</div>
+            <div class="num">${fmtN(svc.approved_places)}</div>
+          </div>
+        `;
+      }).join("");
+    } else {
+      // v3: show rating date on each centre row
+      centreRows = rows.map(svc => `
+        <div class="bucket-centre">
+          <div><b>${htmlEscape(svc.service_name || "")}</b></div>
+          <div class="loc">${htmlEscape(svc.suburb || "")} ${htmlEscape(svc.state || "")}</div>
+          <div class="rating-col">${
+            svc.rating_issued_date
+              ? "rated " + formatMonYYYY(svc.rating_issued_date)
+              : '<span style="color:var(--text-mute);font-style:italic;">rating date not ingested</span>'
+          }</div>
+          <div class="num">${fmtN(svc.approved_places)}</div>
+        </div>
+      `).join("");
+    }
+    const zeroStyle = (b.count === 0) ? ' style="color:var(--text-mute);"' : '';
+    return `
+      <div class="nqs-bucket" data-bucket="${htmlEscape(b.rating)}">
+        <div class="bucket-head"${zeroStyle}>
+          <span class="k">${htmlEscape(b.rating)}</span>
+          <b>${b.count} / ${total}
+            <span style="color:var(--text-mute);font-weight:400;">(${pct(b.count, total)})</span>
+            <span class="chev">▸</span></b>
+        </div>
+        <div class="bucket-body">${centreRows}</div>
+      </div>
+    `;
+  }).join("");
+
+  // Rating currency lines — handle None gracefully
+  const mostRecent = q.most_recent_rating_date
+    ? formatMonYYYY(q.most_recent_rating_date)
+    : '<span style="color:var(--text-mute);font-style:italic;">not ingested</span>';
+  const oldest = q.oldest_rating_date
+    ? formatMonYYYY(q.oldest_rating_date)
+    : '<span style="color:var(--text-mute);font-style:italic;">not ingested</span>';
+  // v4: surface both the 18-month "due soon" window and the stale
+  // threshold that operator_page.py v5 returns. Fall back to the
+  // historical 3-year label if an older payload is served.
+  const staleYears = q.stale_threshold_years || 3;
+  const dueSoon    = q.due_soon_count        || 0;
+  const stale      = q.stale_rating_count    || 0;
+  const neverRated = q.never_rated_count     || 0;
+
+  return `
+  <div class="op-section">
+    <h3>Quality <span class="note">NQS · kinder · rating currency</span></h3>
+
+    <div class="nqs-donut-wrap">
+      ${donut}
+      <div class="nqs-legend" style="max-width:360px;">${legend || '<span style="color:var(--text-mute);">No rated services.</span>'}</div>
+    </div>
+
+    <div style="margin-top:14px;">
+      ${buckets}
+    </div>
+
+    <div style="margin-top:14px;">
+      <div class="fact"><span class="k">Kinder approved (ACECQA flag)</span>
+        <b>${q.kinder_by_flag ?? 0} / ${sc.services}
+          <span style="color:var(--text-mute);font-weight:400;">(${pct(q.kinder_by_flag || 0, sc.services)})</span></b></div>
+      <div class="fact"><span class="k">Kindergarten in service name</span>
+        <b>${q.kinder_by_name ?? 0} / ${sc.services}
+          <span style="color:var(--text-mute);font-weight:400;">(${pct(q.kinder_by_name || 0, sc.services)})</span></b></div>
+      <div class="fact"><span class="k">Long day care</span>
+        <b>${q.long_day_care ?? 0} / ${sc.services}
+          <span style="color:var(--text-mute);font-weight:400;">(${pct(q.long_day_care || 0, sc.services)})</span></b></div>
+      <div class="fact"><span class="k">Most recent rating issued</span><b>${mostRecent}</b></div>
+      <div class="fact"><span class="k">Oldest rating on current roster</span><b>${oldest}</b></div>
+      <div class="fact"><span class="k">Ratings &gt; 18 months old (due-soon window)</span>
+        <b>${dueSoon}${dueSoon ? ' <span style="color:var(--text-mute);font-weight:400;">re-inspection likely</span>' : ''}</b></div>
+      <div class="fact"><span class="k">Ratings &gt; ${staleYears} years old</span>
+        <b>${stale}${stale ? ' <span style="color:var(--amber);">⚠ overdue for reassessment</span>' : ''}</b></div>
+      ${neverRated ? `<div class="fact"><span class="k">Rating date not ingested</span><b>${neverRated}</b></div>` : ""}
+    </div>
+
+    <div style="margin-top:10px;font-size:11px;color:var(--text-mute);font-style:italic;">
+      Tip: click any NQS rating above to see the centres in that category.
+      Click "(not rated)" to see their opening dates — centres unassessed
+      more than 12 months after approval are flagged.
+      "Due-soon" uses 18 months, "overdue" uses ${staleYears} years
+      (ACECQA cycle typically 2–3 years, practically ~2).
+    </div>
+  </div>
+  `;
+}
+
+function wireNqsBuckets() {
+  document.querySelectorAll(".nqs-bucket .bucket-head").forEach(h => {
+    h.addEventListener("click", () => {
+      h.parentElement.classList.toggle("open");
+    });
+  });
+  // v3: clicking a donut wedge also toggles its matching bucket
+  document.querySelectorAll(".donut-wedge[data-bucket]").forEach(w => {
+    w.addEventListener("click", () => {
+      const rating = w.getAttribute("data-bucket");
+      const bucket = document.querySelector(`.nqs-bucket[data-bucket="${CSS.escape(rating)}"]`);
+      if (bucket) {
+        bucket.classList.toggle("open");
+        // scroll the bucket into view
+        bucket.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
+  });
+}
+
+// ── Catchment section (placeholder for v1) ───────────────────────
+function renderCatchment() {
+  const c = payload.catchment || {};
+  if (!c.populated) {
+    return `
+    <div class="op-section">
+      <h3>Catchment Quality Profile <span class="note">pending cache</span></h3>
+      <div class="placeholder">Catchment metrics not yet computed.
+        <span class="will-show">Will show: <b>weighted SEIFA decile headline</b>
+        for the portfolio, plus a <b>histogram of centres in SEIFA 1–3 / 4–6 / 7–10 bands</b>
+        so concentration in lower or higher socio-economic catchments is visible at a glance.
+        Also: weighted under-5 population, weighted median income, and supply-band
+        exposure (balanced &lt;0.55x, supplied 0.55–1.0x, oversupplied &gt;1.0x)
+        across the ${fmtN(payload.scale.services)} centres.
+        Lights up when service_catchment_cache is populated.</span>
+      </div>
+    </div>
+    `;
+  }
+  const b = c.supply_bands || {};
+  return `
+  <div class="op-section">
+    <h3>Catchment Quality Profile</h3>
+    <div class="fact"><span class="k">Weighted SEIFA decile</span><b>${c.weighted_seifa ?? "—"}</b></div>
+    <div class="fact"><span class="k">Weighted under-5 population</span><b>${fmtN(c.weighted_under5)}</b></div>
+    <div class="fact"><span class="k">Weighted median income</span><b>$${fmtN(c.weighted_income)}</b></div>
+    <div class="fact"><span class="k">Balanced catchments (&lt;0.55x)</span><b>${b.balanced||0}</b></div>
+    <div class="fact"><span class="k">Supplied (0.55–1.0x)</span><b>${b.supplied||0}</b></div>
+    <div class="fact"><span class="k">Oversupplied (&gt;1.0x)</span><b>${b.oversupplied||0}</b></div>
+    <div class="fact"><span class="k">Not yet cached</span><b>${b.not_cached||0}</b></div>
+  </div>
+  `;
+}
+
+// ── Competitive exposure (placeholder) ───────────────────────────
+function renderCompetitive() {
+  const ce = payload.competitive_exposure || {};
+  if (!ce.populated) {
+    return `
+    <div class="op-section">
+      <h3>Competitive Exposure <span class="note">own build session</span></h3>
+      <div class="placeholder">A full per-catchment competitive profile lands in a later build.
+        <span class="will-show">Will show, for each of this operator's catchments:
+        (1) the <b>competitor roster</b> — every other LDC in the catchment;
+        (2) each competitor's <b>ownership type</b> — NFP, listed, private, sole-trader;
+        (3) <b>centre-size comparison</b> — this centre's approved places against the catchment average;
+        (4) <b>centre-age comparison</b> — this centre's vintage against the catchment average;
+        plus headline aggregates: % of group places in oversupplied catchments,
+        count of catchments in supply-deterioration, and competitor-approval count
+        in the last 12 months. Requires catchment cache, competitor roster, and an
+        ownership-type classifier for competitor operators.</span>
+      </div>
+    </div>`;
+  }
+  return `
+    <div class="op-section">
+      <h3>Competitive Exposure</h3>
+      <div class="fact"><span class="k">Places in oversupplied catchments</span><b>${ce.oversupplied_places_pct ?? "—"}</b></div>
+      <div class="fact"><span class="k">Deteriorating catchments</span><b>${ce.deteriorating_catchments ?? "—"}</b></div>
+      <div class="fact"><span class="k">Recent competitor approvals</span><b>${ce.recent_competitor_approvals ?? "—"}</b></div>
+    </div>`;
+}
+
+// ── Growth section ───────────────────────────────────────────────
+function renderGrowthSection() {
+  const g = payload.growth || {};
+  const cells = ["window_12m", "window_24m", "window_36m"].map(k => {
+    const w = g[k] || {};
+    const label = k.replace("window_", "").replace("m", " months");
+    return `
+      <div class="growth-cell">
+        <div class="label">${label}</div>
+        <div class="since">since ${w.cutoff_date || "—"}</div>
+        <div class="big">+${w.new_services || 0}</div>
+        <div class="sub">+${fmtN(w.new_places || 0)} places</div>
+      </div>
+    `;
+  }).join("");
+  return `
+  <div class="op-section">
+    <h3>Growth <span class="note">rolling windows</span></h3>
+    <div class="growth-grid">${cells}</div>
+    <div style="margin-top:10px;font-size:12px;color:var(--text-mute);">
+      New services are counted by ACECQA <b>approval_granted_date</b>.
+      Includes any service currently assigned to this group; prior transfers
+      are not reflected.
+    </div>
+  </div>
+  `;
+}
+
+// ── Structural flags ─────────────────────────────────────────────
+function renderStructural() {
+  const sc = payload.scale;
+  const entities = payload.entities || [];
+  const services = payload.services || [];
+
+  // State concentration — largest state share of places
+  const stateCounts = {};
+  const statePlaces = {};
+  for (const s of services) {
+    if (!s.is_active) continue;
+    const st = s.state || "(unknown)";
+    stateCounts[st] = (stateCounts[st] || 0) + 1;
+    statePlaces[st] = (statePlaces[st] || 0) + (s.approved_places || 0);
+  }
+  const statesSorted = Object.keys(statePlaces)
+    .sort((a, b) => statePlaces[b] - statePlaces[a]);
+  const totalPlaces = sc.approved_places || 0;
+  const stateBars = statesSorted.map(st => {
+    const p = statePlaces[st];
+    return { state: st, places: p, svc: stateCounts[st],
+             pct: totalPlaces ? (100 * p / totalPlaces) : 0 };
+  });
+
+  // Single-PA share — entities with exactly one service
+  const singlePA = entities.filter(e => e.is_active && e.services_count === 1).length;
+  const multiPA  = entities.filter(e => e.is_active && e.services_count >  1).length;
+  const emptyE   = entities.filter(e => e.is_active && e.services_count === 0).length;
+
+  // Top state concentration
+  const topState = stateBars[0];
+  const topStatePct = topState ? topState.pct : 0;
+
+  const stateColours = ["#4ade80","#fbbf24","#a78bfa","#60a5fa","#f87171","#94a3b8"];
+
+  return `
+  <div class="op-section">
+    <h3>Structural Flags <span class="note">computed from the current roster</span></h3>
+
+    <div class="struct-bar">
+      <div class="top">
+        <span>State distribution (by approved places)</span>
+        <b>top: ${topState ? htmlEscape(topState.state) + " " + topState.pct.toFixed(0) + "%" : "—"}</b>
+      </div>
+      <div class="stack">
+        ${stateBars.map((s, i) => `
+          <div style="flex:${s.places} 0 auto;background:${stateColours[i % stateColours.length]};"
+               title="${htmlEscape(s.state)}: ${fmtN(s.places)} places (${s.pct.toFixed(0)}%)">${s.state}</div>
+        `).join("")}
+      </div>
+    </div>
+
+    <div class="fact"><span class="k">Single-service entities</span>
+      <b>${singlePA} / ${entities.length} <span style="color:var(--text-mute);font-weight:400;">(${pct(singlePA, entities.length)})</span></b></div>
+    <div class="fact"><span class="k">Multi-service entities</span>
+      <b>${multiPA} / ${entities.length}</b></div>
+    ${emptyE ? `<div class="fact"><span class="k">Entities with no active services</span>
+      <b>${emptyE}</b></div>` : ""}
+    <div class="fact"><span class="k">Propco entities</span><b>${sc.propco_entities || 0}</b></div>
+    <div class="fact"><span class="k">Opco entities</span><b>${sc.opco_entities || 0}</b></div>
+    <div class="fact"><span class="k">Notional entities</span>
+      <b>${sc.entities_notional || 0}</b></div>
+    <div class="fact"><span class="k">Regulatory stress %</span>
+      <b style="color:var(--text-mute);font-weight:400;">pending regulatory_events</b></div>
+    <div class="fact"><span class="k">Freehold / leasehold mix</span>
+      <b style="color:var(--text-mute);font-weight:400;">pending properties data</b></div>
+  </div>
+  `;
+}
+
+// ── Soft spots (placeholder) ─────────────────────────────────────
+function renderSoftSpots() {
+  return `
+  <div class="op-section">
+    <h3>Soft Spots <span class="note">pending cache</span></h3>
+    <div class="placeholder">Bottom 5 centres by composite quality score.
+      <span class="will-show">Will show: centres with the weakest combination of NQS,
+      local supply exposure, and catchment quality — derived from
+      service_catchment_cache joined with the current NQS rating.
+      Requires catchment cache population first.</span>
+    </div>
+  </div>
+  `;
+}
+
+// ── Opportunities (placeholder) ──────────────────────────────────
+function renderOpportunities() {
+  return `
+  <div class="op-section">
+    <h3>Opportunities <span class="note">pending cache</span></h3>
+    <div class="placeholder">Under-represented high-demographic catchments where this
+      operator has no presence.
+      <span class="will-show">Will show: SA2s with high under-5 population and
+      low supply ratio, where a demographically-matched centre would plausibly
+      fit this operator's profile. Requires catchment cache and SA2 demographics.</span>
+    </div>
+  </div>
+  `;
+}
+
+// ── v2: Places-over-time chart (cumulative SVG) ──────────────────
+function renderPlacesTimelineCard() {
+  const events = payload.places_timeline || [];
+  if (events.length < 2) {
+    return `
+    <div class="op-section timeline-card">
+      <h3>Places over time <span class="note">cumulative</span></h3>
+      <div class="placeholder">Not enough dated events to plot a timeline.</div>
+    </div>`;
+  }
+
+  // Parse ISO dates (operator_page emits ISO already)
+  const parsed = events.map(e => ({
+    ...e,
+    d: new Date(e.date),
+    places: e.places || 0,
+  })).filter(e => !isNaN(e.d));
+
+  // Cumulative sum
+  let cum = 0;
+  const pts = parsed.map(e => {
+    cum += e.places;
+    return { ...e, cum };
+  });
+
+  const minDate = pts[0].d;
+  const maxDate = new Date();
+  const maxCum = pts[pts.length - 1].cum || 1;
+
+  // SVG viewport
+  const W = 700, H = 220;
+  const pad = { top: 14, right: 16, bottom: 30, left: 56 };
+  const plotW = W - pad.left - pad.right;
+  const plotH = H - pad.top - pad.bottom;
+
+  const toX = (d) => pad.left + plotW *
+    (d.getTime() - minDate.getTime()) / Math.max(1, (maxDate.getTime() - minDate.getTime()));
+  const toY = (v) => pad.top + plotH - plotH * v / maxCum;
+
+  // Step path (cumulative line)
+  let dPath = `M ${toX(minDate)} ${toY(0)}`;
+  let last = 0;
+  for (const p of pts) {
+    dPath += ` L ${toX(p.d)} ${toY(last)}`;
+    dPath += ` L ${toX(p.d)} ${toY(p.cum)}`;
+    last = p.cum;
+  }
+  dPath += ` L ${toX(maxDate)} ${toY(last)}`;
+  // Area path (fills under line)
+  const areaPath = dPath + ` L ${toX(maxDate)} ${toY(0)} L ${toX(minDate)} ${toY(0)} Z`;
+
+  // Y-axis gridlines (5 steps)
+  const ySteps = 4;
+  const yAxis = [];
+  for (let i = 0; i <= ySteps; i++) {
+    const val = Math.round(maxCum * i / ySteps);
+    yAxis.push(`
+      <line class="gridline" x1="${pad.left}" y1="${toY(val)}"
+            x2="${W - pad.right}" y2="${toY(val)}"/>
+      <text class="axis-text" x="${pad.left - 6}" y="${toY(val) + 3}" text-anchor="end">${fmtN(val)}</text>
+    `);
+  }
+
+  // X-axis year ticks
+  const minYear = minDate.getFullYear();
+  const maxYear = maxDate.getFullYear();
+  const span = maxYear - minYear;
+  const step = span > 20 ? 5 : span > 10 ? 2 : 1;
+  const xAxis = [];
+  for (let y = Math.ceil(minYear / step) * step; y <= maxYear; y += step) {
+    const tx = toX(new Date(y, 0, 1));
+    if (tx >= pad.left && tx <= W - pad.right) {
+      // v3: X-axis labels show "Jan YYYY" for the year tick
+      xAxis.push(`
+        <text class="axis-text" x="${tx}" y="${H - pad.bottom + 14}" text-anchor="middle">Jan ${y}</text>
+      `);
+    }
+  }
+
+  // Event dots (v3: tooltip shows Mon-YYYY)
+  const dots = pts.map(p => `
+    <circle class="pt-${p.type}" cx="${toX(p.d)}" cy="${toY(p.cum)}" r="3.2">
+      <title>${htmlEscape(p.service_name || "")} — ${formatDateMonYYYY(p.d)} · +${p.places} places · ${p.type === 'acquired' ? 'brownfield / transferred in' : 'greenfield'}</title>
+    </circle>
+  `).join("");
+
+  const gfCount = pts.filter(p => p.type === "greenfield").length;
+  const acCount = pts.filter(p => p.type === "acquired").length;
+
+  return `
+  <div class="op-section timeline-card">
+    <h3>Places over time <span class="note">cumulative; dots mark each centre joining the group</span></h3>
+    <svg class="timeline-svg" viewBox="0 0 ${W} ${H}"
+         preserveAspectRatio="xMidYMid meet">
+      ${yAxis.join("")}
+      ${xAxis.join("")}
+      <path class="cum-area" d="${areaPath}"/>
+      <path class="cum-line" d="${dPath}"/>
+      ${dots}
+    </svg>
+    <div class="timeline-legend">
+      <span><span class="dot g"></span>greenfield approval (${gfCount})</span>
+      <span><span class="dot a"></span>brownfield / transferred in (${acCount})</span>
+      <span style="color:var(--text-mute);">
+        Each dot is a single centre joining the current ownership group on that date.
+      </span>
+    </div>
+  </div>`;
+}
+
+// ── v2/v3: Greenfield vs Brownfield card ─────────────────────────
+function renderAcquisition() {
+  const a = payload.acquisition || {};
+  const sc = payload.scale || {};
+  const total = sc.services || 0;
+  const g = a.greenfield_count || 0;
+  const b = a.brownfield_count || 0;
+  const tot = g + b || 1;
+  return `
+  <div class="op-section">
+    <h3>Greenfield vs Brownfield <span class="note">how this portfolio was assembled</span></h3>
+    <div class="acq-split">
+      <div class="green" style="flex:${g} 0 auto;" title="Greenfield: ${g} centres">${g ? "greenfield " + g : ""}</div>
+      <div class="amber" style="flex:${b} 0 auto;" title="Brownfield: ${b} centres">${b ? "brownfield " + b : ""}</div>
+    </div>
+    <div class="fact"><span class="k">Greenfield approvals (built by this group)</span>
+      <b>${g} / ${total}
+        <span style="color:var(--text-mute);font-weight:400;">(${pct(g, tot)})</span></b></div>
+    <div class="fact"><span class="k">Brownfield centres (previously under another PA)</span>
+      <b>${b} / ${total}
+        <span style="color:var(--text-mute);font-weight:400;">(${pct(b, tot)})</span></b></div>
+    <div class="fact"><span class="k">Brownfield in last 12 months</span>
+      <b>${a.brownfield_12m || 0}</b></div>
+    <div class="fact"><span class="k">Brownfield in last 24 months</span>
+      <b>${a.brownfield_24m || 0}</b></div>
+    <div class="fact"><span class="k">Brownfield in last 36 months</span>
+      <b>${a.brownfield_36m || 0}</b></div>
+    <div style="margin-top:8px;font-size:11px;color:var(--text-mute);font-style:italic;">
+      Brownfield = last_transfer_date &gt; approval_granted_date + 30 days.
+      Catchment quality at the time of each brownfield transfer will
+      populate here once service_catchment_cache is available — useful
+      for judging whether selection discipline was applied.
+    </div>
+  </div>`;
+}
+
+// ── v3: Brownfield geography card ────────────────────────────────
+function renderBrownfieldGeography() {
+  const a = payload.acquisition || {};
+  const list = a.brownfield_list || [];
+
+  if (list.length === 0) {
+    return `
+    <div class="op-section">
+      <h3>Brownfield geography <span class="note">where acquisitions landed</span></h3>
+      <div class="placeholder">No brownfield centres in this portfolio.
+        <span class="will-show">This card lights up when the group has
+        acquired centres previously operated under different providers.</span>
+      </div>
+    </div>`;
+  }
+
+  // State breakdown
+  const byState = {};
+  for (const b of list) {
+    const st = b.state || "(unknown)";
+    byState[st] = (byState[st] || 0) + 1;
+  }
+  const states = Object.entries(byState).sort((a, b) => b[1] - a[1]);
+
+  // Suburb clusters — show only suburbs where brownfield centre count > 1
+  const bySuburb = {};
+  for (const b of list) {
+    const key = `${(b.suburb || "").toUpperCase()}|${b.state || ""}`;
+    if (!bySuburb[key]) {
+      bySuburb[key] = {
+        suburb: b.suburb, state: b.state, count: 0, places: 0
+      };
+    }
+    bySuburb[key].count += 1;
+    bySuburb[key].places += (b.approved_places || 0);
+  }
+  const clusterSuburbs = Object.values(bySuburb)
+    .filter(x => x.count > 1)
+    .sort((a, b) => b.count - a.count);
+
+  const stateChips = states.map(([st, n]) => `
+    <span class="chip-inline">${htmlEscape(st)}<b>${n}</b></span>
+  `).join("");
+
+  const clusterHtml = clusterSuburbs.length ? `
+    <div style="margin-top:12px;">
+      <div style="font-size:10px;color:var(--text-dim);letter-spacing:0.08em;
+                  text-transform:uppercase;font-weight:700;margin-bottom:6px;">
+        Suburbs with more than one brownfield centre
+      </div>
+      ${clusterSuburbs.map(s => `
+        <div class="fact">
+          <span class="k">${htmlEscape(s.suburb || "—")} ${htmlEscape(s.state || "")}</span>
+          <b>${s.count} centres · ${fmtN(s.places)} places</b>
+        </div>
+      `).join("")}
+    </div>
+  ` : `
+    <div style="margin-top:10px;font-size:11px;color:var(--text-mute);font-style:italic;">
+      No suburb-level clustering — brownfield acquisitions are geographically
+      dispersed.
+    </div>
+  `;
+
+  const fullRows = list.map(b => `
+    <tr>
+      <td><b>${htmlEscape(b.service_name || "")}</b>
+        ${b.brand_name ? `<span class="brand-chip" style="margin-left:6px;">${htmlEscape(b.brand_name)}</span>` : ""}
+      </td>
+      <td class="tight">${htmlEscape(b.suburb || "")}
+        <span style="color:var(--text-mute);">${htmlEscape(b.state || "")}</span></td>
+      <td class="tight">${formatMonYYYY(b.last_transfer_date)}</td>
+      <td class="num">${fmtN(b.approved_places)}</td>
+    </tr>
+  `).join("");
+
+  return `
+  <div class="op-section">
+    <h3>Brownfield geography <span class="note">state · suburb · full list</span></h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
+      ${stateChips}
+    </div>
+    ${clusterHtml}
+    <details class="full-list" style="margin-top:14px;">
+      <summary>Full brownfield list (${list.length}, newest transfer first)</summary>
+      <table class="op-table" style="margin-top:8px;">
+        <thead>
+          <tr>
+            <th>Centre</th>
+            <th>Location</th>
+            <th>Transferred in</th>
+            <th class="num">Places</th>
+          </tr>
+        </thead>
+        <tbody>${fullRows}</tbody>
+      </table>
+    </details>
+  </div>`;
+}
+
+// ── v3: Remoteness distribution (placeholder until POA lookup) ───
+function renderRemoteness() {
+  const r = payload.remoteness || {};
+  if (!r.populated) {
+    return `
+    <div class="op-section">
+      <h3>Remoteness distribution <span class="note">pending ABS lookup</span></h3>
+      <div class="placeholder">${htmlEscape(r.note || "Pending POA → RA lookup.")}
+        <span class="will-show">Bands: Major Cities / Inner Regional / Outer
+        Regional / Remote / Very Remote — counts of centres and approved
+        places in each. Wider band than a single metro/non-metro split and
+        matches the classification used on the Kintell industry panel.</span>
+      </div>
+    </div>`;
+  }
+  // When populated, render a simple horizontal bar
+  const bands = r.bands || {};
+  const entries = Object.entries(bands);
+  const total = entries.reduce((n, [, v]) => n + (v || 0), 0) || 1;
+  const colors = {
+    "Major Cities":   "#60a5fa",
+    "Inner Regional": "#4ade80",
+    "Outer Regional": "#fbbf24",
+    "Remote":         "#f97316",
+    "Very Remote":    "#f87171",
+  };
+  return `
+  <div class="op-section">
+    <h3>Remoteness distribution <span class="note">ABS 5-band structure</span></h3>
+    <div class="share-bar">
+      <div class="top"><span>${htmlEscape(r.scheme || "")}</span><b>${fmtN(total)}</b></div>
+      <div class="stack">
+        ${entries.map(([band, count]) => count ? `
+          <div style="flex:${count} 0 auto;background:${colors[band] || '#94a3b8'};"
+               title="${htmlEscape(band)}: ${count} (${pct(count, total)})">
+            ${htmlEscape(band)} ${count}
+          </div>` : '').join('')}
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── v2: State share dual bars (centres vs places) ─────────────────
+function renderStateShare() {
+  const services = (payload.services || []).filter(s => s.is_active);
+  const byState = {};
+  for (const s of services) {
+    const st = s.state || "(unknown)";
+    if (!byState[st]) byState[st] = { state: st, centres: 0, places: 0 };
+    byState[st].centres += 1;
+    byState[st].places  += (s.approved_places || 0);
+  }
+  const rows = Object.values(byState).sort((a, b) => b.places - a.places);
+  const totalC = rows.reduce((n, r) => n + r.centres, 0);
+  const totalP = rows.reduce((n, r) => n + r.places, 0);
+  const colors = ["#4ade80","#fbbf24","#a78bfa","#60a5fa","#f87171","#94a3b8"];
+
+  if (!rows.length) {
+    return `<div class="op-section">
+      <h3>State Share</h3><div class="placeholder">No services with a state recorded.</div>
+    </div>`;
+  }
+
+  const bar = (which) => rows.map((r, i) => {
+    const share = which === "centres" ? r.centres : r.places;
+    const total = which === "centres" ? totalC : totalP;
+    const label = which === "centres"
+      ? `${r.state} ${share} · ${pct(share, total, 0)}`
+      : `${r.state} ${fmtN(share)} · ${pct(share, total, 0)}`;
+    return `
+      <div style="flex:${share} 0 auto;background:${colors[i % colors.length]};"
+           title="${htmlEscape(r.state)}: ${fmtN(share)} ${which} (${pct(share, total)})">
+        ${label}
+      </div>
+    `;
+  }).join("");
+
+  // Detect imbalances: state whose places-share diverges meaningfully from centres-share
+  const imbalances = rows.map(r => ({
+    state: r.state,
+    cShare: totalC ? r.centres / totalC : 0,
+    pShare: totalP ? r.places / totalP  : 0,
+  })).filter(x => Math.abs(x.pShare - x.cShare) >= 0.05);
+
+  const note = imbalances.length
+    ? imbalances.map(x => {
+        const diff = (x.pShare - x.cShare) * 100;
+        const dir = diff > 0 ? "larger" : "smaller";
+        return `${x.state} centres are ${dir} than average (${diff > 0 ? "+" : ""}${diff.toFixed(0)}pp)`;
+      }).join(" · ")
+    : "State share is balanced — centres and places shares align across states.";
+
+  return `
+  <div class="op-section">
+    <h3>State Share <span class="note">centres vs places</span></h3>
+    <div class="share-bar">
+      <div class="top"><span>Centres by state</span><b>${totalC}</b></div>
+      <div class="stack">${bar("centres")}</div>
+    </div>
+    <div class="share-bar">
+      <div class="top"><span>Places by state</span><b>${fmtN(totalP)}</b></div>
+      <div class="stack">${bar("places")}</div>
+    </div>
+    <div style="font-size:11px;color:var(--text-dim);margin-top:6px;">
+      ${htmlEscape(note)}
+    </div>
+  </div>`;
+}
+
+// ── v2: Centres-by-places-band histogram ─────────────────────────
+function renderPlacesBandCard() {
+  const bands = [
+    { label: "0–50",   min: 0,   max: 50  },
+    { label: "51–90",  min: 51,  max: 90  },
+    { label: "91–120", min: 91,  max: 120 },
+    { label: "121+",   min: 121, max: 9999 },
+  ];
+  const services = (payload.services || []).filter(s => s.is_active);
+  const rows = bands.map(b => ({
+    ...b,
+    count: services.filter(s => {
+      const p = s.approved_places || 0;
+      return p >= b.min && p <= b.max;
+    }).length,
+  }));
+  const maxCount = Math.max(...rows.map(r => r.count), 1);
+
+  return `
+  <div class="op-section">
+    <h3>Centres by size <span class="note">approved places per centre</span></h3>
+    <div class="hist">
+      ${rows.map(r => `
+        <div class="lbl">${r.label}</div>
+        <div class="track"><div class="fill" style="width:${100 * r.count / maxCount}%;"></div></div>
+        <div class="val">${r.count}</div>
+      `).join("")}
+    </div>
+    <div style="font-size:11px;color:var(--text-mute);margin-top:6px;font-style:italic;">
+      Weighting to smaller bands signals a community-centre portfolio; weighting
+      to 91–120+ signals a suburban-scale portfolio with higher revenue-per-site
+      but more operational leverage.
+    </div>
+  </div>`;
+}
+
+// ── v2: Valuation card ───────────────────────────────────────────
+function renderValuation() {
+  const v = payload.valuation || {};
+  if (!v.total_places) {
+    return `
+    <div class="op-section">
+      <h3>Valuation (illustrative)</h3>
+      <div class="placeholder">No approved places — nothing to value.</div>
+    </div>`;
+  }
+  const loLabel = "$" + fmtN(Math.round((v.group_low  || 0) / 1e6)) + "m";
+  const hiLabel = "$" + fmtN(Math.round((v.group_high || 0) / 1e6)) + "m";
+
+  return `
+  <div class="op-section">
+    <h3>Valuation (illustrative) <span class="note">group level</span></h3>
+    <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:11px;color:var(--text-mute);letter-spacing:0.08em;
+                    text-transform:uppercase;font-weight:700;">indicative range</div>
+        <div style="font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;">
+          ${loLabel} – ${hiLabel}
+        </div>
+      </div>
+      <div style="color:var(--text-dim);font-size:13px;">
+        ${fmtN(v.total_places)} approved places ×
+        $${fmtN(v.per_place_low)}–$${fmtN(v.per_place_high)} per place
+      </div>
+    </div>
+    <div class="val-bar">
+      <div class="range" style="left:10%;right:10%;">
+        <span class="low">${loLabel}</span>
+        <span class="mid">${fmtN(v.total_places)} places</span>
+        <span class="high">${hiLabel}</span>
+      </div>
+    </div>
+    <div class="val-note">${htmlEscape(v.note || "")}</div>
+    <div class="val-source">source: ${htmlEscape(v.source || "")}</div>
+  </div>`;
+}
+
+// ── v2: collapsible-table wiring ─────────────────────────────────
+function wireCollapsibles() {
+  document.querySelectorAll(".op-section.collapsible > .tbl-title").forEach(h => {
+    h.addEventListener("click", () => {
+      h.parentElement.classList.toggle("open");
+    });
+  });
+}
+
+// ── Entities table ───────────────────────────────────────────────
+function renderEntitiesTable() {
+  const entities = [...(payload.entities || [])];
+  sortArray(entities, sortState.entities);
+
+  const rows = entities.map(e => {
+    const flags = [];
+    if (e.is_propco)   flags.push(`<span class="f propco">propco</span>`);
+    if (e.is_opco)     flags.push(`<span class="f opco">opco</span>`);
+    if (e.is_fgc)      flags.push(`<span class="f">fgc</span>`);
+    if (e.is_trustee)  flags.push(`<span class="f">trustee</span>`);
+    if (e.is_notional) flags.push(`<span class="f notional">notional</span>`);
+    if (!e.is_active)  flags.push(`<span class="f">inactive</span>`);
+
+    const star = e.is_largest ? `<span class="star" title="largest entity">★</span>` : "";
+    const parentTag = e.is_parent ? `<span class="parent-tag">parent</span>` : "";
+
+    return `
+      <tr class="${e.is_parent ? 'is-parent' : ''}">
+        <td class="entity-name">
+          ${star}<b>${htmlEscape(e.legal_name)}</b>${parentTag}
+        </td>
+        <td class="tight">${htmlEscape(e.abn || "—")}</td>
+        <td class="tight">${htmlEscape(e.entity_type || "—")}</td>
+        <td class="tight">${htmlEscape(e.registered_state || "—")}</td>
+        <td class="num">${fmtN(e.services_count)}</td>
+        <td class="num">${fmtN(e.places_count)}</td>
+        <td><div class="entity-flags">${flags.join("")}</div></td>
+      </tr>
+    `;
+  }).join("");
+
+  return `
+  <div class="op-section collapsible">
+    <div class="tbl-title"><h3>Entities (${entities.length})</h3></div>
+    <div class="collapsible-body">
+      <table class="op-table" data-table="entities">
+        <thead>
+          <tr>
+            <th data-col="legal_name">Legal name</th>
+            <th data-col="abn">ABN</th>
+            <th data-col="entity_type">Type</th>
+            <th data-col="registered_state">State</th>
+            <th data-col="services_count" class="num">Services</th>
+            <th data-col="places_count" class="num">Places</th>
+            <th data-col="_flags">Flags</th>
+          </tr>
+        </thead>
+        <tbody>${rows || `<tr><td colspan="7" style="color:var(--text-mute);">No entities.</td></tr>`}</tbody>
+      </table>
+    </div>
+  </div>
+  `;
+}
+
+// ── Centres table ────────────────────────────────────────────────
+function renderCentresTable() {
+  const services = [...(payload.services || [])];
+  sortArray(services, sortState.services);
+
+  // Compute "stale" threshold once — 2 years, matching quality.stale_threshold_years
+  const staleCutoffIso = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 730);
+    return d.toISOString().slice(0, 10);
+  })();
+  // v4: inner parser also handles Mon-YYYY (mirrors the outer one)
+  const parseAustralianToIso = (s) => {
+    if (!s) return null;
+    const str = String(s).trim();
+    const m = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(str);
+    if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+    const m2 = /^(\d{4})-(\d{2})-(\d{2})/.exec(str);
+    if (m2) return m2[0];
+    const m3 = /^([A-Za-z]{3})\s+(\d{4})\b/.exec(str);
+    if (m3) {
+      const mon = m3[1].charAt(0).toUpperCase() + m3[1].slice(1).toLowerCase();
+      const mm = MON_NUM[mon];
+      if (mm) return `${m3[2]}-${mm}-01`;
+    }
+    return null;
+  };
+
+  const rows = services.map(s => {
+    const nqs = s.nqs || "(not rated)";
+    const cls = nqsClass(nqs);
+    const brand = s.brand_name
+      ? `<span class="brand-chip">${htmlEscape(s.brand_name)}</span>`
+      : `<span class="brand-chip none">unbranded</span>`;
+    const ratingIso = parseAustralianToIso(s.rating_issued_date);
+    const isStale = ratingIso && ratingIso < staleCutoffIso;
+    return `
+      <tr>
+        <td><b>${htmlEscape(s.service_name || "")}</b>
+          <div style="color:var(--text-mute);font-size:11px;">
+            ${htmlEscape(s.entity_legal_name || "")}
+          </div>
+        </td>
+        <td class="tight">${htmlEscape(s.suburb || "")} <span style="color:var(--text-mute);">${htmlEscape(s.state || "")}</span></td>
+        <td>${brand}</td>
+        <td class="num">${fmtN(s.approved_places)}</td>
+        <td><span class="nqs-pill ${cls}">${htmlEscape(nqs)}</span></td>
+        <td class="tight ${isStale ? 'rating-stale' : ''}">${s.rating_issued_date ? htmlEscape(formatMonYYYY(s.rating_issued_date)) : "—"}</td>
+        <td class="tight">${htmlEscape(s.approval_granted_date || "—")}</td>
+        <td class="tight">${htmlEscape(s.last_transfer_date || "—")}</td>
+      </tr>
+    `;
+  }).join("");
+
+  return `
+  <div class="op-section collapsible">
+    <div class="tbl-title"><h3>Centres (${services.length})</h3></div>
+    <div class="collapsible-body">
+      <table class="op-table" data-table="services">
+        <thead>
+          <tr>
+            <th data-col="service_name">Centre</th>
+            <th data-col="suburb">Location</th>
+            <th data-col="brand_name">Brand</th>
+            <th data-col="approved_places" class="num">Places</th>
+            <th data-col="nqs">NQS</th>
+            <th data-col="rating_issued_date">Rated</th>
+            <th data-col="approval_granted_date">Approved</th>
+            <th data-col="last_transfer_date">Last transfer</th>
+          </tr>
+        </thead>
+        <tbody>${rows || `<tr><td colspan="8" style="color:var(--text-mute);">No centres.</td></tr>`}</tbody>
+      </table>
+    </div>
+  </div>
+  `;
+}
+
+function sortArray(arr, state) {
+  const col = state.col;
+  const dir = state.dir === "asc" ? 1 : -1;
+  arr.sort((a, b) => {
+    let av = a[col];
+    let bv = b[col];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+    return String(av).localeCompare(String(bv)) * dir;
+  });
+}
+
+function wireTableSorts() {
+  document.querySelectorAll("table.op-table").forEach(tbl => {
+    const which = tbl.dataset.table; // entities | services
+    const state = sortState[which];
+    tbl.querySelectorAll("th[data-col]").forEach(th => {
+      const col = th.dataset.col;
+      if (col === state.col) {
+        th.classList.add("active");
+        th.classList.toggle("asc", state.dir === "asc");
+      }
+      th.addEventListener("click", () => {
+        if (state.col === col) {
+          state.dir = (state.dir === "asc") ? "desc" : "asc";
+        } else {
+          state.col = col;
+          state.dir = "asc";
+        }
+        render();
+      });
+    });
+  });
+}
+
+// ── Intelligence notes ───────────────────────────────────────────
+function renderNotes() {
+  const n = payload.intelligence_notes || {};
+  const gn = n.group || [];
+  const be = n.by_entity || {};
+  const entityCount = Object.keys(be).length;
+
+  if (gn.length === 0 && entityCount === 0) {
+    return `
+    <div class="op-section">
+      <h3>Intelligence notes</h3>
+      <div class="notes-empty">No notes recorded for this operator yet.
+        <small>A POST endpoint to add notes will come in a later step.
+          Notes will show group-level and per-entity, newest first.</small>
+      </div>
+    </div>`;
+  }
+
+  // Minimal rendering when notes exist — defer the "add" form.
+  const groupHtml = gn.map(row => `
+    <div style="background:var(--panel-2);border:1px solid var(--border);
+                border-radius:5px;padding:10px 12px;margin-bottom:6px;font-size:13px;">
+      <div style="color:var(--text-mute);font-size:11px;">
+        ${htmlEscape(row.created_at || "")}  ·  ${htmlEscape(row.author || "")}
+      </div>
+      <div>${htmlEscape(row.note || row.body || "(empty)")}</div>
+    </div>
+  `).join("");
+
+  return `
+  <div class="op-section">
+    <h3>Intelligence notes (${gn.length} group-level · ${entityCount} entities with notes)</h3>
+    ${groupHtml || "<div class='notes-empty'>No group-level notes.</div>"}
+  </div>`;
+}
+
+// ── Boot ─────────────────────────────────────────────────────────
+load();
+</script>
+
+</body>
+</html>
