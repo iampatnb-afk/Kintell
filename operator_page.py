@@ -1,39 +1,42 @@
 """
-operator_page.py  v5
+operator_page.py  v6
 ────────────────────────────────────────────────────────────────
 Builds the consolidated payload for a single operator group.
 
-v5 changes (2026-04-23):
-  - _parse_date() now accepts the Mon-YYYY format ("Feb 2023",
-    "Sep 2025") that ACECQA uses for rating_issued_date. Maps to
-    the first of the month. DD/MM/YYYY and YYYY-MM-DD still work.
-    This unblocks the Quality card's rating-currency metrics —
-    previously every row failed to parse and the UI showed
-    "not ingested" across the board despite data being present.
-  - Stale-rating threshold moved from 3 years to 2 years, matching
-    the NQS Assessment & Rating cadence in practice.
-  - Added quality.due_soon_count — centres whose most recent
-    rating is >18 months old (likely to be re-inspected soon).
-    Pure compute from existing rating_issued_date; no schema change.
+v6 changes (2026-04-23, Tier 2 NQS ingest wire-up):
+  - _fetch_services() pulls the new columns populated by
+    ingest_nqs_snapshot.py v1: aria_plus, seifa_decile,
+    service_sub_type, provider_management_type, qa1..qa7. These
+    flow through into the services[] array in the payload.
+  - _compute_remoteness() now computes real counts from
+    services.aria_plus. populated=True when any service carries
+    a value; previously always returned a stub.
+  - _fetch_catchment() has been replaced by _compute_catchment()
+    which derives weighted SEIFA, SEIFA decile histogram, and a
+    band headline (low / mid / high) directly from services.
+    The old service_catchment_cache fallback is retained as a
+    secondary path for when that table eventually gets populated
+    (Tier 3) — supply bands, weighted under-5, weighted income
+    still come from the cache when available.
+
+v5 changes retained:
+  - _parse_date() accepts Mon-YYYY ("Feb 2023") in addition to
+    DD/MM/YYYY and YYYY-MM-DD. Maps Mon-YYYY to first of month.
+  - STALE_RATING_YEARS = 2 (was 3).
+  - quality.due_soon_count — rated >18 months ago.
 
 v4 changes retained:
-  - acquisition block uses "brownfield" terminology throughout.
-  - acquisition.brownfield_list with suburb/state for geography.
-  - remoteness stub (awaits POA → Remoteness Area lookup).
+  - acquisition block uses "brownfield" terminology.
+  - acquisition.brownfield_list with suburb/state.
 
 v3 additions retained:
-  - quality block (kinder, rating currency)
-  - places_timeline (chronological event list)
-  - valuation (illustrative group-level range)
+  - quality block, places_timeline, valuation.
 
 v2 fixes retained:
-  - Date parsing handles DD/MM/YYYY (Australian) + YYYY-MM-DD.
-  - Brand name column introspection across brands table variants.
+  - DD/MM/YYYY date handling, brand-name column introspection.
 
 Public:
   get_operator_payload(group_id) -> dict
-
-Payload layout unchanged from v4 except for the new quality fields.
 
 CLI:
   python operator_page.py <group_id>
@@ -275,7 +278,10 @@ def _fetch_services(conn, group_id):
                s.provider_approval_number, s.service_approval_number,
                s.is_active,
                s.brand_id, {brand_select},
-               e.entity_id, e.legal_name AS entity_legal_name
+               e.entity_id, e.legal_name AS entity_legal_name,
+               s.aria_plus, s.seifa_decile, s.service_sub_type,
+               s.provider_management_type,
+               s.qa1, s.qa2, s.qa3, s.qa4, s.qa5, s.qa6, s.qa7
           FROM services s
           JOIN entities e ON e.entity_id = s.entity_id
           {brand_join}
@@ -285,6 +291,8 @@ def _fetch_services(conn, group_id):
     try:
         rows = conn.execute(sql, (group_id,)).fetchall()
     except sqlite3.OperationalError:
+        # Hard fallback — if the new columns don't exist yet (pre-Tier 2 DB),
+        # keep the old SELECT shape. The per-row unpacking below handles both.
         rows = conn.execute("""
             SELECT s.service_id, s.service_name,
                    s.address_line, s.suburb, s.state, s.postcode,
@@ -296,7 +304,10 @@ def _fetch_services(conn, group_id):
                    s.provider_approval_number, s.service_approval_number,
                    s.is_active,
                    s.brand_id, NULL AS brand_name,
-                   e.entity_id, e.legal_name AS entity_legal_name
+                   e.entity_id, e.legal_name AS entity_legal_name,
+                   NULL, NULL, NULL,
+                   NULL,
+                   NULL, NULL, NULL, NULL, NULL, NULL, NULL
               FROM services s
               JOIN entities e ON e.entity_id = s.entity_id
              WHERE e.group_id = ?
@@ -312,7 +323,10 @@ def _fetch_services(conn, group_id):
          kinder, kinder_src, ldc,
          pan, san, is_active,
          bid, brand_name,
-         eid, eln) = r
+         eid, eln,
+         aria_plus, seifa_decile, sub_type,
+         pmt,
+         qa1, qa2, qa3, qa4, qa5, qa6, qa7) = r
         out.append({
             "service_id":               sid,
             "service_name":             name,
@@ -339,6 +353,18 @@ def _fetch_services(conn, group_id):
             "brand_name":               brand_name,
             "entity_id":                eid,
             "entity_legal_name":        eln,
+            # v6: Tier 2 fields
+            "aria_plus":                aria_plus,
+            "seifa_decile":             seifa_decile,
+            "service_sub_type":         sub_type,
+            "provider_management_type": pmt,
+            "qa1":                      qa1,
+            "qa2":                      qa2,
+            "qa3":                      qa3,
+            "qa4":                      qa4,
+            "qa5":                      qa5,
+            "qa6":                      qa6,
+            "qa7":                      qa7,
         })
     return out
 
@@ -524,21 +550,57 @@ def _compute_acquisition(services):
     }
 
 
+# v6: remoteness now computed from services.aria_plus (populated by
+# ingest_nqs_snapshot.py v1). populated=True when any service carries
+# a value. The bands list matches the ABS 5-band Remoteness Structure
+# exactly — ACECQA stores the full "X Australia" strings.
+ARIA_CANONICAL_BANDS = [
+    "Major Cities of Australia",
+    "Inner Regional Australia",
+    "Outer Regional Australia",
+    "Remote Australia",
+    "Very Remote Australia",
+]
+
+
 def _compute_remoteness(services):
+    active = [s for s in services if s.get("is_active")]
+    bands = {label: 0 for label in ARIA_CANONICAL_BANDS}
+    unknown_count = 0
+    places_by_band = {label: 0 for label in ARIA_CANONICAL_BANDS}
+    places_unknown = 0
+
+    for s in active:
+        a = s.get("aria_plus")
+        p = s.get("approved_places") or 0
+        if a in bands:
+            bands[a] += 1
+            places_by_band[a] += p
+        else:
+            unknown_count += 1
+            places_unknown += p
+
+    populated_n = sum(bands.values())
+    if populated_n == 0:
+        return {
+            "populated": False,
+            "scheme":    "ABS Remoteness Structure (5-band)",
+            "bands":     {k: 0 for k in ARIA_CANONICAL_BANDS},
+            "note": ("ARIA+ not populated on these services. "
+                     "Re-run ingest_nqs_snapshot.py to populate, or "
+                     "confirm the services exist in the NQS snapshot."),
+        }
+
     return {
-        "populated": False,
-        "scheme":    "ABS Remoteness Structure (5-band)",
-        "bands": {
-            "Major Cities":      0,
-            "Inner Regional":    0,
-            "Outer Regional":    0,
-            "Remote":            0,
-            "Very Remote":       0,
-        },
-        "note": ("Pending ABS POA → Remoteness Area lookup. "
-                 "Services will be mapped by postcode. Matches the "
-                 "remoteness classification used on the Kintell "
-                 "industry panel."),
+        "populated":      True,
+        "scheme":         "ABS Remoteness Structure (5-band)",
+        "bands":          bands,
+        "places_by_band": places_by_band,
+        "unknown_count":  unknown_count,
+        "places_unknown": places_unknown,
+        "total_services": len(active),
+        "total_places":   sum((s.get("approved_places") or 0) for s in active),
+        "source":         "ACECQA ARIA+ via NQS Data Q4 2025",
     }
 
 
@@ -592,10 +654,86 @@ def _compute_valuation(services):
     }
 
 
-# ─── Catchment (defensive on unpopulated cache) ────────────────────
+# ─── Catchment (v6: SEIFA from services; cache fallback for later) ─
 
-def _fetch_catchment(conn, services):
-    active_sids = [s["service_id"] for s in services if s.get("is_active")]
+# SEIFA deciles → three-band grouping. 1–3 = low, 4–6 = mid, 7–10 = high.
+# Consistent with Strategic Insights V4 and the Kintell industry panel.
+def _seifa_band(decile):
+    if decile is None:
+        return None
+    try:
+        d = int(decile)
+    except (TypeError, ValueError):
+        return None
+    if 1 <= d <= 3:  return "low"
+    if 4 <= d <= 6:  return "mid"
+    if 7 <= d <= 10: return "high"
+    return None
+
+
+# v6: derives weighted SEIFA and decile histogram directly from
+# services.seifa_decile (populated by ingest_nqs_snapshot.py v1).
+# Also calls the service_catchment_cache path for supply bands /
+# weighted under-5 / weighted income — those remain null until the
+# Tier 3 cache is populated, but the call is retained so the payload
+# shape stays stable when they do land.
+def _compute_catchment(conn, services):
+    active = [s for s in services if s.get("is_active")]
+    active_sids = [s["service_id"] for s in active]
+
+    decile_hist = {d: 0 for d in range(1, 11)}
+    band_counts = {"low": 0, "mid": 0, "high": 0, "unknown": 0}
+    band_places = {"low": 0, "mid": 0, "high": 0, "unknown": 0}
+    total_w = 0
+    w_sum   = 0.0
+    seifa_populated_n = 0
+
+    for s in active:
+        d = s.get("seifa_decile")
+        p = s.get("approved_places") or 0
+        band = _seifa_band(d)
+        if band is None:
+            band_counts["unknown"] += 1
+            band_places["unknown"] += p
+            continue
+        seifa_populated_n += 1
+        decile_hist[int(d)] += 1
+        band_counts[band] += 1
+        band_places[band] += p
+        w_sum += float(d) * p
+        total_w += p
+
+    seifa_block = {
+        "populated":        seifa_populated_n > 0,
+        "populated_count":  seifa_populated_n,
+        "total_services":   len(active),
+        "weighted_decile":  round(w_sum / total_w, 2) if total_w else None,
+        "histogram":        decile_hist,
+        "band_counts":      band_counts,
+        "band_places":      band_places,
+        "source":           "ACECQA SEIFA via NQS Data Q4 2025",
+    }
+
+    cache_block = _fetch_catchment_cache(conn, active_sids, active)
+
+    return {
+        "populated":       seifa_block["populated"] or cache_block.get("populated", False),
+        "seifa":           seifa_block,
+        "weighted_seifa":  seifa_block["weighted_decile"],
+        "weighted_under5": cache_block.get("weighted_under5"),
+        "weighted_income": cache_block.get("weighted_income"),
+        "supply_bands":    cache_block.get("supply_bands", {
+            "balanced": 0, "supplied": 0, "oversupplied": 0,
+            "not_cached": len(active_sids),
+        }),
+        "cache_populated": cache_block.get("populated", False),
+    }
+
+
+# Retained path for the eventual Tier 3 service_catchment_cache.
+# Returns whatever the cache has; stub when empty. Identical logic to
+# v5 _fetch_catchment.
+def _fetch_catchment_cache(conn, active_sids, services):
     stub = {
         "populated":        False,
         "weighted_seifa":   None,
@@ -778,7 +916,7 @@ def get_operator_payload(group_id):
             "remoteness":           _compute_remoteness(services),
             "places_timeline":      _compute_places_timeline(services),
             "valuation":            _compute_valuation(services),
-            "catchment":            _fetch_catchment(conn, services),
+            "catchment":            _compute_catchment(conn, services),
             "competitive_exposure": {
                 "populated":                   False,
                 "oversupplied_places_pct":     None,

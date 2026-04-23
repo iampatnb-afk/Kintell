@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- operator.html v4 -->
+<!-- operator.html v5 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -740,7 +740,14 @@
 
 <script>
 /* ──────────────────────────────────────────────────────────────────
-   operator.html v4
+   operator.html v5
+   v5: Tier 2 NQS ingest wire-up. Header shows prettified
+       ownership_type (private → "Private (for profit)" etc).
+       Catchment Quality Profile renders a SEIFA decile
+       histogram + weighted decile + low/mid/high band split.
+       Remoteness distribution renders real ARIA+ counts as a
+       5-band stacked bar with per-band chips. Both cards stop
+       saying "pending cache" when we have data.
    v4: parseAustralianToIso now recognises the "Mon YYYY" format
        that ACECQA uses for rating_issued_date (e.g. "Feb 2023").
        Fixes the Quality card's per-centre rating-date column
@@ -879,6 +886,28 @@ function isOlderThan12Months(dateStr) {
   return d < cutoff;
 }
 
+// v5: pretty label for groups.ownership_type enum. The DB stores
+// short codes; the UI shows human labels.
+const OWNERSHIP_LABELS = {
+  "private":            "Private (for profit)",
+  "nfp":                "Not-for-profit",
+  "government":         "Government",
+  "independent_school": "Independent school",
+  "catholic_school":    "Catholic school",
+  "unknown":            "Not classified",
+  "family":             "Family-owned",
+  "pe":                 "Private equity",
+  "listed":             "ASX-listed",
+};
+function prettifyOwnership(value) {
+  if (!value) return "Not classified";
+  if (OWNERSHIP_LABELS[value]) return OWNERSHIP_LABELS[value];
+  // Fall back: replace underscores, Title Case
+  return String(value)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
 // ── Fetch + render ───────────────────────────────────────────────
 async function load() {
   if (!GID) {
@@ -942,7 +971,7 @@ function renderHeader() {
   const canonical = g.canonical_name;
   const showCanonical = (g.display_name && canonical && canonical !== effective);
 
-  const ownership = g.ownership_type || "not classified";
+  const ownership = prettifyOwnership(g.ownership_type);
   const parent    = g.parent_entity
     ? htmlEscape(g.parent_entity.legal_name) +
       (g.parent_entity.is_notional ? " <i>(notional)</i>" : "")
@@ -1343,36 +1372,125 @@ function wireNqsBuckets() {
   });
 }
 
-// ── Catchment section (placeholder for v1) ───────────────────────
+// ── Catchment section (v5: renders real SEIFA, keeps placeholders
+//      for supply bands / u5 / income until Tier 3 cache populates)
 function renderCatchment() {
   const c = payload.catchment || {};
-  if (!c.populated) {
+  const seifa = c.seifa || {};
+  const totalServices = payload.scale.services || 1;
+
+  // If neither SEIFA nor the old cache has anything, show placeholder
+  if (!seifa.populated && !c.cache_populated) {
     return `
     <div class="op-section">
-      <h3>Catchment Quality Profile <span class="note">pending cache</span></h3>
+      <h3>Catchment Quality Profile <span class="note">pending</span></h3>
       <div class="placeholder">Catchment metrics not yet computed.
-        <span class="will-show">Will show: <b>weighted SEIFA decile headline</b>
-        for the portfolio, plus a <b>histogram of centres in SEIFA 1–3 / 4–6 / 7–10 bands</b>
-        so concentration in lower or higher socio-economic catchments is visible at a glance.
-        Also: weighted under-5 population, weighted median income, and supply-band
-        exposure (balanced &lt;0.55x, supplied 0.55–1.0x, oversupplied &gt;1.0x)
-        across the ${fmtN(payload.scale.services)} centres.
-        Lights up when service_catchment_cache is populated.</span>
+        <span class="will-show">Will show: <b>weighted SEIFA decile headline</b>,
+        a <b>1–10 decile histogram</b>, a <b>low/mid/high band split</b>,
+        plus weighted under-5 population, weighted median income, and
+        supply-band exposure once the SA2 catchment cache is populated (Tier 3).</span>
       </div>
     </div>
     `;
   }
-  const b = c.supply_bands || {};
+
+  // SEIFA sub-block is what Tier 2 gives us. Render it.
+  const hist   = seifa.histogram || {};
+  const bc     = seifa.band_counts || {low:0, mid:0, high:0, unknown:0};
+  const bp     = seifa.band_places || {low:0, mid:0, high:0, unknown:0};
+  const wd     = seifa.weighted_decile;
+  const popN   = seifa.populated_count || 0;
+  const totalN = seifa.total_services || totalServices;
+
+  // Compute histogram max for bar scaling
+  const histMax = Math.max(1, ...Object.values(hist));
+  const histBars = [];
+  for (let d = 1; d <= 10; d++) {
+    const n = hist[d] || 0;
+    const h = Math.round((n / histMax) * 100);
+    const col = d <= 3 ? "var(--danger, #e66)"
+             : d <= 6 ? "var(--amber, #d8b050)"
+                      : "var(--ok, #7ac57a)";
+    histBars.push(`
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;">
+        <div style="height:60px;width:100%;display:flex;align-items:flex-end;">
+          <div title="Decile ${d}: ${n} centre${n===1?'':'s'}"
+               style="width:100%;height:${h}%;background:${col};border-radius:2px 2px 0 0;min-height:${n>0?'2px':'0'};"></div>
+        </div>
+        <div style="font-size:10px;color:var(--text-mute);">${d}</div>
+        <div style="font-size:11px;color:var(--text);">${n||''}</div>
+      </div>
+    `);
+  }
+
+  // Weighted-decile interpretation
+  let wdBandLabel = "";
+  if (wd !== null && wd !== undefined) {
+    if (wd <= 3.5)      wdBandLabel = '<span style="color:var(--danger,#e66);">low-SES catchment mix</span>';
+    else if (wd <= 6.5) wdBandLabel = '<span style="color:var(--amber,#d8b050);">mid-SES catchment mix</span>';
+    else                wdBandLabel = '<span style="color:var(--ok,#7ac57a);">high-SES catchment mix</span>';
+  }
+
+  // Cache-dependent facts (still null today; shown conditionally)
+  const u5   = c.weighted_under5;
+  const inc  = c.weighted_income;
+  const sb   = c.supply_bands || {};
+  const anyCache = c.cache_populated;
+
   return `
   <div class="op-section">
-    <h3>Catchment Quality Profile</h3>
-    <div class="fact"><span class="k">Weighted SEIFA decile</span><b>${c.weighted_seifa ?? "—"}</b></div>
-    <div class="fact"><span class="k">Weighted under-5 population</span><b>${fmtN(c.weighted_under5)}</b></div>
-    <div class="fact"><span class="k">Weighted median income</span><b>$${fmtN(c.weighted_income)}</b></div>
-    <div class="fact"><span class="k">Balanced catchments (&lt;0.55x)</span><b>${b.balanced||0}</b></div>
-    <div class="fact"><span class="k">Supplied (0.55–1.0x)</span><b>${b.supplied||0}</b></div>
-    <div class="fact"><span class="k">Oversupplied (&gt;1.0x)</span><b>${b.oversupplied||0}</b></div>
-    <div class="fact"><span class="k">Not yet cached</span><b>${b.not_cached||0}</b></div>
+    <h3>Catchment Quality Profile <span class="note">SEIFA · portfolio catchments</span></h3>
+
+    <div class="fact"><span class="k">Weighted SEIFA decile (places-weighted)</span>
+      <b>${wd !== null && wd !== undefined ? wd : '—'} ${wdBandLabel}</b></div>
+
+    <div style="margin-top:10px;">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-mute);margin-bottom:4px;">
+        <span>Decile distribution (1 = most disadvantaged, 10 = most advantaged)</span>
+        <span>${popN} / ${totalN} services rated</span>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:3px;height:80px;">
+        ${histBars.join('')}
+      </div>
+    </div>
+
+    <div style="margin-top:14px;display:flex;gap:8px;">
+      <div style="flex:1;padding:8px 10px;border-radius:6px;background:rgba(230,110,110,.08);border:1px solid rgba(230,110,110,.25);">
+        <div style="font-size:11px;color:var(--text-mute);">Low SES (1–3)</div>
+        <div style="font-size:18px;font-weight:600;">${bc.low || 0}</div>
+        <div style="font-size:11px;color:var(--text-mute);">${fmtN(bp.low || 0)} places</div>
+      </div>
+      <div style="flex:1;padding:8px 10px;border-radius:6px;background:rgba(216,176,80,.08);border:1px solid rgba(216,176,80,.25);">
+        <div style="font-size:11px;color:var(--text-mute);">Mid SES (4–6)</div>
+        <div style="font-size:18px;font-weight:600;">${bc.mid || 0}</div>
+        <div style="font-size:11px;color:var(--text-mute);">${fmtN(bp.mid || 0)} places</div>
+      </div>
+      <div style="flex:1;padding:8px 10px;border-radius:6px;background:rgba(122,197,122,.08);border:1px solid rgba(122,197,122,.25);">
+        <div style="font-size:11px;color:var(--text-mute);">High SES (7–10)</div>
+        <div style="font-size:18px;font-weight:600;">${bc.high || 0}</div>
+        <div style="font-size:11px;color:var(--text-mute);">${fmtN(bp.high || 0)} places</div>
+      </div>
+      ${bc.unknown ? `
+      <div style="flex:0 0 auto;padding:8px 10px;border-radius:6px;background:rgba(150,150,150,.08);border:1px solid rgba(150,150,150,.25);">
+        <div style="font-size:11px;color:var(--text-mute);">Unknown</div>
+        <div style="font-size:18px;font-weight:600;">${bc.unknown}</div>
+      </div>` : ''}
+    </div>
+
+    ${anyCache ? `
+    <div style="margin-top:14px;">
+      <div class="fact"><span class="k">Weighted under-5 population</span><b>${fmtN(u5)}</b></div>
+      <div class="fact"><span class="k">Weighted median income</span><b>$${fmtN(inc)}</b></div>
+      <div class="fact"><span class="k">Balanced catchments (&lt;0.55x)</span><b>${sb.balanced||0}</b></div>
+      <div class="fact"><span class="k">Supplied (0.55–1.0x)</span><b>${sb.supplied||0}</b></div>
+      <div class="fact"><span class="k">Oversupplied (&gt;1.0x)</span><b>${sb.oversupplied||0}</b></div>
+    </div>
+    ` : `
+    <div style="margin-top:10px;font-size:11px;color:var(--text-mute);font-style:italic;">
+      Supply bands, weighted under-5 population and median income arrive when the
+      SA2 catchment cache is populated (Tier 3). SEIFA above is live from the NQS snapshot.
+    </div>
+    `}
   </div>
   `;
 }
@@ -1780,45 +1898,84 @@ function renderBrownfieldGeography() {
   </div>`;
 }
 
-// ── v3: Remoteness distribution (placeholder until POA lookup) ───
+// ── v5: Remoteness distribution (real ARIA+ data from Tier 2) ────
 function renderRemoteness() {
   const r = payload.remoteness || {};
   if (!r.populated) {
     return `
     <div class="op-section">
-      <h3>Remoteness distribution <span class="note">pending ABS lookup</span></h3>
-      <div class="placeholder">${htmlEscape(r.note || "Pending POA → RA lookup.")}
+      <h3>Remoteness distribution <span class="note">unpopulated</span></h3>
+      <div class="placeholder">${htmlEscape(r.note || "ARIA+ not present on services.")}
         <span class="will-show">Bands: Major Cities / Inner Regional / Outer
-        Regional / Remote / Very Remote — counts of centres and approved
-        places in each. Wider band than a single metro/non-metro split and
-        matches the classification used on the Kintell industry panel.</span>
+        Regional / Remote / Very Remote — centres and approved places in each.
+        Matches the ABS 5-band classification used on the Kintell industry panel.</span>
       </div>
     </div>`;
   }
-  // When populated, render a simple horizontal bar
-  const bands = r.bands || {};
-  const entries = Object.entries(bands);
-  const total = entries.reduce((n, [, v]) => n + (v || 0), 0) || 1;
-  const colors = {
-    "Major Cities":   "#60a5fa",
-    "Inner Regional": "#4ade80",
-    "Outer Regional": "#fbbf24",
-    "Remote":         "#f97316",
-    "Very Remote":    "#f87171",
+
+  // v5: canonical 5-band ordering + short display labels
+  const CANON = [
+    "Major Cities of Australia",
+    "Inner Regional Australia",
+    "Outer Regional Australia",
+    "Remote Australia",
+    "Very Remote Australia",
+  ];
+  const SHORT = {
+    "Major Cities of Australia":   "Major Cities",
+    "Inner Regional Australia":    "Inner Regional",
+    "Outer Regional Australia":    "Outer Regional",
+    "Remote Australia":            "Remote",
+    "Very Remote Australia":       "Very Remote",
   };
+  const COLORS = {
+    "Major Cities of Australia":   "#60a5fa",
+    "Inner Regional Australia":    "#4ade80",
+    "Outer Regional Australia":    "#fbbf24",
+    "Remote Australia":            "#f97316",
+    "Very Remote Australia":       "#f87171",
+  };
+
+  const bands  = r.bands || {};
+  const places = r.places_by_band || {};
+  const totalCentres = CANON.reduce((n, b) => n + (bands[b] || 0), 0);
+  const totalPlaces  = r.total_places || CANON.reduce((n, b) => n + (places[b] || 0), 0);
+
+  // Horizontal stacked bar
+  const segs = CANON.map(band => {
+    const n = bands[band] || 0;
+    if (!n) return '';
+    const p = places[band] || 0;
+    return `
+      <div style="flex:${n} 0 auto;background:${COLORS[band]};min-width:30px;padding:4px 6px;font-size:11px;color:#0b1020;"
+           title="${htmlEscape(SHORT[band])}: ${n} centres, ${fmtN(p)} places (${pct(n, totalCentres)})">
+        ${htmlEscape(SHORT[band])} ${n}
+      </div>`;
+  }).filter(Boolean).join('');
+
+  // Per-band chip facts — only show bands with non-zero counts
+  const chips = CANON.map(band => {
+    const n = bands[band] || 0;
+    if (!n) return '';
+    const p = places[band] || 0;
+    return `
+      <div style="display:inline-flex;gap:8px;align-items:center;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid ${COLORS[band]}44;margin:2px 4px 2px 0;">
+        <span style="width:8px;height:8px;border-radius:50%;background:${COLORS[band]};"></span>
+        <span style="color:var(--text);font-size:12px;">${htmlEscape(SHORT[band])}</span>
+        <span style="color:var(--text-mute);font-size:12px;">${n} <span style="opacity:.7;">(${fmtN(p)} places)</span></span>
+      </div>`;
+  }).filter(Boolean).join('');
+
+  const unknown = r.unknown_count || 0;
+
   return `
   <div class="op-section">
-    <h3>Remoteness distribution <span class="note">ABS 5-band structure</span></h3>
-    <div class="share-bar">
-      <div class="top"><span>${htmlEscape(r.scheme || "")}</span><b>${fmtN(total)}</b></div>
-      <div class="stack">
-        ${entries.map(([band, count]) => count ? `
-          <div style="flex:${count} 0 auto;background:${colors[band] || '#94a3b8'};"
-               title="${htmlEscape(band)}: ${count} (${pct(count, total)})">
-            ${htmlEscape(band)} ${count}
-          </div>` : '').join('')}
-      </div>
+    <h3>Remoteness distribution <span class="note">ABS 5-band · ${fmtN(totalCentres)} centres · ${fmtN(totalPlaces)} places</span></h3>
+    <div class="share-bar" style="margin-bottom:10px;">
+      <div class="stack">${segs}</div>
     </div>
+    <div>${chips}</div>
+    ${unknown ? `<div style="margin-top:8px;font-size:11px;color:var(--text-mute);">${unknown} service${unknown===1?'':'s'} without ARIA+ value</div>` : ''}
   </div>`;
 }
 
