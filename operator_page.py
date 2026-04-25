@@ -1,51 +1,53 @@
 """
-operator_page.py  v7
-────────────────────────────────────────────────────────────────
-Builds the consolidated payload for a single operator group.
+operator_page.py v8
 
-v7 changes (2026-04-25, Phase 0a Step 3b — model_assumptions wire-up):
-  - New _fetch_assumptions(conn) reads all is_active=1 rows from
-    model_assumptions and returns them keyed by assumption_key.
-    Each entry carries value_numeric, value_text, units,
-    display_name, source, description — enough for operator.html
-    to render the OBS/DER/COM badge tooltips with full
-    methodology citations without a second API call.
-  - get_operator_payload() now fetches assumptions once at the
-    start of the request and passes them to _compute_quality()
-    (the only function currently consuming them); the assumptions
-    block is also returned at the top level of the payload as
-    `assumptions` so the HTML can cite source/formula in tooltips.
-  - _compute_quality() signature changes from (services) to
-    (services, assumptions). The hardcoded module constants
-    DUE_SOON_DAYS, STALE_RATING_DAYS, STALE_RATING_YEARS are
-    retained as FALLBACK DEFAULTS only — the active path reads
-    inspection_due_soon_months and inspection_overdue_years from
-    the assumptions dict. If the table is missing or empty, the
-    fallbacks keep the Quality card rendering. Per project brief
-    §4 decision 13: model_assumptions is the single source of
-    truth for every configurable parameter at render time.
+v8 additions:
+  - _compute_workforce(): Phase 1 Module 2 backend.
+    Computes required_educators per centre by service_sub_type using
+    model_assumptions ratios:
+      LDC  -> educator_ratio_ldc_blended  (1:6.5)
+      OSHC -> educator_ratio_oshc         (1:15)
+      PSK  -> educator_ratio_36m_plus     (1:11)
+      FDC, NULL, 'Other' -> excluded (different regulatory model or
+                                       data-quality exclusion).
+    Aggregates to group total. Pulls historical trend from
+    group_snapshots when available (12m and 24m deltas; None when
+    no historical snapshot exists in the window).
+  - _supply_state_lookup(): training_completions read for the
+    operator's states of operation. Returns latest year, prior year,
+    YoY change, YoY %, and a caveat string for NSW 2024 (NCVER
+    flagged as overstated).
+  - _fetch_workforce_growth(): defensive group_snapshots reader.
+    Auto-discovers required-educator column name; returns empty
+    shape when table or column is missing.
+  - get_operator_payload() now surfaces a top-level `workforce`
+    block. Backwards-compatible: every v7 key is unchanged.
+  - No COM trigger fires in v8 (rule deferred to Phase 7 commentary
+    engine). Data is exposed; the commentary line is a frontend
+    decision in v8 of operator.html.
 
-v6 changes retained (2026-04-23, Tier 2 NQS ingest wire-up):
-  - _fetch_services() pulls the new columns populated by
-    ingest_nqs_snapshot.py v1: aria_plus, seifa_decile,
-    service_sub_type, provider_management_type, qa1..qa7. These
-    flow through into the services[] array in the payload.
-  - _compute_remoteness() now computes real counts from
-    services.aria_plus. populated=True when any service carries
-    a value; previously always returned a stub.
-  - _fetch_catchment() has been replaced by _compute_catchment()
-    which derives weighted SEIFA, SEIFA decile histogram, and a
-    band headline (low / mid / high) directly from services.
-    The old service_catchment_cache fallback is retained as a
-    secondary path for when that table eventually gets populated
-    (Tier 3) — supply bands, weighted under-5, weighted income
-    still come from the cache when available.
+v7 changes retained:
+  - _fetch_assumptions / _assumption_value: model_assumptions reader.
+  - _compute_quality reads inspection thresholds + commentary
+    threshold from model_assumptions, with module constants as
+    fallback defaults.
+  - quality block carries due_soon_threshold_months,
+    overdue_threshold_years, due_soon_share, commentary_threshold,
+    elevated_inspection_exposure.
+  - get_operator_payload surfaces a top-level `assumptions` block.
+
+v6 changes retained:
+  - Tier 2 columns on services (aria_plus, seifa_decile,
+    service_sub_type, provider_management_type, qa1..qa7).
+  - _compute_remoteness driven by services.aria_plus.
+  - _compute_catchment uses services.seifa_decile directly;
+    service_catchment_cache path retained for Tier 3.
 
 v5 changes retained:
   - _parse_date() accepts Mon-YYYY ("Feb 2023") in addition to
     DD/MM/YYYY and YYYY-MM-DD. Maps Mon-YYYY to first of month.
   - STALE_RATING_YEARS = 2 (was 3).
-  - quality.due_soon_count — rated >18 months ago.
+  - quality.due_soon_count - rated >18 months ago.
 
 v4 changes retained:
   - acquisition block uses "brownfield" terminology.
@@ -77,7 +79,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 DB_PATH = ROOT / "data" / "kintell.db"
 
-# Illustrative valuation constants — stabilised-market range per
+# Illustrative valuation constants - stabilised-market range per
 # Remara Credit Committee Briefing Paper (leasehold going concern).
 VALUATION_LOW_PER_PLACE  = 25_000
 VALUATION_HIGH_PER_PLACE = 40_000
@@ -86,34 +88,41 @@ VALUATION_SOURCE = (
     "(Remara Credit Committee Briefing Paper)"
 )
 
-# v5: stale-rating threshold now 2 years (was 3). The NQS
-# Assessment & Rating cycle is legislatively "typically every
-# 2–3 years, practically ~2 years"; the Credit Committee brief
-# treats rating currency as a credit signal, so 2y is the right
-# bar. Kept as a module constant so it's tunable.
 # v7: STALE_RATING_YEARS, STALE_RATING_DAYS, and DUE_SOON_DAYS are
-# now FALLBACK DEFAULTS only. _compute_quality() reads canonical
-# values from model_assumptions (inspection_overdue_years,
-# inspection_due_soon_months); if the table is missing or empty,
-# these constants keep the card rendering. Single source of truth
-# is the DB; this is the safety net.
-
+# fallback defaults. _compute_quality reads canonical values from
+# model_assumptions; if the table is missing or empty, these
+# constants keep the card rendering. Single source of truth is the
+# DB; this is the safety net.
 STALE_RATING_YEARS = 2
 STALE_RATING_DAYS  = 365 * STALE_RATING_YEARS
-
-# v5: "due soon" threshold — centres whose last rating was
-# issued more than 18 months ago are in the window where ACECQA
-# typically re-inspects. Surfaced separately from the stale
-# threshold so the Quality card can show "X centres due for
-# reassessment in the near term" ahead of the stale count.
-DUE_SOON_DAYS = int(365 * 1.5)
+DUE_SOON_DAYS      = int(365 * 1.5)
 
 # Regex for "kindergarten" / "kinder" / "preschool" in service names.
-# Used as a secondary signal when ACECQA kinder_approved is NULL.
 KINDER_PAT = re.compile(r'\b(kinder(garten)?|pre-?school)\b', re.I)
 
+# v8: service_sub_type to model_assumptions key mapping for the
+# Workforce card. Subtypes not in the map are excluded from the
+# required_educators computation:
+#   FDC has a different regulatory model (1 carer per up to 7
+#        children, including own); not directly comparable.
+#   NULL and 'Other' are data-quality exclusions; revisit when
+#        subtype is populated.
+SUBTYPE_TO_RATIO_KEY = {
+    "LDC":  "educator_ratio_ldc_blended",
+    "OSHC": "educator_ratio_oshc",
+    "PSK":  "educator_ratio_36m_plus",
+}
 
-# ─── Utilities ─────────────────────────────────────────────────────
+# v8: if model_assumptions row for a key is missing, these defaults
+# keep the card rendering. They mirror the seeded values.
+SUBTYPE_RATIO_FALLBACKS = {
+    "educator_ratio_ldc_blended": 6.5,
+    "educator_ratio_oshc":        15.0,
+    "educator_ratio_36m_plus":    11.0,
+}
+
+
+# --- Utilities -----------------------------------------------------
 
 def _connect():
     if not DB_PATH.exists():
@@ -134,12 +143,6 @@ def _columns(conn, table):
     return [r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()]
 
 
-# v7: model_assumptions reader. Returns a dict keyed by
-# assumption_key with each row's full metadata so the API response
-# can carry the values plus enough context (units, source,
-# description) to populate methodology tooltips on the OBS/DER/COM
-# badges. Returns {} if the table is missing or empty — callers
-# then fall back to module constants where available.
 def _fetch_assumptions(conn):
     if not _table_exists(conn, "model_assumptions"):
         return {}
@@ -162,9 +165,6 @@ def _fetch_assumptions(conn):
     return out
 
 
-# v7: small helper for compute_* functions to read a numeric
-# assumption value with a fallback default. Keeps every call site
-# trivial: _assumption_value(assumptions, "key", default=18.0).
 def _assumption_value(assumptions, key, default):
     if not assumptions:
         return default
@@ -175,14 +175,6 @@ def _assumption_value(assumptions, key, default):
     return v if v is not None else default
 
 
-# v5: accept Mon-YYYY as a third format. ACECQA's rating_issued_date
-# is stored as e.g. "Feb 2023", "Sep 2025". Maps to the first of
-# the month so downstream date arithmetic (>= cutoff, age in days)
-# behaves sensibly. DD/MM/YYYY and YYYY-MM-DD still work unchanged.
-#
-# Format detection order matters: try the specific numeric formats
-# first; the "%b %Y" fallback only fires when the first 10 chars
-# aren't a full date.
 def _parse_date(s):
     if s is None:
         return None
@@ -195,8 +187,6 @@ def _parse_date(s):
             return datetime.strptime(head, fmt).date()
         except ValueError:
             continue
-    # v5: Mon-YYYY path. Trim to first 8 chars max ("Sep 2025"),
-    # strip any trailing punctuation. Case-insensitive match.
     short = s[:8].strip().rstrip(",").title()
     try:
         return datetime.strptime(short, "%b %Y").date()
@@ -205,9 +195,6 @@ def _parse_date(s):
     return None
 
 
-# The brands table's "name" column varies by how build_graph
-# populated it. Pick whichever exists so the services join finds
-# a real value rather than NULL for every row.
 def _brand_name_column(conn):
     if not _table_exists(conn, "brands"):
         return None
@@ -218,7 +205,7 @@ def _brand_name_column(conn):
     return None
 
 
-# ─── Group meta + parent ───────────────────────────────────────────
+# --- Group meta + parent -------------------------------------------
 
 def _fetch_group(conn, group_id):
     row = conn.execute("""
@@ -268,7 +255,7 @@ def _fetch_group(conn, group_id):
     }
 
 
-# ─── Entities ──────────────────────────────────────────────────────
+# --- Entities ------------------------------------------------------
 
 def _fetch_entities(conn, group_id, parent_entity_id):
     rows = conn.execute("""
@@ -307,7 +294,7 @@ def _fetch_entities(conn, group_id, parent_entity_id):
             "is_trustee":          trustee,
             "trust_name":          trust,
             "is_propco":           propco,
-            "is_opco":             opco,
+            "is_opco":              opco,
             "is_fgc":              fgc,
             "is_notional":         notional,
             "is_active":           is_active,
@@ -326,7 +313,7 @@ def _fetch_entities(conn, group_id, parent_entity_id):
     return out
 
 
-# ─── Services ──────────────────────────────────────────────────────
+# --- Services ------------------------------------------------------
 
 def _fetch_services(conn, group_id):
     brand_col = _brand_name_column(conn)
@@ -361,8 +348,6 @@ def _fetch_services(conn, group_id):
     try:
         rows = conn.execute(sql, (group_id,)).fetchall()
     except sqlite3.OperationalError:
-        # Hard fallback — if the new columns don't exist yet (pre-Tier 2 DB),
-        # keep the old SELECT shape. The per-row unpacking below handles both.
         rows = conn.execute("""
             SELECT s.service_id, s.service_name,
                    s.address_line, s.suburb, s.state, s.postcode,
@@ -423,7 +408,6 @@ def _fetch_services(conn, group_id):
             "brand_name":               brand_name,
             "entity_id":                eid,
             "entity_legal_name":        eln,
-            # v6: Tier 2 fields
             "aria_plus":                aria_plus,
             "seifa_decile":             seifa_decile,
             "service_sub_type":         sub_type,
@@ -439,7 +423,7 @@ def _fetch_services(conn, group_id):
     return out
 
 
-# ─── Aggregations ──────────────────────────────────────────────────
+# --- Aggregations --------------------------------------------------
 
 def _compute_scale(entities, services):
     active_entities = [e for e in entities if e.get("is_active")]
@@ -468,7 +452,7 @@ NQS_ORDER = [
     "Meeting NQS",
     "Working Towards NQS",
     "Significant Improvement Required",
-    "Provisional — Not Yet Assessed",
+    "Provisional - Not Yet Assessed",
     "(not rated)",
 ]
 
@@ -519,19 +503,6 @@ def _compute_growth(services):
     return result
 
 
-# v5: rating-currency compute now gets correct parses from
-# _parse_date() — previously every Mon-YYYY failed silently.
-#
-# New fields on the return value:
-#   due_soon_count        — rated >18 months ago (within the
-#                           ACECQA typical re-inspection window)
-#   stale_rating_count    — rated more than STALE_RATING_YEARS ago
-#                           (the credit-relevance threshold)
-#   due_soon_threshold_days / stale_threshold_days — surfaced
-#                           so the UI can show the exact thresholds
-#                           used in card tooltips and facts rows.
-# v7: thresholds now sourced from model_assumptions when available.
-# Module constants are fallback defaults only.
 def _compute_quality(services, assumptions):
     active = [s for s in services if s.get("is_active")]
     kinder_by_flag = sum(1 for s in active if s.get("kinder_approved"))
@@ -541,8 +512,6 @@ def _compute_quality(services, assumptions):
     )
     ldc = sum(1 for s in active if s.get("long_day_care"))
 
-    # v7: Read canonical thresholds from model_assumptions; fall
-    # back to module constants if the assumption is missing.
     due_soon_months = _assumption_value(
         assumptions, "inspection_due_soon_months", default=18.0
     )
@@ -571,9 +540,6 @@ def _compute_quality(services, assumptions):
     due_soon    = sum(1 for d in rating_dates if d < due_soon_cutoff)
     stale       = sum(1 for d in rating_dates if d < stale_cutoff)
 
-    # v7: also compute the COM-trigger flag for the operator.html
-    # commentary line. Sourced from commentary_inspection_threshold
-    # in model_assumptions (default 0.30 = 30%).
     com_threshold = _assumption_value(
         assumptions, "commentary_inspection_threshold", default=0.30
     )
@@ -582,19 +548,18 @@ def _compute_quality(services, assumptions):
     elevated_inspection_exposure = due_soon_share > com_threshold
 
     return {
-        "total_services":          total_active,
-        "kinder_by_flag":          kinder_by_flag,
-        "kinder_by_name":          kinder_by_name,
-        "long_day_care":           ldc,
-        "most_recent_rating_date": most_recent,
-        "oldest_rating_date":      oldest,
-        "due_soon_count":          due_soon,
-        "stale_rating_count":      stale,
-        "never_rated_count":       never_rated,
-        "due_soon_threshold_days": due_soon_days,
-        "stale_threshold_days":    stale_days,
-        "stale_threshold_years":   stale_years,
-        # v7 additions:
+        "total_services":                    total_active,
+        "kinder_by_flag":                    kinder_by_flag,
+        "kinder_by_name":                    kinder_by_name,
+        "long_day_care":                     ldc,
+        "most_recent_rating_date":           most_recent,
+        "oldest_rating_date":                oldest,
+        "due_soon_count":                    due_soon,
+        "stale_rating_count":                stale,
+        "never_rated_count":                 never_rated,
+        "due_soon_threshold_days":           due_soon_days,
+        "stale_threshold_days":              stale_days,
+        "stale_threshold_years":             stale_years,
         "due_soon_threshold_months":         due_soon_months,
         "overdue_threshold_years":           overdue_years,
         "due_soon_share":                    round(due_soon_share, 4),
@@ -628,7 +593,7 @@ def _compute_acquisition(services):
             brownfield_list.append({
                 "service_id":         s.get("service_id"),
                 "service_name":       s.get("service_name"),
-                "suburb":             s.get("suburb"),
+                "suburb":              s.get("suburb"),
                 "state":              s.get("state"),
                 "last_transfer_date": s.get("last_transfer_date"),
                 "approved_places":    s.get("approved_places"),
@@ -650,10 +615,6 @@ def _compute_acquisition(services):
     }
 
 
-# v6: remoteness now computed from services.aria_plus (populated by
-# ingest_nqs_snapshot.py v1). populated=True when any service carries
-# a value. The bands list matches the ABS 5-band Remoteness Structure
-# exactly — ACECQA stores the full "X Australia" strings.
 ARIA_CANONICAL_BANDS = [
     "Major Cities of Australia",
     "Inner Regional Australia",
@@ -754,10 +715,8 @@ def _compute_valuation(services):
     }
 
 
-# ─── Catchment (v6: SEIFA from services; cache fallback for later) ─
+# --- Catchment -----------------------------------------------------
 
-# SEIFA deciles → three-band grouping. 1–3 = low, 4–6 = mid, 7–10 = high.
-# Consistent with Strategic Insights V4 and the Kintell industry panel.
 def _seifa_band(decile):
     if decile is None:
         return None
@@ -771,12 +730,6 @@ def _seifa_band(decile):
     return None
 
 
-# v6: derives weighted SEIFA and decile histogram directly from
-# services.seifa_decile (populated by ingest_nqs_snapshot.py v1).
-# Also calls the service_catchment_cache path for supply bands /
-# weighted under-5 / weighted income — those remain null until the
-# Tier 3 cache is populated, but the call is retained so the payload
-# shape stays stable when they do land.
 def _compute_catchment(conn, services):
     active = [s for s in services if s.get("is_active")]
     active_sids = [s["service_id"] for s in active]
@@ -830,9 +783,6 @@ def _compute_catchment(conn, services):
     }
 
 
-# Retained path for the eventual Tier 3 service_catchment_cache.
-# Returns whatever the cache has; stub when empty. Identical logic to
-# v5 _fetch_catchment.
 def _fetch_catchment_cache(conn, active_sids, services):
     stub = {
         "populated":        False,
@@ -920,7 +870,258 @@ def _fetch_catchment_cache(conn, active_sids, services):
     return result
 
 
-# ─── Regulatory events / Intelligence notes (defensive) ────────────
+# --- Workforce (v8) ------------------------------------------------
+
+def _supply_state_lookup(conn, state_codes):
+    """For each state code in `state_codes`, summarise training_completions
+    as latest year, prior year, YoY change, YoY%, and an attached
+    caveat string for NSW 2024 (NCVER flagged as overstated).
+
+    Defensive: returns {} if training_completions is missing or no
+    state codes are supplied.
+    """
+    if not state_codes or not _table_exists(conn, "training_completions"):
+        return {}
+    placeholders = ",".join(["?"] * len(state_codes))
+    try:
+        rows = conn.execute(
+            f"SELECT state_code, year, SUM(completions) AS total "
+            f"  FROM training_completions "
+            f" WHERE state_code IN ({placeholders}) "
+            f" GROUP BY state_code, year",
+            list(state_codes),
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return {}
+
+    by_state = {}
+    for sc, yr, total in rows:
+        by_state.setdefault(sc, {})[int(yr)] = int(total or 0)
+
+    nsw_2024_caveat = (
+        "NCVER flagged NSW 2024 completions as overstated; treat as "
+        "an upper-bound figure pending the next NCVER release."
+    )
+
+    out = {}
+    for sc, year_map in by_state.items():
+        years = sorted(year_map.keys())
+        if not years:
+            continue
+        latest_year = years[-1]
+        prior_year  = years[-2] if len(years) >= 2 else None
+        latest = {"year": latest_year, "completions": year_map[latest_year]}
+        prior  = ({"year": prior_year, "completions": year_map[prior_year]}
+                  if prior_year is not None else None)
+        yoy = None
+        yoy_pct = None
+        if prior:
+            yoy = latest["completions"] - prior["completions"]
+            if prior["completions"] > 0:
+                yoy_pct = round(100.0 * yoy / prior["completions"], 1)
+        block = {
+            "available_years": years,
+            "latest":          latest,
+            "prior":           prior,
+            "yoy_change":      yoy,
+            "yoy_pct":         yoy_pct,
+        }
+        if sc == "NSW" and latest_year == 2024:
+            block["caveat"] = nsw_2024_caveat
+        out[sc] = block
+    return out
+
+
+def _fetch_workforce_growth(conn, group_id, current_required):
+    """Read group_snapshots for 12m and 24m historical required-educator
+    counts. Returns the empty shape if the table is missing, the
+    required-educator column doesn't exist, or no historical row
+    is found in either window. Auto-discovers the column name across
+    common variants.
+    """
+    empty = {
+        "growth_12m":         None,
+        "growth_24m":         None,
+        "snapshot_12m_date":  None,
+        "snapshot_12m_value": None,
+        "snapshot_24m_date":  None,
+        "snapshot_24m_value": None,
+        "table_available":    False,
+        "column_used":        None,
+    }
+    if not _table_exists(conn, "group_snapshots"):
+        return empty
+    cols = set(_columns(conn, "group_snapshots"))
+    candidate = None
+    for c in ("required_educators", "required_educators_total",
+              "required_educators_group", "workforce_required"):
+        if c in cols:
+            candidate = c
+            break
+    if candidate is None or "occurred_at" not in cols or "group_id" not in cols:
+        out = dict(empty)
+        out["table_available"] = True  # table exists but column is missing
+        return out
+
+    cutoff_12 = (datetime.now() - timedelta(days=365)).isoformat(timespec="seconds")
+    cutoff_24 = (datetime.now() - timedelta(days=730)).isoformat(timespec="seconds")
+
+    out = dict(empty)
+    out["table_available"] = True
+    out["column_used"]     = candidate
+    try:
+        r12 = conn.execute(
+            f"SELECT occurred_at, {candidate} FROM group_snapshots "
+            f" WHERE group_id = ? AND occurred_at <= ? "
+            f"   AND {candidate} IS NOT NULL "
+            f" ORDER BY occurred_at DESC LIMIT 1",
+            (group_id, cutoff_12),
+        ).fetchone()
+        if r12:
+            out["snapshot_12m_date"]  = r12[0]
+            out["snapshot_12m_value"] = r12[1]
+            if current_required is not None and r12[1] is not None:
+                out["growth_12m"] = current_required - r12[1]
+        r24 = conn.execute(
+            f"SELECT occurred_at, {candidate} FROM group_snapshots "
+            f" WHERE group_id = ? AND occurred_at <= ? "
+            f"   AND {candidate} IS NOT NULL "
+            f" ORDER BY occurred_at DESC LIMIT 1",
+            (group_id, cutoff_24),
+        ).fetchone()
+        if r24:
+            out["snapshot_24m_date"]  = r24[0]
+            out["snapshot_24m_value"] = r24[1]
+            if current_required is not None and r24[1] is not None:
+                out["growth_24m"] = current_required - r24[1]
+    except sqlite3.OperationalError:
+        return empty
+    return out
+
+
+def _compute_workforce(conn, services, assumptions, group_id):
+    """Phase 1 Module 2 main computation.
+    Returns:
+      required_total            - int (rounded headline)
+      required_total_precise    - float (1dp, for tooltip)
+      by_subtype                - per-subtype services / places / required
+      excluded                  - FDC + Unknown buckets with reasons
+      ratios_used               - the actual ratio numbers used per subtype
+      growth_12m / growth_24m   - int or None (None when no snapshot)
+      growth_snapshots          - the underlying snapshot dates / values
+      supply.operator_states    - sorted list of state codes the operator
+                                  has active centres in
+      supply.primary_state      - state with the largest share of places
+      supply.primary_state_place_share
+      supply.by_state           - per-state training_completions block
+                                  (latest year, prior year, YoY)
+      supply.source             - methodology citation
+    """
+    # 1) Pull ratios (with hardcoded fallbacks)
+    ratios_used = {}
+    for subtype, key in SUBTYPE_TO_RATIO_KEY.items():
+        ratios_used[subtype] = _assumption_value(
+            assumptions, key,
+            default=SUBTYPE_RATIO_FALLBACKS[key],
+        )
+
+    # 2) Per-centre required_educators by subtype, plus state place tally
+    by_subtype = {st: {"services": 0, "places": 0,
+                       "required_educators": 0.0,
+                       "ratio_used": ratios_used.get(st)}
+                  for st in SUBTYPE_TO_RATIO_KEY}
+    excluded = {
+        "FDC": {
+            "services": 0, "places": 0,
+            "reason": ("FDC operates under a different regulatory model "
+                       "(1 educator per up to 7 children, including own). "
+                       "Not directly comparable to the educator-on-floor "
+                       "headcount derived for centre-based services."),
+        },
+        "Unknown": {
+            "services": 0, "places": 0,
+            "reason": ("service_sub_type is NULL or 'Other'. Excluded "
+                       "for data quality; revisit when subtype is "
+                       "populated upstream."),
+        },
+    }
+    state_places = {}
+    required_total = 0.0
+
+    for s in services:
+        if not s.get("is_active"):
+            continue
+        st = s.get("service_sub_type")
+        places = s.get("approved_places") or 0
+        sc = s.get("state")
+        if sc:
+            state_places[sc] = state_places.get(sc, 0) + places
+        if st in SUBTYPE_TO_RATIO_KEY:
+            ratio = ratios_used[st]
+            req = (places / ratio) if ratio else 0.0
+            by_subtype[st]["services"]            += 1
+            by_subtype[st]["places"]              += places
+            by_subtype[st]["required_educators"]  += req
+            required_total                        += req
+        elif st == "FDC":
+            excluded["FDC"]["services"] += 1
+            excluded["FDC"]["places"]   += places
+        else:
+            excluded["Unknown"]["services"] += 1
+            excluded["Unknown"]["places"]   += places
+
+    for st, blk in by_subtype.items():
+        blk["required_educators"] = round(blk["required_educators"], 1)
+    required_total_int = int(round(required_total))
+
+    # 3) Historical growth (defensive)
+    growth = _fetch_workforce_growth(conn, group_id, required_total_int)
+
+    # 4) Supply lookup
+    operator_states = sorted(state_places.keys())
+    primary_state = None
+    primary_share = None
+    if state_places:
+        total_places = sum(state_places.values())
+        primary_state = max(state_places.items(), key=lambda kv: kv[1])[0]
+        if total_places > 0:
+            primary_share = round(state_places[primary_state] / total_places, 4)
+
+    supply_by_state = _supply_state_lookup(conn, operator_states)
+
+    return {
+        "populated":              True,
+        "required_total":         required_total_int,
+        "required_total_precise": round(required_total, 1),
+        "by_subtype":             by_subtype,
+        "excluded":               excluded,
+        "ratios_used":            ratios_used,
+        "growth_12m":             growth["growth_12m"],
+        "growth_24m":             growth["growth_24m"],
+        "growth_snapshots": {
+            "snapshot_12m_date":  growth["snapshot_12m_date"],
+            "snapshot_12m_value": growth["snapshot_12m_value"],
+            "snapshot_24m_date":  growth["snapshot_24m_date"],
+            "snapshot_24m_value": growth["snapshot_24m_value"],
+            "table_available":    growth["table_available"],
+            "column_used":        growth["column_used"],
+        },
+        "supply": {
+            "operator_states":           operator_states,
+            "primary_state":             primary_state,
+            "primary_state_place_share": primary_share,
+            "by_state":                  supply_by_state,
+            "source": (
+                "NCVER VOCSTATS DataBuilder, Total Program Completions, "
+                "filtered to ECEC qualification codes (Cert III and "
+                "Diploma of Early Childhood Education and Care, current "
+                "and superseded versions)."
+            ),
+        },
+    }
+
+
+# --- Regulatory events / Intelligence notes (defensive) ------------
 
 def _fetch_regulatory_events(conn, group_id, entities, services):
     if not _table_exists(conn, "regulatory_events"):
@@ -991,7 +1192,7 @@ def _fetch_intelligence_notes(conn, group_id, entities):
         return empty
 
 
-# ─── Public ────────────────────────────────────────────────────────
+# --- Public --------------------------------------------------------
 
 def get_operator_payload(group_id):
     conn = _connect()
@@ -1000,10 +1201,6 @@ def get_operator_payload(group_id):
         if not group:
             return {"ok": False, "msg": f"Group {group_id} not found"}
 
-        # v7: read model_assumptions once per request. Used by
-        # _compute_quality and surfaced at the top level of the
-        # payload so operator.html can populate OBS/DER/COM
-        # methodology tooltips without a second API call.
         assumptions = _fetch_assumptions(conn)
 
         entities = _fetch_entities(conn, group_id, group.get("parent_entity_id"))
@@ -1023,6 +1220,9 @@ def get_operator_payload(group_id):
             "places_timeline":      _compute_places_timeline(services),
             "valuation":            _compute_valuation(services),
             "catchment":            _compute_catchment(conn, services),
+            # v8: Phase 1 Module 2 Workforce.
+            "workforce":            _compute_workforce(
+                                        conn, services, assumptions, group_id),
             "competitive_exposure": {
                 "populated":                   False,
                 "oversupplied_places_pct":     None,
@@ -1033,15 +1233,13 @@ def get_operator_payload(group_id):
                                         conn, group_id, entities, services),
             "intelligence_notes":   _fetch_intelligence_notes(
                                         conn, group_id, entities),
-            # v7: full assumption set with metadata for
-            # methodology tooltips on OBS/DER/COM badges.
             "assumptions":          assumptions,
         }
     finally:
         conn.close()
 
 
-# ─── CLI ───────────────────────────────────────────────────────────
+# --- CLI -----------------------------------------------------------
 
 def _cli():
     p = argparse.ArgumentParser(description="Dump operator payload for a group.")
