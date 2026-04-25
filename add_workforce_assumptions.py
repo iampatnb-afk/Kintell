@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────────────────────────────
-# add_workforce_assumptions.py  v1
+# add_workforce_assumptions.py  v2
 # Phase 1 (Module 2 Workforce) pre-step.
 # Adds two rows to model_assumptions:
 #   educator_ratio_ldc_blended = 6.5   (children per educator, blended LDC)
 #   educator_ratio_oshc        = 15    (children per educator, OSHC)
-# Same pattern as add_commentary_threshold.py:
-#   - timestamped pre-mutation backup
-#   - INSERT OR IGNORE (idempotent — safe to re-run)
-#   - audit_log row capturing what landed
-#   - post-write validation query
-# Defensive: discovers model_assumptions columns at runtime via
-# PRAGMA table_info, so unexpected schema additions won't break it.
+#
+# v2 fixes (relative to v1):
+#   1. Commits model_assumptions inserts BEFORE attempting audit_log
+#      insert. v1 deferred the commit until after audit, so an audit
+#      failure rolled back the data write.
+#   2. audit_log column name corrected: 'action' (real schema) replaces
+#      v1's 'action_type'. Maps to either if both somehow exist.
+#   3. audit_log insert wrapped in try/except — a failure here logs
+#      a warning and exits cleanly with the data already committed.
+# Idempotent: INSERT OR IGNORE means re-running v2 after a partial v1
+# run is safe (rows already there are skipped).
 # ─────────────────────────────────────────────────────────────────────
 from __future__ import annotations
 import sqlite3, shutil, sys, json
@@ -99,6 +103,7 @@ def main() -> int:
         full = dict(row)
         if "is_active" in cols:        full.setdefault("is_active", 1)
         if "last_changed_at" in cols:  full.setdefault("last_changed_at", nowiso)
+        if "last_changed_by" in cols:  full.setdefault("last_changed_by", "add_workforce_assumptions.py v2")
         if "created_at" in cols:       full.setdefault("created_at", nowiso)
         if "updated_at" in cols:       full.setdefault("updated_at", nowiso)
 
@@ -111,34 +116,49 @@ def main() -> int:
         )
         (inserted_keys if cur.rowcount == 1 else skipped_keys).append(row["assumption_key"])
 
-    print(f"[3/5] Inserted: {inserted_keys}")
+    # Commit data write FIRST so audit failures cannot roll it back.
+    con.commit()
+    print(f"[3/5] Inserted: {inserted_keys}    (committed)")
     if skipped_keys:
         print(f"      Skipped (already present): {skipped_keys}")
 
-    cur.execute("PRAGMA table_info(audit_log)")
-    audit_cols = {r[1] for r in cur.fetchall()}
-    if audit_cols:
-        audit_payload = {
-            "action_type": "data_seed",
-            "entity_type": "model_assumptions",
-            "entity_key":  "phase_1_workforce_assumptions",
-            "actor":       "add_workforce_assumptions.py v1",
-            "occurred_at": nowiso,
-            "after_json":  json.dumps({"inserted": inserted_keys, "skipped": skipped_keys}),
-            "notes":       "Phase 1 pre-step: educator_ratio_ldc_blended + educator_ratio_oshc",
-        }
-        audit_use = {k: v for k, v in audit_payload.items() if k in audit_cols}
-        if audit_use:
-            cl = ", ".join(audit_use.keys())
-            pl = ", ".join(["?"] * len(audit_use))
-            cur.execute(f"INSERT INTO audit_log ({cl}) VALUES ({pl})", list(audit_use.values()))
-            print(f"[4/5] audit_log row inserted (audit_id={cur.lastrowid})")
+    # Audit log — best-effort. Wrapped so any schema mismatch or NOT NULL
+    # violation logs a warning instead of taking down the script.
+    try:
+        cur.execute("PRAGMA table_info(audit_log)")
+        audit_cols = {r[1] for r in cur.fetchall()}
+        if not audit_cols:
+            print("[4/5] audit_log table missing; audit row skipped")
         else:
-            print("[4/5] audit_log columns mismatched; audit row skipped")
-    else:
-        print("[4/5] audit_log table missing; audit row skipped")
-
-    con.commit()
+            audit_payload = {
+                # v2: 'action' is the real column; keep 'action_type' as alias
+                "action":      "data_seed",
+                "action_type": "data_seed",
+                "entity_type": "model_assumptions",
+                "entity_key":  "phase_1_workforce_assumptions",
+                "actor":       "add_workforce_assumptions.py v2",
+                "occurred_at": nowiso,
+                "created_at":  nowiso,
+                "before_json": json.dumps(None),
+                "after_json":  json.dumps({"inserted": inserted_keys, "skipped": skipped_keys}),
+                "notes":       "Phase 1 pre-step: educator_ratio_ldc_blended + educator_ratio_oshc",
+            }
+            audit_use = {k: v for k, v in audit_payload.items() if k in audit_cols}
+            if audit_use:
+                cl = ", ".join(audit_use.keys())
+                pl = ", ".join(["?"] * len(audit_use))
+                cur.execute(f"INSERT INTO audit_log ({cl}) VALUES ({pl})", list(audit_use.values()))
+                con.commit()
+                print(f"[4/5] audit_log row inserted (audit_id={cur.lastrowid})")
+            else:
+                print(f"[4/5] audit_log columns: {sorted(audit_cols)}")
+                print("      No overlap with payload keys; audit row skipped.")
+    except sqlite3.IntegrityError as e:
+        con.rollback()
+        print(f"[4/5] audit_log insert failed (IntegrityError: {e}). Data write is safe; audit row skipped.")
+    except sqlite3.OperationalError as e:
+        con.rollback()
+        print(f"[4/5] audit_log insert failed (OperationalError: {e}). Data write is safe; audit row skipped.")
 
     cur.execute(
         "SELECT assumption_key, value_numeric, value_text, units "
