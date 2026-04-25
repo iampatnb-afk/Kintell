@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- operator.html v6 -->
+<!-- operator.html v8 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -889,6 +889,160 @@
     flex-wrap: wrap;
   }
 
+  /* --- v7: Workforce card --------------------------------------- */
+  .wf-headline {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin: 4px 0 14px;
+  }
+  .wf-headline .big {
+    font-size: 30px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    line-height: 1;
+  }
+  .wf-headline .label {
+    font-size: 12px;
+    color: var(--text-dim);
+    flex: 1;
+  }
+  .wf-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 4px 0 12px;
+  }
+  .wf-cell {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 9px 12px;
+  }
+  .wf-cell .label {
+    font-size: 10px;
+    color: var(--text-mute);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .wf-cell .big {
+    font-size: 18px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    margin-top: 4px;
+    color: var(--text);
+  }
+  .wf-cell .big .unit {
+    font-size: 11px; color: var(--text-dim);
+    font-weight: 400; margin-left: 6px;
+  }
+  .wf-cell .big.up   { color: var(--green); }
+  .wf-cell .big.down { color: var(--red); }
+  .wf-cell .big.flat { color: var(--text); }
+  .wf-cell .pending {
+    font-size: 11px;
+    color: var(--text-mute);
+    font-style: italic;
+    margin-top: 4px;
+  }
+  .wf-subtype-table {
+    display: grid;
+    grid-template-columns: 56px 1fr 70px 80px;
+    gap: 4px 12px;
+    font-size: 12px;
+    margin-top: 6px;
+  }
+  .wf-subtype-table > div {
+    padding: 5px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .wf-subtype-table > div.h {
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    font-weight: 700;
+    border-bottom: 1px solid var(--border);
+    padding: 0 0 4px;
+  }
+  .wf-subtype-table > div.right {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .wf-subtype-table > div.cell { color: var(--text); }
+  .wf-subtype-table > div.cell.zero {
+    color: var(--text-mute);
+    font-style: italic;
+  }
+  .wf-supply-block {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .wf-supply-block .h {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .wf-state-row {
+    display: grid;
+    grid-template-columns: 50px 1fr 130px;
+    gap: 12px;
+    align-items: baseline;
+    padding: 4px 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: 12.5px;
+  }
+  .wf-state-row:last-child { border-bottom: none; }
+  .wf-state-row .sc {
+    font-weight: 600;
+    color: var(--text);
+  }
+  .wf-state-row.primary .sc { color: var(--accent); }
+  .wf-state-row .desc {
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+  }
+  .wf-state-row .yoy {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+  .wf-state-row .yoy.up   { color: var(--green); }
+  .wf-state-row .yoy.down { color: var(--red); }
+  .wf-state-row .yoy.flat { color: var(--text-dim); }
+  .wf-caveat {
+    font-size: 11px;
+    color: var(--amber);
+    font-style: italic;
+    margin-top: 6px;
+  }
+  .wf-excluded-note {
+    font-size: 11px;
+    color: var(--text-mute);
+    font-style: italic;
+    margin-top: 8px;
+  }
+  .wf-ratio-line {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0 0;
+    border-top: 1px dashed var(--border);
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .wf-ratio-line b {
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+
+
 </style>
 </head>
 
@@ -910,7 +1064,7 @@
 
 <script>
 /* ──────────────────────────────────────────────────────────────────
-   operator.html v6
+   operator.html v7
    v6 (2026-04-25): Phase 0a Step 3c — OBS/DER/COM badge component
        and methodology tooltips. Page-level legend in the header
        defines the three classifications once; each metric on the
@@ -1195,6 +1349,7 @@ function render() {
   el.innerHTML = [
     renderHeader(),
     renderQuality(),                                                 // v3: donut + permanent buckets
+    renderWorkforce(),                                              // v7: Phase 1 Module 2
     renderPlacesTimelineCard(),                                      // Mon-YYYY axis
     renderSectionRow(renderGrowthSection(), renderAcquisition()),    // Greenfield vs Brownfield
     renderBrownfieldGeography(),                                     // v3 new
@@ -1671,6 +1826,210 @@ function renderQuality() {
       (ACECQA cycle typically 2–3 years, practically ~2).
     </div>
   </div>
+  `;
+}
+
+// v7: Phase 1 Module 2 Workforce card. Required-side derivation
+// from approved_places + model_assumptions ratios; supply-side
+// state-level lookup from training_completions. Group total
+// renders DER data; per-subtype + ratios shown in audit-grade
+// detail. Growth cells show "awaiting historical snapshot" until
+// group_snapshots carries 12m and 24m old rows for the operator.
+function renderWorkforce() {
+  const w = payload.workforce || {};
+  const sc = payload.scale || {};
+  const a = payload.assumptions || {};
+
+  if (!w.populated) {
+    return `
+      <div class="op-section">
+        <h3>Workforce <span class="note">pending</span></h3>
+        <div class="placeholder">Workforce metrics not yet computed.
+          <span class="will-show">Will show: <b>required educators on-floor</b>
+            (group total + per-centre breakdown), <b>12 / 24-month change</b>,
+            and <b>state-level training-completions supply</b>.</span>
+        </div>
+      </div>
+    `;
+  }
+
+  const totalServices = sc.services || 0;
+  const ratios = w.ratios_used || {};
+  const ldcAssumption = a.educator_ratio_ldc_blended || {};
+
+  const headlineBadge = renderBadge("der", {
+    source:  "ACECQA NQAITS approved_places + model_assumptions ratios",
+    formula: "<code>required_educators_centre = approved_places &divide; blended_ratio_for_subtype</code>, summed across active centres in the group.",
+    asAt:    "Live computation from current data",
+  });
+
+  const subtypeRows = ["LDC", "OSHC", "PSK"].map(st => {
+    const blk = (w.by_subtype && w.by_subtype[st]) || { services: 0, places: 0, required_educators: 0, ratio_used: null };
+    const zCls = blk.services === 0 ? " zero" : "";
+    const ratioStr = (blk.ratio_used != null) ? `1:${blk.ratio_used}` : "n/a";
+    return `
+      <div class="cell${zCls}">${st}</div>
+      <div class="cell${zCls}">${fmtN(blk.services)} centre${blk.services === 1 ? "" : "s"} &middot; ratio ${ratioStr}</div>
+      <div class="cell right${zCls}">${fmtN(blk.places)}</div>
+      <div class="cell right${zCls}">${blk.services > 0 ? fmtN(Math.round(blk.required_educators)) : "&mdash;"}</div>
+    `;
+  }).join("");
+
+  const excl = w.excluded || {};
+  const fdcN = (excl.FDC && excl.FDC.services) || 0;
+  const unkN = (excl.Unknown && excl.Unknown.services) || 0;
+  const unkP = (excl.Unknown && excl.Unknown.places) || 0;
+  let exclNote = "";
+  if (fdcN + unkN > 0) {
+    const parts = [];
+    if (fdcN > 0) parts.push(`${fdcN} FDC service${fdcN === 1 ? "" : "s"}`);
+    if (unkN > 0) parts.push(`${unkN} unclassified service${unkN === 1 ? "" : "s"} (${fmtN(unkP)} places)`);
+    exclNote = `<div class="wf-excluded-note">Excluded from required-educator total: ${parts.join(", ")}.</div>`;
+  }
+
+  function growthCell(val, label) {
+    if (val === null || val === undefined) {
+      return `
+        <div class="wf-cell">
+          <div class="label">${label}</div>
+          <div class="pending">Awaiting historical snapshot</div>
+        </div>
+      `;
+    }
+    const sign = val > 0 ? "+" : "";
+    const cls = val > 0 ? "up" : (val < 0 ? "down" : "flat");
+    return `
+      <div class="wf-cell">
+        <div class="label">${label}</div>
+        <div class="big ${cls}">${sign}${fmtN(val)}<span class="unit">educators</span></div>
+      </div>
+    `;
+  }
+
+  const supply = w.supply || {};
+  const byState = supply.by_state || {};
+  const operatorStates = supply.operator_states || [];
+  const primary = supply.primary_state;
+
+  let supplyHtml = "";
+  if (operatorStates.length > 0) {
+    const ordered = operatorStates.slice().sort((x, y) => {
+      if (x === primary) return -1;
+      if (y === primary) return 1;
+      return x.localeCompare(y);
+    });
+
+    const stateRows = ordered.map(s => {
+      const blk = byState[s];
+      const isPrimary = (s === primary);
+      if (!blk) {
+        return `
+          <div class="wf-state-row${isPrimary ? " primary" : ""}">
+            <div class="sc">${htmlEscape(s)}</div>
+            <div class="desc" style="font-style:italic;color:var(--text-mute);">No NCVER data available</div>
+            <div class="yoy"></div>
+          </div>
+        `;
+      }
+      const latest = blk.latest || {};
+      const prior = blk.prior;
+      const yoy = blk.yoy_change;
+      const yoyPct = blk.yoy_pct;
+      const yoyCls = (yoy === null || yoy === undefined) ? "" :
+                     yoy > 0 ? "up" : (yoy < 0 ? "down" : "flat");
+      let yoyText;
+      if (yoy === null || yoy === undefined) {
+        yoyText = "&mdash;";
+      } else {
+        const ySign = yoy > 0 ? "+" : "";
+        const pSign = (yoyPct !== null && yoyPct > 0) ? "+" : "";
+        const pStr  = (yoyPct === null || yoyPct === undefined) ? "" : ` (${pSign}${yoyPct}%)`;
+        yoyText = `${ySign}${fmtN(yoy)}${pStr}`;
+      }
+      const desc = `${fmtN(latest.completions)} completions in ${latest.year}` +
+                   (prior ? ` (vs ${fmtN(prior.completions)} in ${prior.year})` : "");
+      return `
+        <div class="wf-state-row${isPrimary ? " primary" : ""}">
+          <div class="sc">${htmlEscape(s)}</div>
+          <div class="desc">${desc}</div>
+          <div class="yoy ${yoyCls}">${yoyText}</div>
+        </div>
+      `;
+    }).join("");
+
+    let caveat = "";
+    for (const s of ordered) {
+      const blk = byState[s];
+      if (blk && blk.caveat) {
+        caveat = `<div class="wf-caveat">&#9888; ${htmlEscape(blk.caveat)}</div>`;
+        break;
+      }
+    }
+
+    const supplyBadge = renderBadge("obs", {
+      source:  htmlEscape(supply.source || "NCVER VOCSTATS DataBuilder"),
+      formula: "<code>SUM(completions) WHERE state_code = ? AND year = ?</code> over the four ECEC qualification codes (Cert III + Diploma ECEC, current and superseded versions).",
+      asAt:    "Latest NCVER ingest (Phase 1.5)",
+    }, true);
+
+    supplyHtml = `
+      <div class="wf-supply-block">
+        <div class="h">Educator supply pipeline ${supplyBadge}</div>
+        ${stateRows}
+        ${caveat}
+      </div>
+    `;
+  }
+
+  const ratiosBadge = renderBadge("obs", {
+    source:  "model_assumptions table (educator_ratio_* rows)",
+    formula: "Per-subtype ratio applied to approved_places. NQF Reg 123 (1:11) for PSK; weighted blend for LDC; jurisdiction-standard 1:15 for OSHC.",
+    asAt:    ldcAssumption.last_changed_at || "n/a",
+  }, true);
+
+  return `
+    <div class="op-section">
+      <h3>Workforce</h3>
+      <div class="wf-headline">
+        <div class="big">${fmtN(w.required_total)}</div>
+        <div class="label">required educators on-floor across ${fmtN(totalServices)} centre${totalServices === 1 ? "" : "s"}</div>
+        ${headlineBadge}
+      </div>
+
+      <div class="wf-grid">
+        ${growthCell(w.growth_12m, "12-month change")}
+        ${growthCell(w.growth_24m, "24-month change")}
+      </div>
+
+      <div class="wf-subtype-table">
+        <div class="h">Subtype</div>
+        <div class="h">Detail</div>
+        <div class="h right">Places</div>
+        <div class="h right">Required</div>
+        ${subtypeRows}
+      </div>
+      ${exclNote}
+
+      <div class="wf-supply-block">
+        <div class="h">Educator supply pipeline</div>
+        <div style="font-size:12px; color:var(--text-mute); font-style:italic; padding:4px 0; line-height:1.55;">
+          State-level training-supply data is best interpreted at the industry level
+          and will move to the Industry view (Phase 3 of the build sequence).
+          <br><br>
+          Note on NCVER YoY comparisons: superseded ECEC codes (CHC30113 / CHC50113)
+          wound down through 2023 while new codes (CHC30121 / CHC50121) ramped up,
+          producing an artificial trough in 2023. Single-year YoY against 2023 reads
+          as +50&ndash;66% growth in 2024, but compared to 2022 (last steady-state year)
+          national supply is roughly flat. Multi-year baselines required; deferred to
+          Industry view with the qualification-transition curve shown explicitly.
+        </div>
+      </div>
+
+      <div class="wf-ratio-line">
+        <span>Ratios applied</span>
+        <span><b>LDC</b> 1:${ratios.LDC ?? "?"} &nbsp; <b>OSHC</b> 1:${ratios.OSHC ?? "?"} &nbsp; <b>PSK</b> 1:${ratios.PSK ?? "?"} ${ratiosBadge}</span>
+      </div>
+    </div>
   `;
 }
 
