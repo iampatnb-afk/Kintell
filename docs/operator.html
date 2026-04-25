@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- operator.html v5b -->
+<!-- operator.html v6 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -719,6 +719,176 @@
   details.full-list[open] summary::before {
     transform: rotate(90deg);
   }
+  /* ─── v6: OBS/DER/COM badge component ─────────────────────────
+     Cross-cutting UI primitive per project brief §5 (data
+     classification) and §4 decision 12 (cross-cutting primitive).
+     Three classifications:
+       OBS — Observed (neutral grey)
+       DER — Derived (accent blue)
+       COM — Commentary (amber)
+     Hover reveals a methodology card showing Source / Formula /
+     As-at — written for an auditor or valuer relying on the
+     figure for academic integrity, not for an end-user
+     explanation of terminology. The page-level legend (see
+     .methodology-legend) defines each classification once at
+     the top of the page so badge tooltips don't need to repeat
+     it.
+  */
+  .km-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    padding: 2px 5px;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    line-height: 1;
+    vertical-align: middle;
+    cursor: help;
+    user-select: none;
+    position: relative;
+  }
+  .km-badge.obs {
+    color: var(--text-mute);
+    background: rgba(107, 118, 132, 0.10);
+    border-color: rgba(107, 118, 132, 0.35);
+  }
+  .km-badge.der {
+    color: var(--accent);
+    background: rgba(74, 158, 255, 0.10);
+    border-color: rgba(74, 158, 255, 0.35);
+  }
+  .km-badge.com {
+    color: var(--amber);
+    background: rgba(251, 191, 36, 0.10);
+    border-color: rgba(251, 191, 36, 0.35);
+  }
+
+  /* Methodology tooltip: appears below-right on hover, three rows
+     (Source / Formula / As-at). Width capped so long formulas wrap
+     instead of pushing the page out. Click-through transparent so
+     the tooltip itself doesn't capture pointer events. */
+  .km-badge .km-tip {
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 30;
+    width: 320px;
+    padding: 10px 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+    color: var(--text);
+    font-size: 11.5px;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-align: left;
+    pointer-events: none;
+    cursor: default;
+  }
+  .km-badge:hover .km-tip,
+  .km-badge:focus-within .km-tip {
+    visibility: visible;
+    opacity: 1;
+  }
+  .km-tip .km-row {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    column-gap: 8px;
+    padding: 3px 0;
+  }
+  .km-tip .km-row + .km-row { border-top: 1px dashed var(--border); }
+  .km-tip .km-key {
+    color: var(--text-mute);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding-top: 2px;
+  }
+  .km-tip .km-val { color: var(--text); }
+  .km-tip .km-val code {
+    font-family: "SF Mono", "Consolas", monospace;
+    font-size: 10.5px;
+    background: rgba(74, 158, 255, 0.08);
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: var(--text);
+  }
+  /* When badge is near the right edge of the page, anchor tooltip
+     to the right so it doesn't overflow. Caller adds .right-anchor. */
+  .km-badge.right-anchor .km-tip { left: auto; right: 0; }
+
+  /* ─── v6: page-level methodology legend ───────────────────────
+     Sits in the operator-page header, below the external-tools
+     row, above the first card. Defines OBS/DER/COM once so badge
+     tooltips can focus on metric-specific methodology rather than
+     re-explaining classifications.
+  */
+  .methodology-legend {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 14px;
+    padding: 8px 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 11.5px;
+    color: var(--text-dim);
+  }
+  .methodology-legend .ml-label {
+    color: var(--text-mute);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding-right: 4px;
+    border-right: 1px solid var(--border);
+    margin-right: 4px;
+  }
+  .methodology-legend .ml-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* ─── v6: COM commentary line on cards ────────────────────────
+     A single sentence summarising rule-based interpretation,
+     prefixed with the COM badge. Amber-tinted background so it
+     reads as commentary, not data.
+  */
+  .com-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 14px;
+    padding: 10px 12px;
+    background: var(--amber-bg);
+    border: 1px solid rgba(251, 191, 36, 0.30);
+    border-radius: 6px;
+    font-size: 12.5px;
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .com-line .km-badge { flex-shrink: 0; margin-top: 1px; }
+  .com-line .com-text { flex: 1; }
+  .com-line .com-text b { color: var(--amber); }
+
+  /* ─── v6: pulls the existing .fact row apart slightly so a
+     trailing badge has breathing room. Non-disruptive — only
+     applies to .fact rows that contain a .km-badge. */
+  .fact:has(.km-badge) > b {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
 </style>
 </head>
 
@@ -740,7 +910,20 @@
 
 <script>
 /* ──────────────────────────────────────────────────────────────────
-   operator.html v5b
+   operator.html v6
+   v6 (2026-04-25): Phase 0a Step 3c — OBS/DER/COM badge component
+       and methodology tooltips. Page-level legend in the header
+       defines the three classifications once; each metric on the
+       Quality card carries a coloured badge whose hover reveals
+       Source / Formula / As-at — written for an auditor / valuer
+       reading the page as primary-source backed evidence rather
+       than a UI explanation of jargon. Three Quality-card badges
+       added (OBS rating dates, DER due-soon count, DER overdue
+       count) plus a new COM commentary line "Elevated inspection
+       exposure" that renders only when the v7 backend flag
+       elevated_inspection_exposure = true. Thresholds for the
+       DER and COM badges are read from the v7 payload's
+       assumptions block (the canonical model_assumptions table).
    v5b (2026-04-23): Catchment card rename + layout breathing room.
        "Catchment Quality Profile" → "Portfolio catchment profile"
        (low-SES ≠ low-quality for a childcare operator; the card is
@@ -905,6 +1088,60 @@ function isOlderThan12Months(dateStr) {
   return d < cutoff;
 }
 
+// ── v6: OBS/DER/COM badge renderer ───────────────────────────────
+//
+// Returns a small inline badge with a methodology tooltip.
+// classification : "OBS" | "DER" | "COM"
+// methodology    : { source, formula, asAt, rule, inputs, threshold }
+//                  Only the fields you pass are rendered. Convention:
+//                    OBS — source + asAt
+//                    DER — source + formula
+//                    COM — rule + inputs + threshold + asAt
+// rightAnchor    : true to anchor tooltip to the right edge (use
+//                  when badge sits near the right of its container)
+//
+// All values are htmlEscape'd. Pass formulas with `<code>` already
+// applied if you want them styled as code; otherwise plain text.
+function renderBadge(classification, methodology, rightAnchor = false) {
+  const cls = String(classification || "").toLowerCase();
+  if (!["obs", "der", "com"].includes(cls)) return "";
+  const m = methodology || {};
+  const rows = [];
+  if (m.source)    rows.push({ k: "Source",    v: m.source    });
+  if (m.formula)   rows.push({ k: "Formula",   v: m.formula   });
+  if (m.rule)      rows.push({ k: "Rule",      v: m.rule      });
+  if (m.inputs)    rows.push({ k: "Inputs",    v: m.inputs    });
+  if (m.threshold) rows.push({ k: "Threshold", v: m.threshold });
+  if (m.asAt)      rows.push({ k: "As at",     v: m.asAt      });
+
+  const tipHtml = rows.length === 0 ? "" : `
+    <span class="km-tip" role="tooltip">
+      ${rows.map(r => `
+        <span class="km-row">
+          <span class="km-key">${htmlEscape(r.k)}</span>
+          <span class="km-val">${r.v}</span>
+        </span>
+      `).join("")}
+    </span>
+  `;
+  const anchorCls = rightAnchor ? " right-anchor" : "";
+  return `<span class="km-badge ${cls}${anchorCls}" tabindex="0" aria-label="${cls.toUpperCase()} metric — hover for methodology">${cls.toUpperCase()}${tipHtml}</span>`;
+}
+
+// ── v6: methodology legend block ─────────────────────────────────
+// Rendered once in the operator-page header. Keeps the OBS/DER/COM
+// definitions out of every individual badge tooltip.
+function renderMethodologyLegend() {
+  return `
+    <div class="methodology-legend" role="region" aria-label="Metric classification legend">
+      <span class="ml-label">methodology</span>
+      <span class="ml-item">${renderBadge("OBS")} <span>Observed — primary-source data</span></span>
+      <span class="ml-item">${renderBadge("DER")} <span>Derived — transparent formula</span></span>
+      <span class="ml-item">${renderBadge("COM")} <span>Commentary — rule-based interpretation</span></span>
+    </div>
+  `;
+}
+
 // v5: pretty label for groups.ownership_type enum. The DB stores
 // short codes; the UI shows human labels.
 const OWNERSHIP_LABELS = {
@@ -1059,6 +1296,8 @@ function renderHeader() {
         <a href="${t.href}" target="_blank" rel="noopener">${t.label}</a>
       `).join("")}
     </div>
+
+    ${renderMethodologyLegend()}
   </div>
   `;
 }
@@ -1327,10 +1566,68 @@ function renderQuality() {
   // v4: surface both the 18-month "due soon" window and the stale
   // threshold that operator_page.py v5 returns. Fall back to the
   // historical 3-year label if an older payload is served.
-  const staleYears = q.stale_threshold_years || 3;
+  // v6: prefer v7 backend field names (overdue_threshold_years,
+  // due_soon_threshold_months) when present.
+  const staleYears  = q.overdue_threshold_years || q.stale_threshold_years || 3;
+  const dueSoonMonths = q.due_soon_threshold_months || 18;
   const dueSoon    = q.due_soon_count        || 0;
   const stale      = q.stale_rating_count    || 0;
   const neverRated = q.never_rated_count     || 0;
+
+  // v6: build OBS/DER/COM methodology objects. Source/formula
+  // citations are written for an auditor or valuer reading the
+  // page as primary-source backed evidence.
+  const totalActive = q.total_services || 0;
+  const dueSoonShare = q.due_soon_share != null
+    ? (q.due_soon_share * 100).toFixed(1) + '%'
+    : '—';
+  const comThresholdPct = q.commentary_threshold != null
+    ? (q.commentary_threshold * 100).toFixed(0) + '%'
+    : '30%';
+  const ratingAsAt = "ACECQA NQS Snapshot Q4 2025";
+
+  const obsRatingMethod = {
+    source: "ACECQA National Quality Standard register",
+    asAt:   ratingAsAt,
+  };
+  const derDueSoonMethod = {
+    source:  "ACECQA NQS register · model_assumptions",
+    formula: `count of active services where (today &minus; rating_issued_date) &gt; <code>inspection_due_soon_months</code> (${dueSoonMonths} months)`,
+  };
+  const derStaleMethod = {
+    source:  "ACECQA NQS register · model_assumptions",
+    formula: `count of active services where (today &minus; rating_issued_date) &gt; <code>inspection_overdue_years</code> (${staleYears} years)`,
+  };
+  const comExposureMethod = {
+    rule:      `Triggers when more than <code>commentary_inspection_threshold</code> of active centres are past the due-soon window`,
+    inputs:    `<code>services.rating_issued_date</code> (${ratingAsAt}); <code>inspection_due_soon_months</code> (${dueSoonMonths}m)`,
+    threshold: `${comThresholdPct} (model_assumptions.commentary_inspection_threshold)`,
+    asAt:      ratingAsAt,
+  };
+
+  const obsBadge       = renderBadge("OBS", obsRatingMethod,    true);
+  const derDueSoonBadge = renderBadge("DER", derDueSoonMethod,  true);
+  const derStaleBadge   = renderBadge("DER", derStaleMethod,    true);
+
+  // v6: COM commentary line. Renders only when the v7 backend
+  // signals elevated_inspection_exposure (due_soon_share >
+  // commentary_inspection_threshold). Stays silent for portfolios
+  // below the threshold so the card is honest about when the
+  // commentary applies.
+  let comLine = "";
+  if (q.elevated_inspection_exposure) {
+    const comBadge = renderBadge("COM", comExposureMethod);
+    comLine = `
+      <div class="com-line">
+        ${comBadge}
+        <span class="com-text">
+          <b>Elevated inspection exposure.</b>
+          ${dueSoon} of ${totalActive} active centres (${dueSoonShare}) are past the
+          ${dueSoonMonths}-month re-inspection window — above the ${comThresholdPct} commentary threshold.
+        </span>
+      </div>
+    `;
+  }
 
   return `
   <div class="op-section">
@@ -1355,14 +1652,16 @@ function renderQuality() {
       <div class="fact"><span class="k">Long day care</span>
         <b>${q.long_day_care ?? 0} / ${sc.services}
           <span style="color:var(--text-mute);font-weight:400;">(${pct(q.long_day_care || 0, sc.services)})</span></b></div>
-      <div class="fact"><span class="k">Most recent rating issued</span><b>${mostRecent}</b></div>
-      <div class="fact"><span class="k">Oldest rating on current roster</span><b>${oldest}</b></div>
-      <div class="fact"><span class="k">Ratings &gt; 18 months old (due-soon window)</span>
-        <b>${dueSoon}${dueSoon ? ' <span style="color:var(--text-mute);font-weight:400;">re-inspection likely</span>' : ''}</b></div>
+      <div class="fact"><span class="k">Most recent rating issued</span><b>${mostRecent} ${obsBadge}</b></div>
+      <div class="fact"><span class="k">Oldest rating on current roster</span><b>${oldest} ${obsBadge}</b></div>
+      <div class="fact"><span class="k">Ratings &gt; ${dueSoonMonths} months old (due-soon window)</span>
+        <b>${dueSoon}${dueSoon ? ' <span style="color:var(--text-mute);font-weight:400;">re-inspection likely</span>' : ''} ${derDueSoonBadge}</b></div>
       <div class="fact"><span class="k">Ratings &gt; ${staleYears} years old</span>
-        <b>${stale}${stale ? ' <span style="color:var(--amber);">⚠ overdue for reassessment</span>' : ''}</b></div>
+        <b>${stale}${stale ? ' <span style="color:var(--amber);">⚠ overdue for reassessment</span>' : ''} ${derStaleBadge}</b></div>
       ${neverRated ? `<div class="fact"><span class="k">Rating date not ingested</span><b>${neverRated}</b></div>` : ""}
     </div>
+
+    ${comLine}
 
     <div style="margin-top:10px;font-size:11px;color:var(--text-mute);font-style:italic;">
       Tip: click any NQS rating above to see the centres in that category.

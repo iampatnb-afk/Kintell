@@ -1,9 +1,31 @@
 """
-operator_page.py  v6
+operator_page.py  v7
 ────────────────────────────────────────────────────────────────
 Builds the consolidated payload for a single operator group.
 
-v6 changes (2026-04-23, Tier 2 NQS ingest wire-up):
+v7 changes (2026-04-25, Phase 0a Step 3b — model_assumptions wire-up):
+  - New _fetch_assumptions(conn) reads all is_active=1 rows from
+    model_assumptions and returns them keyed by assumption_key.
+    Each entry carries value_numeric, value_text, units,
+    display_name, source, description — enough for operator.html
+    to render the OBS/DER/COM badge tooltips with full
+    methodology citations without a second API call.
+  - get_operator_payload() now fetches assumptions once at the
+    start of the request and passes them to _compute_quality()
+    (the only function currently consuming them); the assumptions
+    block is also returned at the top level of the payload as
+    `assumptions` so the HTML can cite source/formula in tooltips.
+  - _compute_quality() signature changes from (services) to
+    (services, assumptions). The hardcoded module constants
+    DUE_SOON_DAYS, STALE_RATING_DAYS, STALE_RATING_YEARS are
+    retained as FALLBACK DEFAULTS only — the active path reads
+    inspection_due_soon_months and inspection_overdue_years from
+    the assumptions dict. If the table is missing or empty, the
+    fallbacks keep the Quality card rendering. Per project brief
+    §4 decision 13: model_assumptions is the single source of
+    truth for every configurable parameter at render time.
+
+v6 changes retained (2026-04-23, Tier 2 NQS ingest wire-up):
   - _fetch_services() pulls the new columns populated by
     ingest_nqs_snapshot.py v1: aria_plus, seifa_decile,
     service_sub_type, provider_management_type, qa1..qa7. These
@@ -69,6 +91,13 @@ VALUATION_SOURCE = (
 # 2–3 years, practically ~2 years"; the Credit Committee brief
 # treats rating currency as a credit signal, so 2y is the right
 # bar. Kept as a module constant so it's tunable.
+# v7: STALE_RATING_YEARS, STALE_RATING_DAYS, and DUE_SOON_DAYS are
+# now FALLBACK DEFAULTS only. _compute_quality() reads canonical
+# values from model_assumptions (inspection_overdue_years,
+# inspection_due_soon_months); if the table is missing or empty,
+# these constants keep the card rendering. Single source of truth
+# is the DB; this is the safety net.
+
 STALE_RATING_YEARS = 2
 STALE_RATING_DAYS  = 365 * STALE_RATING_YEARS
 
@@ -103,6 +132,47 @@ def _table_exists(conn, name):
 
 def _columns(conn, table):
     return [r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+
+
+# v7: model_assumptions reader. Returns a dict keyed by
+# assumption_key with each row's full metadata so the API response
+# can carry the values plus enough context (units, source,
+# description) to populate methodology tooltips on the OBS/DER/COM
+# badges. Returns {} if the table is missing or empty — callers
+# then fall back to module constants where available.
+def _fetch_assumptions(conn):
+    if not _table_exists(conn, "model_assumptions"):
+        return {}
+    out = {}
+    for row in conn.execute(
+        """SELECT assumption_key, display_name, value_numeric, value_text,
+                  units, description, source, last_changed_at
+             FROM model_assumptions
+            WHERE is_active = 1"""
+    ).fetchall():
+        out[row[0]] = {
+            "display_name":    row[1],
+            "value_numeric":   row[2],
+            "value_text":      row[3],
+            "units":           row[4],
+            "description":     row[5],
+            "source":          row[6],
+            "last_changed_at": row[7],
+        }
+    return out
+
+
+# v7: small helper for compute_* functions to read a numeric
+# assumption value with a fallback default. Keeps every call site
+# trivial: _assumption_value(assumptions, "key", default=18.0).
+def _assumption_value(assumptions, key, default):
+    if not assumptions:
+        return default
+    entry = assumptions.get(key)
+    if not entry:
+        return default
+    v = entry.get("value_numeric")
+    return v if v is not None else default
 
 
 # v5: accept Mon-YYYY as a third format. ACECQA's rating_issued_date
@@ -460,7 +530,9 @@ def _compute_growth(services):
 #   due_soon_threshold_days / stale_threshold_days — surfaced
 #                           so the UI can show the exact thresholds
 #                           used in card tooltips and facts rows.
-def _compute_quality(services):
+# v7: thresholds now sourced from model_assumptions when available.
+# Module constants are fallback defaults only.
+def _compute_quality(services, assumptions):
     active = [s for s in services if s.get("is_active")]
     kinder_by_flag = sum(1 for s in active if s.get("kinder_approved"))
     kinder_by_name = sum(
@@ -469,9 +541,21 @@ def _compute_quality(services):
     )
     ldc = sum(1 for s in active if s.get("long_day_care"))
 
+    # v7: Read canonical thresholds from model_assumptions; fall
+    # back to module constants if the assumption is missing.
+    due_soon_months = _assumption_value(
+        assumptions, "inspection_due_soon_months", default=18.0
+    )
+    overdue_years = _assumption_value(
+        assumptions, "inspection_overdue_years", default=float(STALE_RATING_YEARS)
+    )
+    due_soon_days = int(round(due_soon_months * 365.0 / 12.0))
+    stale_days    = int(round(overdue_years * 365.0))
+    stale_years   = overdue_years
+
     now = datetime.now().date()
-    due_soon_cutoff = now - timedelta(days=DUE_SOON_DAYS)
-    stale_cutoff    = now - timedelta(days=STALE_RATING_DAYS)
+    due_soon_cutoff = now - timedelta(days=due_soon_days)
+    stale_cutoff    = now - timedelta(days=stale_days)
 
     rating_dates = []
     never_rated = 0
@@ -487,8 +571,18 @@ def _compute_quality(services):
     due_soon    = sum(1 for d in rating_dates if d < due_soon_cutoff)
     stale       = sum(1 for d in rating_dates if d < stale_cutoff)
 
+    # v7: also compute the COM-trigger flag for the operator.html
+    # commentary line. Sourced from commentary_inspection_threshold
+    # in model_assumptions (default 0.30 = 30%).
+    com_threshold = _assumption_value(
+        assumptions, "commentary_inspection_threshold", default=0.30
+    )
+    total_active = len(active)
+    due_soon_share = (due_soon / total_active) if total_active else 0.0
+    elevated_inspection_exposure = due_soon_share > com_threshold
+
     return {
-        "total_services":          len(active),
+        "total_services":          total_active,
         "kinder_by_flag":          kinder_by_flag,
         "kinder_by_name":          kinder_by_name,
         "long_day_care":           ldc,
@@ -497,9 +591,15 @@ def _compute_quality(services):
         "due_soon_count":          due_soon,
         "stale_rating_count":      stale,
         "never_rated_count":       never_rated,
-        "due_soon_threshold_days": DUE_SOON_DAYS,
-        "stale_threshold_days":    STALE_RATING_DAYS,
-        "stale_threshold_years":   STALE_RATING_YEARS,
+        "due_soon_threshold_days": due_soon_days,
+        "stale_threshold_days":    stale_days,
+        "stale_threshold_years":   stale_years,
+        # v7 additions:
+        "due_soon_threshold_months":         due_soon_months,
+        "overdue_threshold_years":           overdue_years,
+        "due_soon_share":                    round(due_soon_share, 4),
+        "commentary_threshold":              com_threshold,
+        "elevated_inspection_exposure":      elevated_inspection_exposure,
     }
 
 
@@ -900,6 +1000,12 @@ def get_operator_payload(group_id):
         if not group:
             return {"ok": False, "msg": f"Group {group_id} not found"}
 
+        # v7: read model_assumptions once per request. Used by
+        # _compute_quality and surfaced at the top level of the
+        # payload so operator.html can populate OBS/DER/COM
+        # methodology tooltips without a second API call.
+        assumptions = _fetch_assumptions(conn)
+
         entities = _fetch_entities(conn, group_id, group.get("parent_entity_id"))
         services = _fetch_services(conn, group_id)
 
@@ -910,7 +1016,7 @@ def get_operator_payload(group_id):
             "entities":             entities,
             "services":             services,
             "nqs_profile":          _compute_nqs_profile(services),
-            "quality":              _compute_quality(services),
+            "quality":              _compute_quality(services, assumptions),
             "growth":               _compute_growth(services),
             "acquisition":          _compute_acquisition(services),
             "remoteness":           _compute_remoteness(services),
@@ -927,6 +1033,9 @@ def get_operator_payload(group_id):
                                         conn, group_id, entities, services),
             "intelligence_notes":   _fetch_intelligence_notes(
                                         conn, group_id, entities),
+            # v7: full assumption set with metadata for
+            # methodology tooltips on OBS/DER/COM badges.
+            "assumptions":          assumptions,
         }
     finally:
         conn.close()
