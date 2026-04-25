@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<!-- review.html v8 -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kintell — Ownership Review</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a1f26;
+    --panel-2: #232933;
+    --panel-3: #2a313c;
+    --border: #2d343f;
+    --text: #e6e8eb;
+    --text-dim: #9aa4b1;
+    --text-mute: #6b7684;
+    --accent: #4a9eff;
+    --green: #4ade80;
+    --green-bg: #14301e;
+    --amber: #fbbf24;
+    --amber-bg: #2f2310;
+    --red: #f87171;
+    --red-bg: #2e1414;
+    --purple: #a78bfa;
+    --purple-bg: #1f1a2e;
+    --grey: #94a3b8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: 16px;
+  }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  header .breadcrumb { color: var(--text-mute); font-size: 13px; }
+  header .stats {
+    margin-left: auto; display: flex; gap: 16px;
+    color: var(--text-dim); font-size: 13px;
+  }
+  header .stat b { color: var(--text); font-weight: 600; }
+
+  nav.tabs {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex; gap: 4px;
+    position: sticky; top: 49px; z-index: 9;
+  }
+  nav.tabs button {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    padding: 12px 20px;
+    cursor: pointer;
+    font: inherit;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  nav.tabs button:hover { color: var(--text); }
+  nav.tabs button.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+  }
+
+  main { padding: 18px 24px; max-width: 1500px; margin: 0 auto; }
+
+  .toolbar {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+  }
+  .toolbar label {
+    display: flex; align-items: center; gap: 6px;
+    color: var(--text-dim); font-size: 13px;
+  }
+  .toolbar select, .toolbar input {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 5px 9px;
+    border-radius: 5px;
+    font: inherit;
+    outline: none;
+  }
+  .toolbar select:focus, .toolbar input:focus { border-color: var(--accent); }
+  .toolbar .right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+
+  button {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    font: inherit;
+  }
+  button:hover { background: var(--panel-3); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { background: #3b8ae5; }
+  button.danger  { background: var(--red-bg); border-color: #5c2626; color: var(--red); }
+  button.danger:hover { background: #4a2323; }
+  button.good    { background: var(--green-bg); border-color: #1e5134; color: var(--green); }
+  button.good:hover { background: #1a4128; }
+  button.ghost   { background: transparent; }
+  button[disabled] { opacity: 0.4; cursor: not-allowed; }
+
+  .pane { display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
+  .side {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    height: fit-content;
+    position: sticky; top: 110px;
+  }
+  .side h3 {
+    margin: 0 0 10px 0;
+    font-size: 12px;
+    color: var(--text-dim);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .side .row {
+    display: flex; justify-content: space-between;
+    padding: 5px 0; font-size: 13px;
+    border-bottom: 1px dashed var(--border);
+  }
+  .side .row:last-child { border-bottom: none; }
+  .side .row b { font-variant-numeric: tabular-nums; }
+  .side .row.click { cursor: pointer; }
+  .side .row.click:hover { color: var(--accent); }
+
+  .section-h {
+    color: var(--text-dim);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin: 18px 0 10px 4px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-h::after {
+    content: ""; flex: 1; height: 1px; background: var(--border);
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .card.cluster { border-left: 3px solid var(--green); }
+  .card.hi      { border-left: 3px solid var(--green); }
+  .card.md      { border-left: 3px solid var(--amber); }
+  .card.lo      { border-left: 3px solid var(--red); }
+
+  .card-head {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .conf {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600; font-size: 14px;
+    padding: 2px 8px; border-radius: 4px;
+    background: var(--panel-2);
+  }
+  .conf.hi { color: var(--green); background: var(--green-bg); }
+  .conf.md { color: var(--amber); background: var(--amber-bg); }
+  .conf.lo { color: var(--red);   background: var(--red-bg); }
+  .brand-chip {
+    font-size: 12px; color: var(--purple);
+    background: var(--purple-bg); border: 1px solid #352957;
+    padding: 1px 8px; border-radius: 3px; font-weight: 500;
+  }
+  .cid { color: var(--text-mute); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .pill {
+    font-size: 11px; padding: 1px 7px; border-radius: 3px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    font-weight: 600;
+    background: var(--panel-2); color: var(--text-dim);
+  }
+
+  /* CLUSTER CARD */
+  .cluster .canon-block {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 12px;
+    margin: 10px 0;
+  }
+  .cluster .canon-name b { color: var(--green); }
+  .cluster .canon-meta { color: var(--text-dim); font-size: 12px; }
+
+  .cluster .summary-line {
+    color: var(--text); margin: 8px 0;
+  }
+  .cluster .summary-line b { font-weight: 600; }
+
+  .absorb-list { margin-top: 10px; }
+  .absorb-row {
+    display: grid;
+    grid-template-columns: 24px 1fr 90px 220px;
+    gap: 10px; align-items: center;
+    padding: 7px 8px; border-radius: 4px;
+    border: 1px solid transparent;
+    font-size: 13px;
+  }
+  .absorb-row:hover { background: var(--panel-2); }
+  .absorb-row.excluded { opacity: 0.4; text-decoration: line-through; }
+  .absorb-row .name b { color: var(--text); }
+  .absorb-row .meta { color: var(--text-dim); font-size: 12px; }
+  .absorb-row .conf-tiny {
+    font-variant-numeric: tabular-nums;
+    font-size: 12px; color: var(--text-dim);
+    text-align: right;
+  }
+  .absorb-row .conf-tiny.hi { color: var(--green); }
+  .absorb-row .conf-tiny.md { color: var(--amber); }
+  .absorb-row .conf-tiny.lo { color: var(--red); }
+  .absorb-row .links {
+    display: flex; gap: 4px; justify-content: flex-end;
+  }
+  .absorb-row .links a {
+    font-size: 11px; padding: 1px 6px;
+    background: var(--panel-3); border-radius: 3px;
+    color: var(--text-dim);
+  }
+  .absorb-row .links a:hover { color: var(--text); text-decoration: none; }
+
+  .actions {
+    display: flex; gap: 8px; margin-top: 12px;
+    align-items: center; flex-wrap: wrap;
+  }
+  .actions .spacer { flex: 1; }
+
+  /* INDIVIDUAL CARD */
+  .flow {
+    display: grid; grid-template-columns: 1fr auto 1fr;
+    align-items: center; gap: 12px; margin: 10px 0 6px 0;
+  }
+  .group-box {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 11px;
+  }
+  .group-name { font-weight: 500; }
+  .group-meta { color: var(--text-dim); font-size: 12px; margin-top: 2px; }
+  .arrow { color: var(--text-mute); font-size: 22px; user-select: none; }
+
+  .why {
+    color: var(--text-dim); font-size: 13px;
+    margin: 8px 0 2px 0;
+  }
+  .why b { color: var(--text); font-weight: 500; }
+
+  .ext-links {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+  }
+  .ext-links a {
+    font-size: 12px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 3px 8px; border-radius: 3px;
+  }
+  .ext-links a:hover { color: var(--accent); text-decoration: none; }
+
+  /* HISTORY */
+  .h-row {
+    display: grid;
+    grid-template-columns: 110px 1fr 110px;
+    gap: 12px; align-items: center;
+    padding: 11px 14px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    font-size: 13px;
+  }
+  .h-row .when {
+    color: var(--text-mute); font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .h-row .what b { color: var(--text); }
+  .h-row .what .a { color: var(--accent); font-weight: 500; }
+  .h-row .reason { color: var(--text-dim); font-size: 12px; margin-top: 2px; }
+  .h-row .actions { justify-content: flex-end; margin: 0; }
+
+  details summary {
+    cursor: pointer;
+    color: var(--text-dim);
+    font-size: 12px;
+    user-select: none;
+  }
+  details summary:hover { color: var(--text); }
+  details[open] summary { margin-bottom: 6px; }
+  details summary .when-open  { display: none; }
+  details[open] summary .when-open  { display: inline; }
+  details[open] summary .when-closed { display: none; }
+  details pre {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-size: 11px;
+    max-height: 220px; overflow: auto;
+    color: var(--text-dim);
+  }
+  details .centres-list {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-size: 12px;
+    max-height: 240px; overflow: auto;
+  }
+  details .centres-list .c {
+    padding: 3px 0; border-bottom: 1px dashed var(--border);
+    color: var(--text-dim);
+  }
+  details .centres-list .c:last-child { border-bottom: none; }
+  details .centres-list .c b { color: var(--text); }
+
+  .empty {
+    text-align: center; padding: 60px 20px;
+    color: var(--text-mute);
+  }
+
+  /* v7: one-line workflow hint on each card; v8: larger + lighter */
+  .workflow-hint {
+    color: var(--text-dim);
+    font-size: 13px;
+    font-style: italic;
+    margin: 4px 0 8px 0;
+    letter-spacing: 0.01em;
+  }
+
+  /* v8: SOURCE/CANONICAL column tags in view-centres module */
+  .side-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 3px;
+    margin-bottom: 6px;
+  }
+  .side-tag.source    { background: var(--amber-bg); color: var(--amber); border: 1px solid #5c4210; }
+  .side-tag.canonical { background: var(--green-bg); color: var(--green); border: 1px solid #1e5134; }
+
+  /* v8: signal breakdown grid, shown on individual cards when conf < 1.00 */
+  .signal-grid {
+    margin: 10px 0 4px 0;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+  .signal-grid .sig-heading {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-mute);
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .signal-row {
+    display: grid;
+    grid-template-columns: 18px 170px 1fr;
+    gap: 8px;
+    padding: 2px 0;
+    align-items: baseline;
+    color: var(--text-dim);
+  }
+  .signal-row .sig-ico   { font-weight: 700; text-align: center; }
+  .signal-row .sig-label { color: var(--text); font-weight: 500; }
+  .signal-row.ok   .sig-ico { color: var(--green); }
+  .signal-row.warn .sig-ico { color: var(--amber); }
+  .signal-row.miss .sig-ico { color: var(--text-mute); }
+
+  .server-down {
+    background: var(--red-bg);
+    border: 1px solid #5c2626;
+    color: var(--red);
+    padding: 18px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+  }
+  .server-down h3 { margin: 0 0 6px 0; color: var(--red); }
+  .server-down code {
+    background: #1a0e0e; padding: 2px 6px; border-radius: 3px;
+  }
+
+  .toast {
+    position: fixed; bottom: 20px; right: 20px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    padding: 12px 16px;
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    font-size: 13px;
+    z-index: 100; max-width: 360px;
+  }
+  .toast.success { border-left: 3px solid var(--green); }
+  .toast.error   { border-left: 3px solid var(--red); }
+
+  .loading {
+    color: var(--text-mute); font-size: 13px;
+    padding: 12px 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Kintell</h1>
+  <span class="breadcrumb">/ Ownership Review</span>
+  <div class="stats">
+    <div class="stat"><b id="stat-pending">–</b> pending</div>
+    <div class="stat"><b id="stat-parked">–</b> parked</div>
+    <div class="stat"><b id="stat-accepted">–</b> accepted</div>
+    <div class="stat"><b id="stat-rejected">–</b> rejected</div>
+    <div class="stat"><b id="stat-groups">–</b> active groups</div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button id="tab-pending" class="active">Pending</button>
+  <button id="tab-history">History</button>
+</nav>
+
+<main>
+
+<div id="server-status"></div>
+
+<!-- ─── PENDING TAB ───────────────────────────────────────── -->
+<section id="pane-pending">
+  <div class="toolbar">
+    <label>Status
+      <select id="f-status">
+        <option value="pending" selected>pending</option>
+        <option value="parked">parked</option>
+      </select>
+    </label>
+    <label>Confidence
+      <select id="f-band">
+        <option value="all" selected>all bands</option>
+        <option value="hi">high (≥0.85)</option>
+        <option value="md">medium (0.50–0.85)</option>
+        <option value="lo">low (&lt;0.50)</option>
+      </select>
+    </label>
+    <label>Brand
+      <select id="f-brand"><option value="">(all brands)</option></select>
+    </label>
+    <label style="flex: 1; min-width: 220px;">Search
+      <input id="f-search" type="search" placeholder="operator, brand, suburb..."
+             style="flex: 1; min-width: 200px;">
+    </label>
+    <div class="right">
+      <button id="btn-refresh" class="ghost" title="Refresh">↻ refresh</button>
+    </div>
+  </div>
+
+  <div class="pane">
+    <div>
+      <div id="cluster-section"></div>
+      <div id="individual-section"></div>
+      <div id="empty" class="empty" style="display:none">
+        Nothing in the queue at this filter.
+      </div>
+    </div>
+
+    <aside class="side">
+      <h3>By Brand (pending)</h3>
+      <div id="brand-summary"
+           style="max-height: 360px; overflow-y: auto; font-size: 12px;"></div>
+    </aside>
+  </div>
+</section>
+
+<!-- ─── HISTORY TAB ───────────────────────────────────────── -->
+<section id="pane-history" style="display:none">
+  <div class="toolbar">
+    <label>Show
+      <select id="h-filter">
+        <option value="all" selected>all actions</option>
+        <option value="accept_merge">accepts only</option>
+        <option value="reject_merge">rejects only</option>
+        <option value="park_merge">parks only</option>
+        <option value="reverse_accept">reversals only</option>
+      </select>
+    </label>
+    <div class="right">
+      <button id="btn-refresh-h" class="ghost">↻ refresh</button>
+    </div>
+  </div>
+  <div id="history-list"></div>
+</section>
+
+</main>
+
+<div id="toast-container"></div>
+
+<script>
+const API = "";
+
+let clustersData = [];
+let queueData = [];
+let historyData = [];
+let currentTab = "pending";
+let excludedCidsByBrand = {};   // brand -> Set of cids to exclude
+
+// ─── helpers ────────────────────────────────────────────────────────
+
+async function api(path, opts={}) {
+  const r = await fetch(API + path, {
+    ...opts,
+    headers: { "Content-Type": "application/json", ...(opts.headers||{}) }
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+function toast(msg, type="success") {
+  const el = document.createElement("div");
+  el.className = "toast " + type;
+  el.textContent = msg;
+  document.getElementById("toast-container").appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+function band(c) {
+  if (c >= 0.85) return "hi";
+  if (c >= 0.50) return "md";
+  return "lo";
+}
+
+function fmtAdj(s) {
+  return s.replace(/x0\.30/g, "×0.30")
+          .replace(/x0\.60/g, "×0.60")
+          .replace(/_/g, " ");
+}
+
+function htmlEscape(s) {
+  if (s == null) return "";
+  return String(s).replace(/[&<>"]/g,
+    c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+}
+
+function urlSearchAcecqa(name) {
+  return "https://www.google.com/search?q=" +
+    encodeURIComponent(`"${name}" site:acecqa.gov.au OR site:startingblocks.gov.au`);
+}
+function urlAbn(name) {
+  return "https://abr.business.gov.au/Search/Run?searchText=" +
+    encodeURIComponent(name);
+}
+function urlGoogle(name) {
+  return "https://www.google.com/search?q=" +
+    encodeURIComponent(`${name} childcare`);
+}
+// v7: direct URL guess from brand name — no search engine redirect.
+// TODO(later): replace guessDomain with a lookup against
+// groups.primary_domain once we have an enrichment pass that
+// populates it (from ABR / website scrape / manual nomination).
+function guessDomain(name) {
+  if (!name) return "";
+  return String(name)
+    .replace(/\b(pty|ltd|proprietary|limited|llc|inc|corp|co)\b/gi, "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toLowerCase() + ".com.au";
+}
+function urlWebsite(name) {
+  const d = guessDomain(name);
+  return d ? ("https://" + d) : "#";
+}
+
+function plainEvidence(ev) {
+  // Returns a readable English summary of why this merge was proposed.
+  const conc1 = (ev.canonical_concentration || 0) * 100;
+  const conc2 = (ev.other_concentration || 0) * 100;
+  const parts = [];
+  parts.push(
+    `Both groups operate centres branded <b>${htmlEscape(ev.brand)}</b>. ` +
+    `${ev.canonical_brand_svc||0} of ${ev.canonical_total_svc||0} ` +
+    `centres at the canonical group (${conc1.toFixed(0)}%), and ` +
+    `${ev.other_brand_svc||0} of ${ev.other_total_svc||0} centres ` +
+    `at the proposed merge source (${conc2.toFixed(0)}%).`
+  );
+  const adj = ev.adjustments || [];
+  if (adj.length) {
+    const friendly = adj.map(a => {
+      if (a.includes("religious")) return "religious-name penalty applied";
+      if (a.includes("other_concentration")) return "low concentration penalty";
+      if (a.includes("fuzzy_related")) return "boosted by name-similarity match in legacy linker";
+      if (a.includes("phone_related"))  return "boosted by shared phone in legacy linker";
+      return a;
+    });
+    parts.push("Adjustments: " + friendly.join("; ") + ".");
+  }
+  return parts.join(" ");
+}
+
+// v8: decompose the composite confidence into per-test rows so the
+// operator can see at a glance which signals fired and which didn't.
+// Matches the scoring logic in propose_merges.py — if that changes,
+// update the detection below.
+function signalRows(ev) {
+  const adj = (ev.adjustments || []).map(a => String(a).toLowerCase());
+  const hasFuzzy     = adj.some(a => a.includes("fuzzy"));
+  const hasPhone     = adj.some(a => a.includes("phone"));
+  const hasReligious = adj.some(a => a.includes("religious"));
+  const hasLowConc   = adj.some(a =>
+    a.includes("other_concentration") || a.includes("low_concentration"));
+
+  const canConc = (ev.canonical_concentration || 0) * 100;
+  const othConc = (ev.other_concentration || 0) * 100;
+
+  const rows = [
+    {
+      state: "ok",
+      label: "Brand prefix match",
+      detail: `${ev.canonical_brand_svc||0}/${ev.canonical_total_svc||0} canonical ` +
+              `(${canConc.toFixed(0)}%), ` +
+              `${ev.other_brand_svc||0}/${ev.other_total_svc||0} source ` +
+              `(${othConc.toFixed(0)}%)`
+    },
+    {
+      state: hasLowConc ? "warn" : "ok",
+      label: "Source concentration",
+      detail: hasLowConc
+        ? `brand is only ${othConc.toFixed(0)}% of source's centres — ` +
+          `brand may be incidental (×0.60 penalty)`
+        : `brand dominates source (${othConc.toFixed(0)}% of centres)`
+    },
+    {
+      state: hasFuzzy ? "ok" : "miss",
+      label: "Fuzzy name similarity",
+      detail: hasFuzzy
+        ? "legal names resemble each other (+0.10 boost)"
+        : "legal names don't closely match (no boost)"
+    },
+    {
+      state: hasPhone ? "ok" : "miss",
+      label: "Shared phone / email",
+      detail: hasPhone
+        ? "contact overlap in source data (+0.05 boost)"
+        : "no contact overlap detected"
+    }
+  ];
+  if (hasReligious) {
+    rows.push({
+      state: "warn",
+      label: "Religious naming pattern",
+      detail: "pattern matches a religious institution (×0.30 heavy penalty — " +
+              "usually separate parishes with the same name)"
+    });
+  }
+  return rows;
+}
+
+function signalBreakdownHtml(ev) {
+  const rows = signalRows(ev);
+  const body = rows.map(r => {
+    const icon = r.state === "ok"   ? "✓"
+               : r.state === "warn" ? "⚠"
+               : "○";
+    return `<div class="signal-row ${r.state}">
+      <span class="sig-ico">${icon}</span>
+      <span class="sig-label">${htmlEscape(r.label)}</span>
+      <span class="sig-detail">${r.detail}</span>
+    </div>`;
+  }).join("");
+  return `<div class="signal-grid">
+    <div class="sig-heading">Why not 100%? Signal breakdown</div>
+    ${body}
+  </div>`;
+}
+
+// ─── Pending tab render ────────────────────────────────────────────
+
+async function refreshPending() {
+  try {
+    // Always fetch clusters (high-confidence brand groupings)
+    const c = await api("/api/clusters?min_conf=0.85");
+    clustersData = c.clusters || [];
+
+    // Always fetch the full pending queue for individual cards
+    const qStr = (document.getElementById("f-search").value || "").trim();
+    const url = "/api/queue?status=pending"
+                + (qStr ? "&q=" + encodeURIComponent(qStr) : "");
+    const q = await api(url);
+    queueData = q.rows || [];
+  } catch (e) {
+    toast("Load failed: " + e.message, "error");
+    return;
+  }
+  renderPending();
+}
+
+function renderPending() {
+  const bandVal  = document.getElementById("f-band").value;
+  const brandVal = document.getElementById("f-brand").value;
+  const qStr     = (document.getElementById("f-search").value || "")
+                     .trim().toLowerCase();
+
+  const clusterEl = document.getElementById("cluster-section");
+  const indivEl   = document.getElementById("individual-section");
+  const emptyEl   = document.getElementById("empty");
+
+  clusterEl.innerHTML = "";
+  indivEl.innerHTML = "";
+
+  // ── Cluster cards ──
+  // Show clusters when band filter allows hi (i.e. all or hi).
+  // When band=all, show every cluster with any pending entries.
+  // When band=hi, only show clusters that contain at least one
+  //   high-confidence entry.
+  const showClusters = (bandVal === "all" || bandVal === "hi");
+  let clusters = clustersData.filter(c => (c.absorbing || []).length > 0);
+  if (bandVal === "hi") {
+    clusters = clusters.filter(c => c.high_conf_count > 0);
+  }
+  if (brandVal) {
+    clusters = clusters.filter(c =>
+      (c.brand || "").toLowerCase() === brandVal.toLowerCase());
+  }
+  if (qStr) {
+    // Match on brand, canonical name, or any absorbing entity name
+    clusters = clusters.filter(c => {
+      if ((c.brand || "").toLowerCase().includes(qStr)) return true;
+      if ((c.canonical_name || "").toLowerCase().includes(qStr)) return true;
+      return (c.absorbing || []).some(a =>
+        (a.from_name || "").toLowerCase().includes(qStr));
+    });
+  }
+
+  if (showClusters && clusters.length) {
+    const h = document.createElement("div");
+    h.className = "section-h";
+    h.innerHTML = `High-confidence brand clusters (${clusters.length})`;
+    clusterEl.appendChild(h);
+    clusters.forEach(c => clusterEl.appendChild(renderClusterCard(c)));
+  }
+
+  // ── Individual cards (medium / low) ──
+  let indiv = queueData.slice();
+  // Exclude rows already covered by a cluster card (any confidence,
+  // because clusters now show their full absorb list)
+  if (showClusters) {
+    const inCluster = new Set();
+    clusters.forEach(c =>
+      (c.absorbing || []).forEach(a => inCluster.add(a.candidate_id))
+    );
+    indiv = indiv.filter(r => !inCluster.has(r.candidate_id));
+  }
+  if (bandVal !== "all") {
+    indiv = indiv.filter(r => band(r.confidence) === bandVal);
+  }
+  if (brandVal) {
+    indiv = indiv.filter(r =>
+      (r.evidence.brand || "").toLowerCase() === brandVal.toLowerCase());
+  }
+  indiv.sort((a, b) => b.confidence - a.confidence);
+
+  if (indiv.length) {
+    const h = document.createElement("div");
+    h.className = "section-h";
+    h.innerHTML = `Individual proposals — judgement required (${indiv.length})`;
+    indivEl.appendChild(h);
+    indiv.forEach(r => indivEl.appendChild(renderIndividualCard(r)));
+  }
+
+  emptyEl.style.display =
+    (clusters.length === 0 && indiv.length === 0) ? "" : "none";
+
+  // Smart empty state: when there's a search term and nothing pending,
+  // check if it exists in history so user knows it was already actioned.
+  if (qStr && clusters.length === 0 && indiv.length === 0) {
+    emptyEl.innerHTML = `<div>No pending matches for "<b>${htmlEscape(qStr)}</b>".</div>
+      <div style="margin-top:6px;color:var(--text-mute);font-size:12px;">
+        Checking history…
+      </div>`;
+    api(`/api/history?limit=500`).then(h => {
+      const hits = (h.entries || []).filter(e => {
+        const blob = JSON.stringify(e.summary || {}).toLowerCase()
+                   + " " + (e.reason || "").toLowerCase();
+        return blob.includes(qStr);
+      });
+      if (hits.length) {
+        emptyEl.innerHTML = `
+          <div>No pending matches for "<b>${htmlEscape(qStr)}</b>".</div>
+          <div style="margin-top:8px;color:var(--text);">
+            Found <b>${hits.length}</b> matching ${hits.length===1?'entry':'entries'} in History
+            — already accepted, rejected, or parked.
+          </div>
+          <div style="margin-top:8px;">
+            <button class="primary" onclick="setTab('history')">Open History tab →</button>
+          </div>`;
+      } else {
+        emptyEl.innerHTML = `
+          <div>No matches for "<b>${htmlEscape(qStr)}</b>" in pending or history.</div>
+          <div style="margin-top:6px;color:var(--text-mute);font-size:12px;">
+            Try a shorter or different search term.
+          </div>`;
+      }
+    }).catch(() => { /* leave the simple empty state */ });
+  } else {
+    emptyEl.innerHTML = "Nothing in the queue at this filter.";
+  }
+
+  bindCardActions();
+}
+
+function renderClusterCard(c) {
+  const card = document.createElement("div");
+  card.className = "card cluster";
+  card.dataset.brand = c.brand;
+
+  const excluded = excludedCidsByBrand[c.brand] || new Set();
+  excludedCidsByBrand[c.brand] = excluded;
+
+  // ALL absorbing entries shown. Default-checked = conf >= 0.85.
+  // Anything < 0.85 starts excluded (its cid added to excluded set).
+  const all = c.absorbing.slice();
+  all.forEach(a => {
+    if (a.confidence < 0.85 && !excluded.has(a.candidate_id)) {
+      excluded.add(a.candidate_id);
+    }
+  });
+
+  const checkedCount = all.filter(a => !excluded.has(a.candidate_id)).length;
+  const totalCentres = all.reduce((s, a) => s + (a.brand_svc || 0), 0);
+  const highConf     = all.filter(a => a.confidence >= 0.85).length;
+  const medConf      = all.filter(a => a.confidence >= 0.50 && a.confidence < 0.85).length;
+  const lowConf      = all.filter(a => a.confidence < 0.50).length;
+
+  // Mix label
+  const mixParts = [];
+  if (highConf) mixParts.push(`${highConf} high`);
+  if (medConf)  mixParts.push(`${medConf} medium`);
+  if (lowConf)  mixParts.push(`${lowConf} low`);
+  const mixLabel = mixParts.join(" · ");
+
+  card.innerHTML = `
+    <div class="card-head">
+      <span class="conf hi">cluster</span>
+      <span class="brand-chip">${htmlEscape(c.brand)}</span>
+      <span class="cid">${all.length} entities · ${totalCentres} centres · ${mixLabel}</span>
+    </div>
+    <div class="workflow-hint">
+      Decide: are these all the same operator? Uncheck any that aren't, then accept all selected.
+    </div>
+    <div class="canon-block">
+      <div class="canon-name">canonical group: <b>${htmlEscape(c.canonical_name)}</b></div>
+      <div class="canon-meta">
+        already holds ${c.canonical_svc} centres under this brand
+      </div>
+    </div>
+    <div class="summary-line">
+      Proposing to merge <b>${all.length} other ${all.length===1?'entity':'entities'}</b>
+      into <b>${htmlEscape(c.canonical_name)}</b>, all operating
+      centres branded <b>${htmlEscape(c.brand)}</b>.
+      ${highConf ? `${highConf} are auto-checked at high confidence; ` : ""}
+      ${(medConf+lowConf) ? `${medConf+lowConf} require your review before inclusion.` : ""}
+    </div>
+    <details ${all.length <= 8 ? "open" : ""}>
+      <summary>
+        <span class="when-closed">show ${all.length} ${all.length===1?'entity':'entities'} being merged in
+          (check boxes select inclusion in accept-all)</span>
+        <span class="when-open">hide ${all.length} ${all.length===1?'entity':'entities'}</span>
+      </summary>
+      <div class="absorb-list" data-brand="${htmlEscape(c.brand)}">
+        ${all.map(a => {
+          const isChecked = !excluded.has(a.candidate_id);
+          const b = band(a.confidence);
+          return `
+          <div class="absorb-row ${isChecked ? "" : "excluded"}" data-cid="${a.candidate_id}">
+            <input type="checkbox" data-cid="${a.candidate_id}"
+                   ${isChecked ? "checked" : ""}>
+            <div class="name">
+              <b>${htmlEscape(a.from_name)}</b>
+              <div class="meta">
+                ${a.brand_svc}/${a.total_svc} centres under brand
+                · ${(a.concentration*100).toFixed(0)}% concentration
+              </div>
+            </div>
+            <div class="conf-tiny ${b}">${a.confidence.toFixed(2)}</div>
+            <div class="links">
+              <a href="${urlSearchAcecqa(a.from_name)}" target="_blank" rel="noopener">acecqa</a>
+              <a href="${urlAbn(a.from_name)}"          target="_blank" rel="noopener">abr</a>
+              <a href="${urlGoogle(a.from_name)}"       target="_blank" rel="noopener">google</a>
+              <a href="${urlWebsite(c.brand)}" title="${htmlEscape(guessDomain(c.brand))}"
+                 target="_blank" rel="noopener">website</a>
+            </div>
+          </div>`;
+        }).join("")}
+      </div>
+    </details>
+    <div class="actions">
+      <button class="good cluster-accept" data-brand="${htmlEscape(c.brand)}">
+        ✓ accept all <span class="count">${checkedCount}</span> selected
+      </button>
+      <div class="spacer"></div>
+      <span class="cid">confidence range ${c.min_conf.toFixed(2)} – ${c.max_conf.toFixed(2)}</span>
+    </div>
+  `;
+  return card;
+}
+
+function renderIndividualCard(r) {
+  const b = band(r.confidence);
+  const card = document.createElement("div");
+  card.className = "card " + b;
+  const ev = r.evidence;
+
+  card.innerHTML = `
+    <div class="card-head">
+      <span class="conf ${b}">${r.confidence.toFixed(2)}</span>
+      <span class="brand-chip">${htmlEscape(ev.brand || "—")}</span>
+      <span class="cid">#${r.candidate_id}</span>
+      <span class="pill">${r.status}</span>
+    </div>
+    <div class="workflow-hint">
+      Decide: same operator? Compare centres below, then accept / reject / park.
+    </div>
+    <div class="flow">
+      <div class="group-box">
+        <div class="group-name">${htmlEscape(r.from_name)}
+          <b style="color:var(--amber);font-weight:500;">(merging in)</b></div>
+        <div class="group-meta">
+          ${ev.other_brand_svc||0}/${ev.other_total_svc||0} services under brand
+          · ${((ev.other_concentration||0)*100).toFixed(0)}% concentration
+        </div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="group-box">
+        <div class="group-name">${htmlEscape(r.to_name)}
+          <b style="color:var(--green);font-weight:500;">(canonical)</b></div>
+        <div class="group-meta">
+          ${ev.canonical_brand_svc||0}/${ev.canonical_total_svc||0} services under brand
+          · ${((ev.canonical_concentration||0)*100).toFixed(0)}% concentration
+        </div>
+      </div>
+    </div>
+    <div class="why">${plainEvidence(ev)}</div>
+    ${r.confidence < 1.00 ? signalBreakdownHtml(ev) : ""}
+    <div class="ext-links">
+      <a href="${urlSearchAcecqa(r.from_name)}" target="_blank" rel="noopener">acecqa: ${htmlEscape(r.from_name)}</a>
+      <a href="${urlAbn(r.from_name)}"          target="_blank" rel="noopener">ABR lookup</a>
+      <a href="${urlGoogle(r.from_name)}"       target="_blank" rel="noopener">google search</a>
+      <a href="${urlWebsite(ev.brand || r.to_name || r.from_name)}"
+         target="_blank" rel="noopener">site: ${htmlEscape(guessDomain(ev.brand || r.to_name || r.from_name))}</a>
+    </div>
+    <details style="margin-top:8px">
+      <summary>
+        <span class="when-closed">view centres on each side</span>
+        <span class="when-open">hide centres</span>
+      </summary>
+      <div class="centres-grid" data-from="${r.from_id}" data-to="${r.to_id}"></div>
+    </details>
+    ${r.review_note ? `<div style="margin-top:6px;color:var(--text-dim);
+      font-size:12px;">note: ${htmlEscape(r.review_note)}</div>` : ""}
+    <div class="actions">
+      <button class="good" data-action="accept" data-cid="${r.candidate_id}">
+        ✓ accept merge
+      </button>
+      <button class="danger" data-action="reject" data-cid="${r.candidate_id}">
+        ✗ reject
+      </button>
+      <button class="ghost" data-action="park" data-cid="${r.candidate_id}">
+        park for later
+      </button>
+      <div class="spacer"></div>
+      <details><summary>
+        <span class="when-closed">show raw evidence</span>
+        <span class="when-open">hide raw evidence</span>
+      </summary>
+        <pre>${htmlEscape(JSON.stringify(ev, null, 2))}</pre>
+      </details>
+    </div>
+  `;
+
+  // Lazy-load centres list when expanded
+  card.querySelectorAll("details").forEach(d => {
+    d.addEventListener("toggle", async () => {
+      const grid = d.querySelector(".centres-grid");
+      if (!grid || grid.dataset.loaded) return;
+      if (!d.open) return;
+      grid.dataset.loaded = "1";
+      grid.innerHTML = "<div class='loading'>loading centres…</div>";
+      try {
+        const fromGid = grid.dataset.from;
+        const toGid   = grid.dataset.to;
+        const [from, to] = await Promise.all([
+          api(`/api/centres/${fromGid}`),
+          api(`/api/centres/${toGid}`)
+        ]);
+        grid.innerHTML = `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;
+                      margin-top:6px;">
+            <div class="centres-list">
+              <div class="side-tag source">SOURCE · merging in</div>
+              <div style="color:var(--text);font-weight:500;margin-bottom:4px;">
+                ${htmlEscape(r.from_name)} (${(from.centres||[]).length})
+              </div>
+              ${(from.centres||[]).map(c => `
+                <div class="c"><b>${htmlEscape(c.service_name)}</b>
+                  <span style="color:var(--text-mute)"> — ${htmlEscape(c.suburb||"")} ${htmlEscape(c.state||"")}</span>
+                </div>`).join("")}
+            </div>
+            <div class="centres-list">
+              <div class="side-tag canonical">CANONICAL · stays</div>
+              <div style="color:var(--text);font-weight:500;margin-bottom:4px;">
+                ${htmlEscape(r.to_name)} (${(to.centres||[]).length})
+              </div>
+              ${(to.centres||[]).map(c => `
+                <div class="c"><b>${htmlEscape(c.service_name)}</b>
+                  <span style="color:var(--text-mute)"> — ${htmlEscape(c.suburb||"")} ${htmlEscape(c.state||"")}</span>
+                </div>`).join("")}
+            </div>
+          </div>
+        `;
+      } catch (e) {
+        // v4: surface the actual error on-page so we can diagnose
+        // without DevTools. Also clear dataset.loaded so closing and
+        // reopening the <details> will retry.
+        console.error("centres load failed:", e,
+                      "fromGid=", grid.dataset.from,
+                      "toGid=", grid.dataset.to);
+        delete grid.dataset.loaded;
+        const msg = (e && e.message) ? e.message : String(e);
+        grid.innerHTML =
+          "<div class='loading' style='color:var(--red);" +
+          "white-space:pre-wrap;font-family:monospace;font-size:12px;'>" +
+          "load failed\n" +
+          "error: " + htmlEscape(msg) + "\n" +
+          "from_id: " + htmlEscape(grid.dataset.from) + "\n" +
+          "to_id: "   + htmlEscape(grid.dataset.to)   + "\n" +
+          "(close and reopen to retry)" +
+          "</div>";
+      }
+    });
+  });
+
+  return card;
+}
+
+function bindCardActions() {
+  // Individual accept/reject/park
+  document.querySelectorAll("button[data-action]").forEach(btn => {
+    btn.addEventListener("click", onIndividualAction);
+  });
+  // Cluster accept-all
+  document.querySelectorAll("button.cluster-accept").forEach(btn => {
+    btn.addEventListener("click", onClusterAccept);
+  });
+  // Cluster checkboxes
+  document.querySelectorAll(".absorb-list input[type=checkbox]").forEach(cb => {
+    cb.addEventListener("change", onAbsorbToggle);
+  });
+}
+
+function onAbsorbToggle(e) {
+  const cb = e.currentTarget;
+  const cid = parseInt(cb.dataset.cid);
+  const card = cb.closest(".card.cluster");
+  const brand = card.dataset.brand;
+  const set = excludedCidsByBrand[brand] || new Set();
+  excludedCidsByBrand[brand] = set;
+  if (cb.checked) set.delete(cid); else set.add(cid);
+
+  const row = cb.closest(".absorb-row");
+  if (row) row.classList.toggle("excluded", !cb.checked);
+
+  // update count on accept button
+  const btn = card.querySelector("button.cluster-accept");
+  const totalRows = card.querySelectorAll(".absorb-list input[type=checkbox]").length;
+  const remaining = totalRows - set.size;
+  btn.querySelector(".count").textContent = remaining;
+  btn.disabled = (remaining === 0);
+}
+
+async function onIndividualAction(e) {
+  const btn = e.currentTarget;
+  const action = btn.dataset.action;
+  const cid = btn.dataset.cid;
+  let reason = null;
+  if (action === "reject" || action === "park") {
+    reason = prompt(`Optional note for ${action}:`, "");
+    if (reason === null) return;
+  }
+  btn.disabled = true;
+  try {
+    const res = await api(`/api/${action}/${cid}`, {
+      method: "POST",
+      body: JSON.stringify({ actor: "patrick", reason })
+    });
+    if (!res.ok) {
+      toast(res.msg || "Action failed", "error");
+      btn.disabled = false;
+    } else {
+      toast(res.msg || `${action} ok`);
+      await refreshAll();
+    }
+  } catch (e) {
+    toast("Error: " + e.message, "error");
+    btn.disabled = false;
+  }
+}
+
+async function onClusterAccept(e) {
+  const btn = e.currentTarget;
+  const brand = btn.dataset.brand;
+  const excluded = Array.from(excludedCidsByBrand[brand] || new Set());
+  if (!confirm(
+    `Accept all selected merges for "${brand}"? ` +
+    `(${excluded.length} excluded)\n\n` +
+    `Each merge is individually reversible from the History tab.`
+  )) return;
+  btn.disabled = true;
+  try {
+    const res = await api("/api/bulk-accept-cluster", {
+      method: "POST",
+      body: JSON.stringify({
+        brand: brand,
+        exclude_cids: excluded,
+        actor: "patrick"
+      })
+    });
+    if (res.ok) {
+      toast(`Accepted ${res.accepted} for ${brand}` +
+            (res.failed ? `, ${res.failed} failed` : ""));
+      excludedCidsByBrand[brand] = new Set();
+      await refreshAll();
+    } else {
+      toast("Cluster accept failed: " + (res.msg||""), "error");
+      btn.disabled = false;
+    }
+  } catch (e) {
+    toast("Error: " + e.message, "error");
+    btn.disabled = false;
+  }
+}
+
+// ─── History tab ───────────────────────────────────────────────────
+
+async function refreshHistory() {
+  try {
+    const r = await api("/api/history?limit=200");
+    historyData = r.entries || [];
+  } catch (e) {
+    toast("History load failed: " + e.message, "error");
+    return;
+  }
+  renderHistory();
+}
+
+function renderHistory() {
+  const filt = document.getElementById("h-filter").value;
+  const list = document.getElementById("history-list");
+  list.innerHTML = "";
+
+  const rows = historyData.filter(e => filt === "all" || e.action === filt);
+  if (!rows.length) {
+    list.innerHTML = "<div class='empty'>No history entries.</div>";
+    return;
+  }
+
+  for (const e of rows) {
+    const row = document.createElement("div");
+    row.className = "h-row";
+
+    let what = "";
+    const s = e.summary || {};
+    if (e.action === "accept_merge") {
+      what = `<b class="a">accept_merge</b>: merged
+        <b>${htmlEscape(s.source_name||"?")}</b> →
+        <b>${htmlEscape(s.dest_name||"?")}</b>
+        <span class="reason">
+          ${s.entities||0} entities, ${s.brands||0} brands moved
+          (cid #${s.candidate_id}, conf ${s.confidence != null ? Number(s.confidence).toFixed(2) : "?"})
+        </span>`;
+    } else if (e.action === "reject_merge") {
+      what = `<b class="a">reject_merge</b>: candidate #${s.candidate_id||"?"}
+        ${e.reason ? `<span class="reason">${htmlEscape(e.reason)}</span>` : ""}`;
+    } else if (e.action === "park_merge") {
+      what = `<b class="a">park_merge</b>: candidate #${s.candidate_id||"?"}
+        ${e.reason ? `<span class="reason">${htmlEscape(e.reason)}</span>` : ""}`;
+    } else if (e.action === "reverse_accept") {
+      what = `<b class="a">reverse_accept</b>: restored
+        <b>${htmlEscape(s.restored_name||"?")}</b>`;
+    } else {
+      what = `<b class="a">${htmlEscape(e.action)}</b>: subject #${e.subject_id}`;
+    }
+
+    let actionBtn = "";
+    if (e.action === "accept_merge") {
+      actionBtn = `<button class="ghost" data-undo="${e.audit_id}">↶ undo</button>`;
+    } else {
+      actionBtn = `<span class="cid">audit #${e.audit_id}</span>`;
+    }
+
+    row.innerHTML = `
+      <div class="when">${htmlEscape(e.occurred_at||"")}</div>
+      <div class="what">${what}</div>
+      <div class="actions">${actionBtn}</div>
+    `;
+    list.appendChild(row);
+  }
+
+  list.querySelectorAll("button[data-undo]").forEach(b => {
+    b.addEventListener("click", onUndo);
+  });
+}
+
+async function onUndo(e) {
+  const btn = e.currentTarget;
+  const aid = btn.dataset.undo;
+  if (!confirm(`Undo audit entry ${aid}? This restores the merged-away group ` +
+               `and moves entities back.`)) return;
+  btn.disabled = true;
+  try {
+    const res = await api(`/api/reverse/${aid}`, {
+      method: "POST",
+      body: JSON.stringify({ actor: "patrick" })
+    });
+    if (res.ok) {
+      toast(res.msg || "Reversed");
+      await refreshAll();
+    } else {
+      toast("Reverse failed: " + (res.msg||""), "error");
+      btn.disabled = false;
+    }
+  } catch (e) {
+    toast("Error: " + e.message, "error");
+    btn.disabled = false;
+  }
+}
+
+// ─── Status / sidebar ──────────────────────────────────────────────
+
+async function refreshStatus() {
+  try {
+    const s = await api("/api/status");
+    if (!s.ok) throw new Error(s.msg);
+    document.getElementById("stat-pending").textContent = s.by_status?.pending || 0;
+    document.getElementById("stat-parked").textContent = s.by_status?.parked || 0;
+    document.getElementById("stat-accepted").textContent = s.by_status?.accepted || 0;
+    document.getElementById("stat-rejected").textContent = s.by_status?.rejected || 0;
+    document.getElementById("stat-groups").textContent =
+      (s.active_groups||0).toLocaleString();
+    populateBrandFilter(s.by_brand || {});
+    renderBrandSummary(s.by_brand || {});
+    document.getElementById("server-status").innerHTML = "";
+    return true;
+  } catch (e) {
+    document.getElementById("server-status").innerHTML = `
+      <div class="server-down">
+        <h3>Review server not reachable</h3>
+        <div>Start it locally with:</div>
+        <div style="margin-top:6px"><code>python review_server.py</code></div>
+        <div style="margin-top:6px;color:var(--text-dim)">
+          This panel only works against the local server; the public dashboard
+          does not carry review data.
+        </div>
+      </div>`;
+    return false;
+  }
+}
+
+function populateBrandFilter(byBrand) {
+  const sel = document.getElementById("f-brand");
+  const current = sel.value;
+  sel.innerHTML = "<option value=''>(all brands)</option>";
+  Object.keys(byBrand).sort().forEach(n => {
+    const o = document.createElement("option");
+    o.value = n; o.textContent = n;
+    if (n === current) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
+function renderBrandSummary(byBrand) {
+  const el = document.getElementById("brand-summary");
+  const items = Object.entries(byBrand)
+    .map(([k, v]) => ({ k, pending: v.pending||0 }))
+    .filter(x => x.pending > 0)
+    .sort((a, b) => b.pending - a.pending);
+  if (!items.length) {
+    el.innerHTML = "<div style='color:var(--text-mute)'>No pending brands.</div>";
+    return;
+  }
+  el.innerHTML = items.slice(0, 40).map(b =>
+    `<div class="row click" data-brand="${htmlEscape(b.k)}">
+       <span>${htmlEscape(b.k)}</span><b>${b.pending}</b>
+     </div>`).join("") +
+    (items.length > 40 ? `<div style="color:var(--text-mute);padding:6px 0;
+      font-size:11px;">... and ${items.length-40} more</div>` : "");
+  el.querySelectorAll("[data-brand]").forEach(row =>
+    row.addEventListener("click", () => {
+      document.getElementById("f-brand").value = row.dataset.brand;
+      renderPending();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    })
+  );
+}
+
+async function refreshAll() {
+  const ok = await refreshStatus();
+  if (!ok) return;
+  if (currentTab === "pending") await refreshPending();
+  else                          await refreshHistory();
+}
+
+// ─── Tab switching ─────────────────────────────────────────────────
+
+function setTab(t) {
+  currentTab = t;
+  document.getElementById("tab-pending").classList.toggle("active", t === "pending");
+  document.getElementById("tab-history").classList.toggle("active", t === "history");
+  document.getElementById("pane-pending").style.display = t === "pending" ? "" : "none";
+  document.getElementById("pane-history").style.display = t === "history" ? "" : "none";
+  refreshAll();
+}
+
+document.getElementById("tab-pending").addEventListener("click", () => setTab("pending"));
+document.getElementById("tab-history").addEventListener("click", () => setTab("history"));
+
+// ─── Wire ──────────────────────────────────────────────────────────
+
+document.getElementById("btn-refresh").addEventListener("click", refreshAll);
+document.getElementById("btn-refresh-h").addEventListener("click", refreshAll);
+document.getElementById("f-status").addEventListener("change", refreshAll);
+document.getElementById("f-band").addEventListener("change", renderPending);
+document.getElementById("f-brand").addEventListener("change", renderPending);
+document.getElementById("h-filter").addEventListener("change", renderHistory);
+
+// Search: debounce keystrokes, then re-fetch + re-render
+let searchTimer = null;
+document.getElementById("f-search").addEventListener("input", () => {
+  if (searchTimer) clearTimeout(searchTimer);
+  searchTimer = setTimeout(refreshPending, 200);
+});
+
+refreshAll();
+</script>
+
+</body>
+</html>

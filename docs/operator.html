@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- operator.html v5 -->
+<!-- operator.html v5b -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -740,10 +740,29 @@
 
 <script>
 /* ──────────────────────────────────────────────────────────────────
-   operator.html v5
+   operator.html v5b
+   v5b (2026-04-23): Catchment card rename + layout breathing room.
+       "Catchment Quality Profile" → "Portfolio catchment profile"
+       (low-SES ≠ low-quality for a childcare operator; the card is
+       a positioning signal, not a grade). Subhead tightened to
+       "SEIFA · places-weighted". Histogram gets 22px of top margin
+       so the bars don't crowd the headline fact row. The verbose
+       "1 = most disadvantaged, 10 = most advantaged" inline label
+       is replaced by short arrow annotations below the bars, so the
+       "57/60 services rated" counter fits on the same line without
+       overlap. Applies to both the populated and placeholder paths.
+   v5a (2026-04-23): removed the "site: <guessed>.com.au" external-tools
+       chip. The guessDomain() helper synthesised a URL from the operator
+       name and was occasionally sending users to parked domains (e.g.
+       sparrowgroup.com.au, a parking site, when the real operator lives
+       at sparrowearlylearning.com.au). The five remaining chips (ACECQA,
+       ABR, ASIC, Starting Blocks, Google) all go to authoritative
+       lookup services. A proper primary_domain field exists on the
+       groups table but is unpopulated (0/4078 groups have one); the
+       chip can come back once enrichment fills it in.
    v5: Tier 2 NQS ingest wire-up. Header shows prettified
        ownership_type (private → "Private (for profit)" etc).
-       Catchment Quality Profile renders a SEIFA decile
+       Catchment section renders a SEIFA decile
        histogram + weighted decile + low/mid/high band split.
        Remoteness distribution renders real ARIA+ counts as a
        5-band stacked bar with per-band chips. Both cards stop
@@ -993,7 +1012,13 @@ function renderHeader() {
   `).join("");
 
   // External tools row
-  const site = guessDomain(effective);
+  // v5a (2026-04-23): removed the "site: <guessed>.com.au" chip. The
+  // guessDomain() helper manufactured a URL from the operator name and
+  // was occasionally landing users on parked/squatter domains (e.g.
+  // sparrowgroup.com.au, a parking site, when the real operator is at
+  // sparrowearlylearning.com.au). The five remaining chips all query
+  // authoritative services. The guessDomain() function is retained for
+  // now in case a future chip wants to reuse the normalisation logic.
   const tools = [
     { label: `acecqa: ${htmlEscape(effective)}`,
       href: urlGoogleSite(effective, "acecqa.gov.au") },
@@ -1005,8 +1030,6 @@ function renderHeader() {
       href: urlGoogleSite(effective, "startingblocks.gov.au") },
     { label: "google",
       href: urlGoogle(effective, "childcare") },
-    { label: `site: ${site}`,
-      href: "https://" + site },
   ];
 
   return `
@@ -1383,7 +1406,7 @@ function renderCatchment() {
   if (!seifa.populated && !c.cache_populated) {
     return `
     <div class="op-section">
-      <h3>Catchment Quality Profile <span class="note">pending</span></h3>
+      <h3>Portfolio catchment profile <span class="note">pending</span></h3>
       <div class="placeholder">Catchment metrics not yet computed.
         <span class="will-show">Will show: <b>weighted SEIFA decile headline</b>,
         a <b>1–10 decile histogram</b>, a <b>low/mid/high band split</b>,
@@ -1439,18 +1462,22 @@ function renderCatchment() {
 
   return `
   <div class="op-section">
-    <h3>Catchment Quality Profile <span class="note">SEIFA · portfolio catchments</span></h3>
+    <h3>Portfolio catchment profile <span class="note">SEIFA · places-weighted</span></h3>
 
-    <div class="fact"><span class="k">Weighted SEIFA decile (places-weighted)</span>
+    <div class="fact"><span class="k">Weighted SEIFA decile</span>
       <b>${wd !== null && wd !== undefined ? wd : '—'} ${wdBandLabel}</b></div>
 
-    <div style="margin-top:10px;">
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-mute);margin-bottom:4px;">
-        <span>Decile distribution (1 = most disadvantaged, 10 = most advantaged)</span>
+    <div style="margin-top:22px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:var(--text-mute);margin-bottom:6px;">
+        <span>SEIFA decile distribution</span>
         <span>${popN} / ${totalN} services rated</span>
       </div>
       <div style="display:flex;align-items:flex-end;gap:3px;height:80px;">
         ${histBars.join('')}
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-mute);margin-top:6px;font-style:italic;">
+        <span>← more disadvantaged</span>
+        <span>more advantaged →</span>
       </div>
     </div>
 

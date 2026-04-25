@@ -1,0 +1,2294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kintell • ECEC Market Intelligence</title>
+    <style>
+        
+    :root {
+        --bg: #0d1117;
+        --card-bg: #161b22;
+        --border: #30363d;
+        --text: #f0f6fc;
+        --muted: #7d8590;
+        --accent: #58a6ff;
+        --accent2: #f78166;
+        --hover: #21262d;
+        --mono: 'SF Mono', Consolas, 'Roboto Mono', monospace;
+    }
+    
+    * {
+        box-sizing: border-box;
+    }
+    
+    body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+    }
+    
+    .header {
+        background: var(--card-bg);
+        border-bottom: 1px solid var(--border);
+        padding: 16px 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .logo {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--accent);
+    }
+    
+    .header-info {
+        color: var(--muted);
+        font-size: 13px;
+    }
+    
+    .tab-bar {
+        background: var(--card-bg);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        padding: 0 24px;
+    }
+    
+    .tab {
+        padding: 16px 20px;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        color: var(--muted);
+        transition: color 0.2s, border-color 0.2s;
+    }
+    
+    .tab.active, .tab:hover {
+        color: var(--accent);
+        border-color: var(--accent);
+    }
+    
+    .container {
+        padding: 24px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    
+    .panel {
+        display: none;
+    }
+    
+    .search-bar {
+        margin-bottom: 24px;
+    }
+    
+    .search-input {
+        width: 100%;
+        padding: 12px 16px;
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font-size: 14px;
+    }
+    
+    .search-input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+    }
+    
+    .search-prompt {
+        text-align: center;
+        padding: 48px 24px;
+        color: var(--muted);
+    }
+    
+    .search-prompt h3 {
+        color: var(--text);
+        margin-bottom: 12px;
+    }
+    
+    .panel-placeholder {
+        text-align: center;
+        padding: 64px 24px;
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--muted);
+    }
+    
+    .panel-placeholder h3 {
+        color: var(--text);
+        margin-bottom: 16px;
+    }
+    
+    .operator-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 16px;
+    }
+    
+    .op-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+    }
+    
+    .op-name {
+        font-weight: 600;
+        color: var(--text);
+    }
+    
+    .op-stats {
+        display: flex;
+        gap: 12px;
+        color: var(--muted);
+        font-size: 13px;
+    }
+    
+    .tier {
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 500;
+        text-transform: uppercase;
+    }
+    
+    .tier-hot {
+        background: #f85149;
+        color: white;
+    }
+    
+    .tier-warm {
+        background: #d29922;
+        color: white;
+    }
+    
+    .tier-watch {
+        background: #6e7681;
+        color: white;
+    }
+    
+    .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 16px;
+    }
+    
+    .detail-block-label {
+        font-size: 11px;
+        color: var(--muted);
+        text-transform: uppercase;
+        margin-bottom: 4px;
+    }
+    
+    .detail-block-value {
+        font-family: var(--mono);
+        color: var(--text);
+    }
+    
+    .abr-search-link {
+        color: var(--accent);
+        text-decoration: none;
+        cursor: pointer;
+        font-family: var(--mono);
+    }
+    
+    .abr-search-link:hover {
+        text-decoration: underline;
+    }
+    
+    .no-results {
+        text-align: center;
+        padding: 32px;
+        color: var(--muted);
+    }
+    
+        
+    /* Enhanced Panel 3: Catchment Explorer Styles */
+    .catchment-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 24px;
+        margin-bottom: 24px;
+    }
+    
+    .catchment-header h3 {
+        margin: 0 0 8px 0;
+        color: var(--text);
+        font-size: 20px;
+        font-weight: 600;
+    }
+    
+    .sa2-code {
+        color: var(--muted);
+        font-weight: 400;
+        font-size: 14px;
+    }
+    
+    .catchment-summary {
+        color: var(--muted);
+        font-size: 14px;
+        margin-bottom: 12px;
+    }
+    
+    /* Pipeline Pressure Indicator */
+    .pipeline-indicator {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        margin-bottom: 20px;
+    }
+    
+    .pipeline-indicator.pressure-low {
+        background: rgba(40, 167, 69, 0.15);
+        color: #28a745;
+        border: 1px solid rgba(40, 167, 69, 0.3);
+    }
+    
+    .pipeline-indicator.pressure-medium {
+        background: rgba(255, 193, 7, 0.15);
+        color: #ffc107;
+        border: 1px solid rgba(255, 193, 7, 0.3);
+    }
+    
+    .pipeline-indicator.pressure-high {
+        background: rgba(220, 53, 69, 0.15);
+        color: #dc3545;
+        border: 1px solid rgba(220, 53, 69, 0.3);
+    }
+    
+    .pipeline-label {
+        font-weight: 500;
+    }
+    
+    .pipeline-value {
+        font-weight: 700;
+        font-size: 11px;
+    }
+    
+    .pipeline-detail {
+        color: var(--muted);
+    }
+    
+    /* Enhanced Metrics Grid */
+    .catchment-metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 32px;
+    }
+    
+    .metric-card {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 16px;
+    }
+    
+    .metric-label {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+    }
+    
+    .metric-value {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--text);
+        margin-bottom: 4px;
+    }
+    
+    .metric-trend {
+        font-size: 11px;
+        color: var(--muted);
+    }
+    
+    .metric-trend.growing, .gap-trend-improving {
+        color: var(--accent);
+    }
+    
+    .metric-trend.declining, .gap-trend-worsening {
+        color: #ff6b6b;
+    }
+    
+    /* Historical Section */
+    .historical-section {
+        margin-bottom: 32px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 20px;
+    }
+    
+    .section-header {
+        font-weight: 600;
+        margin-bottom: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: var(--text);
+    }
+    
+    .trend-summary {
+        font-size: 12px;
+        color: var(--muted);
+        font-weight: 400;
+    }
+    
+    .historical-chart {
+        height: 80px;
+        margin-bottom: 12px;
+    }
+    
+    .trend-chart {
+        width: 100%;
+        height: 100%;
+    }
+    
+    .chart-legend {
+        display: flex;
+        gap: 16px;
+        justify-content: center;
+        font-size: 11px;
+        color: var(--muted);
+    }
+    
+    .legend-places {
+        display: inline-block;
+        width: 12px;
+        height: 2px;
+        background: var(--accent);
+        margin-right: 4px;
+        vertical-align: middle;
+    }
+    
+    .legend-operators {
+        display: inline-block;
+        width: 12px;
+        height: 2px;
+        background: var(--accent2);
+        margin-right: 4px;
+        vertical-align: middle;
+        background-image: repeating-linear-gradient(to right, var(--accent2) 0, var(--accent2) 3px, transparent 3px, transparent 6px);
+    }
+    
+    /* Enhanced Competition Section */
+    .competition-section {
+        margin-top: 32px;
+    }
+    
+    .competition-summary {
+        font-size: 12px;
+        color: var(--muted);
+        font-weight: 400;
+    }
+    
+    .centres-list {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        overflow: hidden;
+    }
+    
+    .centre-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border);
+        cursor: pointer;
+        transition: background-color 0.2s, transform 0.1s;
+    }
+    
+    .centre-row:hover {
+        background: var(--hover);
+        transform: translateX(2px);
+    }
+    
+    .centre-row:last-child {
+        border-bottom: none;
+    }
+    
+    .centre-main {
+        flex: 1;
+    }
+    
+    .centre-name {
+        font-weight: 500;
+        color: var(--text);
+        font-size: 14px;
+        margin-bottom: 2px;
+    }
+    
+    .centre-operator {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 2px;
+    }
+    
+    .centre-location {
+        font-size: 11px;
+        color: var(--accent);
+        font-weight: 500;
+    }
+    
+    .centre-stats {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        font-size: 11px;
+    }
+    
+    .centre-places {
+        color: var(--text);
+        font-weight: 500;
+        min-width: 60px;
+        text-align: right;
+    }
+    
+    .centre-share {
+        color: var(--accent);
+        font-weight: 500;
+        min-width: 50px;
+        text-align: right;
+    }
+    
+    .centre-type, .centre-kinder {
+        color: var(--muted);
+        min-width: 65px;
+    }
+    
+    .centre-rating {
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 10px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        min-width: 80px;
+        text-align: center;
+    }
+    
+    /* NQS Rating Colors */
+    .nqs-exceeding-nqs {
+        background: #28a745;
+        color: white;
+    }
+    
+    .nqs-meeting-nqs {
+        background: #17a2b8;
+        color: white;
+    }
+    
+    .nqs-working-towards-nqs {
+        background: #ffc107;
+        color: #212529;
+    }
+    
+    .nqs-not-rated, .nqs-nan {
+        background: #6c757d;
+        color: white;
+    }
+    
+    .search-prompt {
+        text-align: center;
+        padding: 48px 24px;
+        color: var(--muted);
+    }
+    
+    .search-prompt h3 {
+        color: var(--text);
+        margin-bottom: 12px;
+    }
+    
+    .no-results {
+        text-align: center;
+        padding: 32px;
+        color: var(--muted);
+    }
+    
+    .search-info {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 4px;
+    }
+    
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <div class="logo">Kintell</div>
+        </div>
+        <div class="header-right">
+            <div class="header-info">ECEC Market Intelligence • Updated 2026-04-20 • 5 catchments • 46 quarters historical data</div>
+        </div>
+    </div>
+    
+    <div class="tab-bar">
+        <div class="tab" onclick="showPanel('snapshot')">Industry Snapshot</div>
+        <div class="tab" onclick="showPanel('operators')">Operator Intelligence</div>
+        <div class="tab active" onclick="showPanel('catchments')">Catchment Explorer</div>
+    </div>
+    
+    <div class="container">
+        
+        <!-- Panel 1: Industry Snapshot (Placeholder) -->
+        <div class="panel" id="panel-snapshot">
+            <div class="panel-placeholder">
+                <h3>Industry Snapshot</h3>
+                <p>Sector-level metrics and trends analysis</p>
+                <p>• National coverage with state breakdowns</p>
+                <p>• Historical trend charts (46 quarters)</p>
+                <p>• Supply/demand ratios and growth metrics</p>
+                <p>• New approvals pipeline indicators</p>
+                <p>• NQS rating distributions by state and ARIA</p>
+            </div>
+        </div>
+        
+        <!-- Panel 2: Operator Intelligence -->
+        <div class="panel" id="panel-operators">
+            <div class="search-bar">
+                <input type="text" class="search-input" id="op-search"
+                       placeholder="Search by operator name, director, ABN, suburb..."
+                       oninput="filterOperators()">
+            </div>
+            <div id="operator-results" class="operator-results">
+                <div class="search-prompt">
+                    <h3>Operator Intelligence</h3>
+                    <p>Search 0 operators by name, ABN, or location</p>
+                    <p>Click 🔍 Search ABR → links to lookup missing ABNs</p>
+                    <p>Type to search and explore operator details</p>
+                </div>
+            </div>
+        </div>
+        
+        
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div class="panel" id="panel-catchments">
+        
+        <div class="search-bar">
+            <input type="text" class="search-input" id="catchment-search"
+                   placeholder="Search by suburb, postcode, or SA2 name..."
+                   oninput="searchCatchments()">
+            <div class="search-info">Search 5 catchment areas</div>
+        </div>
+        
+        <div id="catchment-results" class="catchment-results">
+            <div class="search-prompt">
+                <h3>Catchment Intelligence</h3>
+                <p>Search by suburb, postcode, or SA2 name to explore local market dynamics, supply ratios, demographics, and competing centres.</p>
+                <p><strong>Click on any centre</strong> to explore its catchment area.</p>
+            </div>
+        </div>
+        
+    </div>
+    
+        
+    </div>
+    
+    <script>
+        
+    // Enhanced catchment data for Panel 3
+    window.catchmentData = [
+  {
+    "sa2_code": "801081094",
+    "sa2_name": "HOLDER",
+    "suburb": "WESTON",
+    "postcode": "2611",
+    "state": "ACT",
+    "population_0_4": 164,
+    "pop_growth_cagr": -2.3,
+    "pop_growth_label": "declining",
+    "total_centres": 12,
+    "total_places": 1363,
+    "concentration_level": "Low",
+    "supply_analysis": {
+      "current_ratio": 831.1,
+      "future_ratio": 1013.7,
+      "current_gap": 771.1,
+      "future_gap": 953.7,
+      "gap_trend": "worsening",
+      "pressure_level": "high"
+    },
+    "historical": {
+      "quarterly_data": [
+        {
+          "quarter": "Q2 2023",
+          "licensed_places": 1335,
+          "operator_count": 11,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q3 2023",
+          "licensed_places": 1376,
+          "operator_count": 12,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q4 2023",
+          "licensed_places": 1417,
+          "operator_count": 12,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q1 2024",
+          "licensed_places": 1458,
+          "operator_count": 12,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q2 2024",
+          "licensed_places": 1444,
+          "operator_count": 12,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q3 2024",
+          "licensed_places": 1485,
+          "operator_count": 13,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q4 2024",
+          "licensed_places": 1526,
+          "operator_count": 13,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q1 2025",
+          "licensed_places": 1567,
+          "operator_count": 13,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q2 2025",
+          "licensed_places": 1553,
+          "operator_count": 13,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q3 2025",
+          "licensed_places": 1594,
+          "operator_count": 14,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q4 2025",
+          "licensed_places": 1635,
+          "operator_count": 14,
+          "new_approvals": 1
+        },
+        {
+          "quarter": "Q1 2026",
+          "licensed_places": 1676,
+          "operator_count": 14,
+          "new_approvals": 1
+        }
+      ],
+      "trends": {
+        "places_cagr_3y": 7.9,
+        "operators_cagr_3y": 8.4,
+        "recent_approvals_4q": 2
+      },
+      "pipeline_pressure": {
+        "level": "medium",
+        "signal": "2 new approvals in last 4 quarters"
+      }
+    },
+    "median_income": 82628.0,
+    "income_growth_cagr": 3.9,
+    "irsd_decile": 10,
+    "irsd_label": "highly_advantaged",
+    "gap_fee_daily": 28.6,
+    "fee_sensitivity": "moderate",
+    "ccs_rate": 0.8,
+    "nfp_percentage": 75.0,
+    "kinder_percentage": 25.0,
+    "nfp_count": 9,
+    "kinder_count": 3,
+    "competitors": [
+      {
+        "service_name": "Canberra Montessori School",
+        "operator_name": "The Canberra Montessori Society Incorporated",
+        "approved_places": 169,
+        "nqs_rating": "Working Towards NQS",
+        "is_nfp": true,
+        "has_kinder": true,
+        "suburb": "HOLDER",
+        "postcode": "2611",
+        "phone": "0262871962",
+        "service_approval": "SE-00009761",
+        "market_share": 12.4
+      },
+      {
+        "service_name": "Stromlo Forest Anglican College",
+        "operator_name": "Anglican Diocesan Services",
+        "approved_places": 151,
+        "nqs_rating": "nan",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "WRIGHT",
+        "postcode": "2611",
+        "phone": "nan",
+        "service_approval": "SE-00018528",
+        "market_share": 11.1
+      },
+      {
+        "service_name": "Orana Steiner School Early Childhood Centre and Kindergarten",
+        "operator_name": "Canberra Rudolf Steiner School Association Incorporated",
+        "approved_places": 132,
+        "nqs_rating": "Meeting NQS",
+        "is_nfp": true,
+        "has_kinder": true,
+        "suburb": "WESTON",
+        "postcode": "2611",
+        "phone": "0262878333",
+        "service_approval": "SE-00009697",
+        "market_share": 9.7
+      },
+      {
+        "service_name": "Coombs Early Learning",
+        "operator_name": "Caerus Early Learning Pty Ltd",
+        "approved_places": 128,
+        "nqs_rating": "Meeting NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "COOMBS",
+        "postcode": "2611",
+        "phone": "0261715399",
+        "service_approval": "SE-40010858",
+        "market_share": 9.4
+      },
+      {
+        "service_name": "YMCA Early Learning Centre Holder",
+        "operator_name": "Young Men's Christian Association of Canberra Ltd",
+        "approved_places": 126,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "HOLDER",
+        "postcode": "2611",
+        "phone": "0262873100",
+        "service_approval": "SE-40002119",
+        "market_share": 9.2
+      },
+      {
+        "service_name": "St Luke's Early Learning Community",
+        "operator_name": "Anglican Diocesan Services",
+        "approved_places": 119,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "CHAPMAN",
+        "postcode": "2611",
+        "phone": "1300687352",
+        "service_approval": "SE-40028821",
+        "market_share": 8.7
+      },
+      {
+        "service_name": "Weston Creek Children's Centre",
+        "operator_name": "Projects on Parkinson Ltd",
+        "approved_places": 115,
+        "nqs_rating": "Working Towards NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "WESTON",
+        "postcode": "2611",
+        "phone": "0262885380",
+        "service_approval": "SE-00009856",
+        "market_share": 8.4
+      },
+      {
+        "service_name": "360 Early Education Rivett",
+        "operator_name": "The Trustee for Rivett Childcare Unit Trust",
+        "approved_places": 100,
+        "nqs_rating": "nan",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "RIVETT",
+        "postcode": "2611",
+        "phone": "0290009360",
+        "service_approval": "SE-00017119",
+        "market_share": 7.3
+      },
+      {
+        "service_name": "Denman Village Early Learning Centre",
+        "operator_name": "Denman Childcare Pty Ltd ATF Percival Family Trust",
+        "approved_places": 96,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "DENMAN PROSPECT",
+        "postcode": "2611",
+        "phone": "nan",
+        "service_approval": "SE-40021520",
+        "market_share": 7.0
+      },
+      {
+        "service_name": "Kids Academy Rivett",
+        "operator_name": "Affinity Education Group Pty Limited",
+        "approved_places": 90,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "RIVETT",
+        "postcode": "2611",
+        "phone": "0280171619",
+        "service_approval": "SE-40012143",
+        "market_share": 6.6
+      },
+      {
+        "service_name": "Noah's Ark Long Day Care Service",
+        "operator_name": "Noah's Ark Resource Centre Incorporated",
+        "approved_places": 87,
+        "nqs_rating": "Meeting NQS",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "RIVETT",
+        "postcode": "2611",
+        "phone": "0405598650",
+        "service_approval": "SE-00009821",
+        "market_share": 6.4
+      },
+      {
+        "service_name": "St Jude\u2019s Early Learning Centre  Holder",
+        "operator_name": "CATHOLIC ARCHDIOCESE OF CANBERRA  AND GOULBURN EDUCATION LIMITED",
+        "approved_places": 50,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": true,
+        "has_kinder": true,
+        "suburb": "HOLDER",
+        "postcode": "2611",
+        "phone": "0262887688",
+        "service_approval": "SE-40001679",
+        "market_share": 3.7
+      }
+    ],
+    "search_terms": [
+      "holder",
+      "weston",
+      "2611",
+      "801081094"
+    ]
+  },
+  {
+    "sa2_code": "801061062",
+    "sa2_name": "DEAKIN",
+    "suburb": "PARKES",
+    "postcode": "2600",
+    "state": "ACT",
+    "population_0_4": 121,
+    "pop_growth_cagr": -2.1,
+    "pop_growth_label": "declining",
+    "total_centres": 13,
+    "total_places": 1160,
+    "concentration_level": "Low",
+    "supply_analysis": {
+      "current_ratio": 958.7,
+      "future_ratio": 1165.7,
+      "current_gap": 898.7,
+      "future_gap": 1105.7,
+      "gap_trend": "worsening",
+      "pressure_level": "high"
+    },
+    "historical": {
+      "quarterly_data": [
+        {
+          "quarter": "Q2 2023",
+          "licensed_places": 1136,
+          "operator_count": 12,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q3 2023",
+          "licensed_places": 1171,
+          "operator_count": 13,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q4 2023",
+          "licensed_places": 1206,
+          "operator_count": 13,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q1 2024",
+          "licensed_places": 1241,
+          "operator_count": 13,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q2 2024",
+          "licensed_places": 1229,
+          "operator_count": 13,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q3 2024",
+          "licensed_places": 1264,
+          "operator_count": 14,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q4 2024",
+          "licensed_places": 1299,
+          "operator_count": 14,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q1 2025",
+          "licensed_places": 1334,
+          "operator_count": 14,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q2 2025",
+          "licensed_places": 1322,
+          "operator_count": 14,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q3 2025",
+          "licensed_places": 1357,
+          "operator_count": 15,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q4 2025",
+          "licensed_places": 1392,
+          "operator_count": 15,
+          "new_approvals": 1
+        },
+        {
+          "quarter": "Q1 2026",
+          "licensed_places": 1426,
+          "operator_count": 15,
+          "new_approvals": 1
+        }
+      ],
+      "trends": {
+        "places_cagr_3y": 7.9,
+        "operators_cagr_3y": 7.7,
+        "recent_approvals_4q": 2
+      },
+      "pipeline_pressure": {
+        "level": "medium",
+        "signal": "2 new approvals in last 4 quarters"
+      }
+    },
+    "median_income": 103376.0,
+    "income_growth_cagr": 2.8,
+    "irsd_decile": 10,
+    "irsd_label": "highly_advantaged",
+    "gap_fee_daily": 40.0,
+    "fee_sensitivity": "moderate",
+    "ccs_rate": 0.72,
+    "nfp_percentage": 23.0,
+    "kinder_percentage": 8.0,
+    "nfp_count": 3,
+    "kinder_count": 1,
+    "competitors": [
+      {
+        "service_name": "Canberra Girls Grammar School Early Learning Centre",
+        "operator_name": "Canberra Girls Grammar School",
+        "approved_places": 154,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": false,
+        "has_kinder": true,
+        "suburb": "DEAKIN",
+        "postcode": "2600",
+        "phone": "0262026330",
+        "service_approval": "SE-00009654",
+        "market_share": 13.3
+      },
+      {
+        "service_name": "Communities@Work Abacus Child Care and Education Centre",
+        "operator_name": "Communities@Work",
+        "approved_places": 143,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "PARKES",
+        "postcode": "2600",
+        "phone": "0261102400",
+        "service_approval": "SE-00009744",
+        "market_share": 12.3
+      },
+      {
+        "service_name": "St Luke's Early Learning Community Deakin",
+        "operator_name": "Anglican Diocesan Services",
+        "approved_places": 116,
+        "nqs_rating": "nan",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "DEAKIN",
+        "postcode": "2600",
+        "phone": "0461546176",
+        "service_approval": "SE-00018094",
+        "market_share": 10.0
+      },
+      {
+        "service_name": "Currawong Child Care Centre",
+        "operator_name": "YWCA Canberra",
+        "approved_places": 92,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "BARTON",
+        "postcode": "2600",
+        "phone": "0262735911",
+        "service_approval": "SE-00009772",
+        "market_share": 7.9
+      },
+      {
+        "service_name": "Deakin School for Early Learning",
+        "operator_name": "HAATH PTY LTD",
+        "approved_places": 90,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "DEAKIN",
+        "postcode": "2600",
+        "phone": "0262829331",
+        "service_approval": "SE-00009774",
+        "market_share": 7.8
+      },
+      {
+        "service_name": "Goodstart Early Learning Barton",
+        "operator_name": "Goodstart Early Learning Ltd",
+        "approved_places": 88,
+        "nqs_rating": "Meeting NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "BARTON",
+        "postcode": "2600",
+        "phone": "0251560020",
+        "service_approval": "SE-00014243",
+        "market_share": 7.6
+      },
+      {
+        "service_name": "One Tree Defence Childcare Unit Russell Hill",
+        "operator_name": "One Tree Community Services Inc",
+        "approved_places": 85,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "RUSSELL HILL",
+        "postcode": "2600",
+        "phone": "0477200447",
+        "service_approval": "SE-00009831",
+        "market_share": 7.3
+      },
+      {
+        "service_name": "Urban Education ELC",
+        "operator_name": "CAFTAN PTY. LIMITED",
+        "approved_places": 82,
+        "nqs_rating": "Meeting NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "DEAKIN",
+        "postcode": "2600",
+        "phone": "0404844800",
+        "service_approval": "SE-40020391",
+        "market_share": 7.1
+      },
+      {
+        "service_name": "St Nicks Botanica",
+        "operator_name": "ZAP & CO PTY LTD",
+        "approved_places": 82,
+        "nqs_rating": "nan",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "YARRALUMLA",
+        "postcode": "2600",
+        "phone": "0447255578",
+        "service_approval": "SE-00018479",
+        "market_share": 7.1
+      },
+      {
+        "service_name": "Guardian Childcare & Education Barton",
+        "operator_name": "Guardian Community Early Learning Centres Pty Ltd",
+        "approved_places": 71,
+        "nqs_rating": "Meeting NQS",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "BARTON",
+        "postcode": "2600",
+        "phone": "0261090070",
+        "service_approval": "SE-40003620",
+        "market_share": 6.1
+      },
+      {
+        "service_name": "Papilio Early Learning Barton",
+        "operator_name": "Affinity Education Group Pty Limited",
+        "approved_places": 65,
+        "nqs_rating": "Meeting NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "BARTON",
+        "postcode": "2600",
+        "phone": "0262735080",
+        "service_approval": "SE-00009847",
+        "market_share": 5.6
+      },
+      {
+        "service_name": "St Nicks Hellenica",
+        "operator_name": "ZAP & CO PTY LTD",
+        "approved_places": 56,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "YARRALUMLA",
+        "postcode": "2600",
+        "phone": "0447255578",
+        "service_approval": "SE-00014355",
+        "market_share": 4.8
+      },
+      {
+        "service_name": "Communities@Work Capital Hill Early Childhood Centre",
+        "operator_name": "Communities@Work",
+        "approved_places": 36,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "CAPITAL HILL",
+        "postcode": "2600",
+        "phone": "0262775555",
+        "service_approval": "SE-00009762",
+        "market_share": 3.1
+      }
+    ],
+    "search_terms": [
+      "deakin",
+      "parkes",
+      "2600",
+      "801061062"
+    ]
+  },
+  {
+    "sa2_code": "801011002",
+    "sa2_name": "BELCONNEN",
+    "suburb": "BRUCE",
+    "postcode": "2617",
+    "state": "ACT",
+    "population_0_4": 450,
+    "pop_growth_cagr": 2.7,
+    "pop_growth_label": "growth",
+    "total_centres": 18,
+    "total_places": 1354,
+    "concentration_level": "Low",
+    "supply_analysis": {
+      "current_ratio": 300.9,
+      "future_ratio": 331.9,
+      "current_gap": 240.9,
+      "future_gap": 271.9,
+      "gap_trend": "worsening",
+      "pressure_level": "high"
+    },
+    "historical": {
+      "quarterly_data": [
+        {
+          "quarter": "Q2 2023",
+          "licensed_places": 1326,
+          "operator_count": 17,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q3 2023",
+          "licensed_places": 1367,
+          "operator_count": 18,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q4 2023",
+          "licensed_places": 1408,
+          "operator_count": 18,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q1 2024",
+          "licensed_places": 1448,
+          "operator_count": 19,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q2 2024",
+          "licensed_places": 1435,
+          "operator_count": 19,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q3 2024",
+          "licensed_places": 1475,
+          "operator_count": 19,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q4 2024",
+          "licensed_places": 1516,
+          "operator_count": 20,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q1 2025",
+          "licensed_places": 1557,
+          "operator_count": 20,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q2 2025",
+          "licensed_places": 1543,
+          "operator_count": 20,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q3 2025",
+          "licensed_places": 1584,
+          "operator_count": 21,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q4 2025",
+          "licensed_places": 1624,
+          "operator_count": 21,
+          "new_approvals": 1
+        },
+        {
+          "quarter": "Q1 2026",
+          "licensed_places": 1665,
+          "operator_count": 22,
+          "new_approvals": 1
+        }
+      ],
+      "trends": {
+        "places_cagr_3y": 7.9,
+        "operators_cagr_3y": 9.0,
+        "recent_approvals_4q": 2
+      },
+      "pipeline_pressure": {
+        "level": "medium",
+        "signal": "2 new approvals in last 4 quarters"
+      }
+    },
+    "median_income": 68432.0,
+    "income_growth_cagr": 2.0,
+    "irsd_decile": 7,
+    "irsd_label": "advantaged",
+    "gap_fee_daily": 14.3,
+    "fee_sensitivity": "moderate",
+    "ccs_rate": 0.9,
+    "nfp_percentage": 44.0,
+    "kinder_percentage": 0.0,
+    "nfp_count": 8,
+    "kinder_count": 0,
+    "competitors": [
+      {
+        "service_name": "Guardian Childcare & Education Bruce",
+        "operator_name": "Guardian Community Early Learning Centres Pty Ltd",
+        "approved_places": 156,
+        "nqs_rating": "Working Towards NQS",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "BRUCE",
+        "postcode": "2617",
+        "phone": "0262219180",
+        "service_approval": "SE-40004913",
+        "market_share": 11.5
+      },
+      {
+        "service_name": "Sage Education and Childcare Belconnen",
+        "operator_name": "Team Gump Pty Ltd as Trustee for Team Gump Trust",
+        "approved_places": 120,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "BELCONNEN",
+        "postcode": "2617",
+        "phone": "0262970922",
+        "service_approval": "SE-40016571",
+        "market_share": 8.9
+      },
+      {
+        "service_name": "Buds and Bees Early Learning Centre",
+        "operator_name": "BRIGHT BEES EARLY LEARNING (NICHOLLS) PTY LIMITED",
+        "approved_places": 100,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "BELCONNEN",
+        "postcode": "2617",
+        "phone": "0261403211",
+        "service_approval": "SE-40023965",
+        "market_share": 7.4
+      },
+      {
+        "service_name": "Evatt Preschool and OSHC",
+        "operator_name": "WODEN COMMUNITY SERVICE LIMITED",
+        "approved_places": 99,
+        "nqs_rating": "Working Towards NQS",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "EVATT",
+        "postcode": "2617",
+        "phone": "0436855845",
+        "service_approval": "SE-40016240",
+        "market_share": 7.3
+      },
+      {
+        "service_name": "Hearts & Minds Early Learning McKellar",
+        "operator_name": "Grassroots Childcare Operations Pty Ltd",
+        "approved_places": 93,
+        "nqs_rating": "Meeting NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "MCKELLAR",
+        "postcode": "2617",
+        "phone": "0261528302",
+        "service_approval": "SE-40025658",
+        "market_share": 6.9
+      },
+      {
+        "service_name": "YMCA Early Learning Centre Belconnen",
+        "operator_name": "Young Men's Christian Association of Canberra Ltd",
+        "approved_places": 90,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "BELCONNEN",
+        "postcode": "2617",
+        "phone": "0262512348",
+        "service_approval": "SE-00009860",
+        "market_share": 6.6
+      },
+      {
+        "service_name": "Bright Future Early Learning Belconnen",
+        "operator_name": "L & M KHIPAL PTY LTD",
+        "approved_places": 90,
+        "nqs_rating": "Working Towards NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "BELCONNEN",
+        "postcode": "2617",
+        "phone": "0262534062",
+        "service_approval": "SE-40012576",
+        "market_share": 6.6
+      },
+      {
+        "service_name": "Papilio Early Learning Bruce",
+        "operator_name": "Affinity Education Group Pty Limited",
+        "approved_places": 89,
+        "nqs_rating": "Meeting NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "BELCONNEN",
+        "postcode": "2617",
+        "phone": "02 62519399",
+        "service_approval": "SE-00009848",
+        "market_share": 6.6
+      },
+      {
+        "service_name": "Bruce Ridge Early Childhood Centre",
+        "operator_name": "Capital Region Community Service Limited",
+        "approved_places": 72,
+        "nqs_rating": "Working Towards NQS",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "BRUCE",
+        "postcode": "2617",
+        "phone": "0262513205",
+        "service_approval": "SE-00009755",
+        "market_share": 5.3
+      },
+      {
+        "service_name": "My Little Star Early Learning Centre",
+        "operator_name": "CHABAD ACT LIMITED",
+        "approved_places": 68,
+        "nqs_rating": "Meeting NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "GIRALANG",
+        "postcode": "2617",
+        "phone": "0262419181",
+        "service_approval": "SE-00014279",
+        "market_share": 5.0
+      },
+      {
+        "service_name": "SDN Bluebell Early Childhood Education Centre",
+        "operator_name": "SDN Children's Services",
+        "approved_places": 62,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "BELCONNEN",
+        "postcode": "2617",
+        "phone": "0261918501",
+        "service_approval": "SE-00009834",
+        "market_share": 4.6
+      },
+      {
+        "service_name": "McKellar Cottage",
+        "operator_name": "EARLY EDUCATION INITIATIVE PTY. LTD.",
+        "approved_places": 59,
+        "nqs_rating": "Meeting NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "MCKELLAR",
+        "postcode": "2617",
+        "phone": "0261622840",
+        "service_approval": "SE-00009812",
+        "market_share": 4.4
+      },
+      {
+        "service_name": "Ginninderra Early Childhood Centre",
+        "operator_name": "Capital Region Community Service Limited",
+        "approved_places": 59,
+        "nqs_rating": "Meeting NQS",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "BELCONNEN",
+        "postcode": "2617",
+        "phone": "0262640200",
+        "service_approval": "SE-00009778",
+        "market_share": 4.4
+      },
+      {
+        "service_name": "Totom House Multicultural Early Childhood Centre",
+        "operator_name": "Totom House Incorporated",
+        "approved_places": 52,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "KALEEN",
+        "postcode": "2617",
+        "phone": "62415672",
+        "service_approval": "SE-00009851",
+        "market_share": 3.8
+      },
+      {
+        "service_name": "Rainbow Cottage Early Childhood Centre",
+        "operator_name": "Rainbow Cottage Early Childhood Centre Inc",
+        "approved_places": 49,
+        "nqs_rating": "Meeting NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "BELCONNEN",
+        "postcode": "2617",
+        "phone": "0262516608",
+        "service_approval": "SE-00009827",
+        "market_share": 3.6
+      },
+      {
+        "service_name": "AIS Caretaker's Cottage Child Care Centre",
+        "operator_name": "Australian Sports Commission",
+        "approved_places": 48,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "BRUCE",
+        "postcode": "2617",
+        "phone": "0262141905",
+        "service_approval": "SE-00009746",
+        "market_share": 3.5
+      },
+      {
+        "service_name": "Mini Miracles Early Learning Centre",
+        "operator_name": "AUSTRALIAN EDUCATION AND TRAINING SERVICES PTY LTD",
+        "approved_places": 28,
+        "nqs_rating": "Meeting NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "BRUCE",
+        "postcode": "2617",
+        "phone": "61560481",
+        "service_approval": "SE-40002848",
+        "market_share": 2.1
+      },
+      {
+        "service_name": "Kaleen Cubby House",
+        "operator_name": "Kaleen Cubbyhouse Association Incorporated",
+        "approved_places": 20,
+        "nqs_rating": "Working Towards NQS",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "KALEEN",
+        "postcode": "2617",
+        "phone": "0262415032",
+        "service_approval": "SE-40013445",
+        "market_share": 1.5
+      }
+    ],
+    "search_terms": [
+      "belconnen",
+      "bruce",
+      "2617",
+      "801011002"
+    ]
+  },
+  {
+    "sa2_code": "801071090",
+    "sa2_name": "WANNIASSA",
+    "suburb": "WANNIASSA",
+    "postcode": "2903",
+    "state": "ACT",
+    "population_0_4": 421,
+    "pop_growth_cagr": -3.2,
+    "pop_growth_label": "declining",
+    "total_centres": 5,
+    "total_places": 337,
+    "concentration_level": "Medium",
+    "supply_analysis": {
+      "current_ratio": 80.0,
+      "future_ratio": 99.5,
+      "current_gap": 20.0,
+      "future_gap": 39.5,
+      "gap_trend": "worsening",
+      "pressure_level": "medium"
+    },
+    "historical": {
+      "quarterly_data": [
+        {
+          "quarter": "Q2 2023",
+          "licensed_places": 330,
+          "operator_count": 4,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q3 2023",
+          "licensed_places": 340,
+          "operator_count": 5,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q4 2023",
+          "licensed_places": 350,
+          "operator_count": 5,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q1 2024",
+          "licensed_places": 360,
+          "operator_count": 5,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q2 2024",
+          "licensed_places": 357,
+          "operator_count": 5,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q3 2024",
+          "licensed_places": 367,
+          "operator_count": 5,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q4 2024",
+          "licensed_places": 377,
+          "operator_count": 5,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q1 2025",
+          "licensed_places": 387,
+          "operator_count": 5,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q2 2025",
+          "licensed_places": 384,
+          "operator_count": 5,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q3 2025",
+          "licensed_places": 394,
+          "operator_count": 5,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q4 2025",
+          "licensed_places": 404,
+          "operator_count": 6,
+          "new_approvals": 1
+        },
+        {
+          "quarter": "Q1 2026",
+          "licensed_places": 414,
+          "operator_count": 6,
+          "new_approvals": 1
+        }
+      ],
+      "trends": {
+        "places_cagr_3y": 7.9,
+        "operators_cagr_3y": 14.5,
+        "recent_approvals_4q": 2
+      },
+      "pipeline_pressure": {
+        "level": "medium",
+        "signal": "2 new approvals in last 4 quarters"
+      }
+    },
+    "median_income": 72644.0,
+    "income_growth_cagr": 3.5,
+    "irsd_decile": 8,
+    "irsd_label": "advantaged",
+    "gap_fee_daily": 28.6,
+    "fee_sensitivity": "moderate",
+    "ccs_rate": 0.8,
+    "nfp_percentage": 40.0,
+    "kinder_percentage": 20.0,
+    "nfp_count": 2,
+    "kinder_count": 1,
+    "competitors": [
+      {
+        "service_name": "Busy Bees at Oxley",
+        "operator_name": "FEL Child Care Centres 4 Pty Ltd",
+        "approved_places": 108,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "OXLEY",
+        "postcode": "2903",
+        "phone": "0262108800",
+        "service_approval": "SE-40004895",
+        "market_share": 32.0
+      },
+      {
+        "service_name": "Guardian Childcare & Education Wanniassa",
+        "operator_name": "Guardian Community Early Learning Centres Pty Ltd",
+        "approved_places": 80,
+        "nqs_rating": "Meeting NQS",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "WANNIASSA",
+        "postcode": "2903",
+        "phone": "0291941500",
+        "service_approval": "SE-40004191",
+        "market_share": 23.7
+      },
+      {
+        "service_name": "Communities@Work Appletree House Childcare & Education Centre",
+        "operator_name": "Communities@Work",
+        "approved_places": 57,
+        "nqs_rating": "Meeting NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "WANNIASSA",
+        "postcode": "2903",
+        "phone": "0262936320",
+        "service_approval": "SE-00009747",
+        "market_share": 16.9
+      },
+      {
+        "service_name": "St Anthony\u2019s Early Learning Centre Wanniassa",
+        "operator_name": "CATHOLIC ARCHDIOCESE OF CANBERRA  AND GOULBURN EDUCATION LIMITED",
+        "approved_places": 50,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": true,
+        "has_kinder": true,
+        "suburb": "WANNIASSA",
+        "postcode": "2903",
+        "phone": "0262310491",
+        "service_approval": "SE-40008090",
+        "market_share": 14.8
+      },
+      {
+        "service_name": "Communities@Work Illoura Childcare & Education Centre",
+        "operator_name": "Communities@Work",
+        "approved_places": 42,
+        "nqs_rating": "Meeting NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "WANNIASSA",
+        "postcode": "2903",
+        "phone": "0262936350",
+        "service_approval": "SE-00009795",
+        "market_share": 12.5
+      }
+    ],
+    "search_terms": [
+      "wanniassa",
+      "wanniassa",
+      "2903",
+      "801071090"
+    ]
+  },
+  {
+    "sa2_code": "801011004",
+    "sa2_name": "CHARNWOOD",
+    "suburb": "SPENCE",
+    "postcode": "2615",
+    "state": "ACT",
+    "population_0_4": 233,
+    "pop_growth_cagr": 1.0,
+    "pop_growth_label": "stable",
+    "total_centres": 13,
+    "total_places": 1382,
+    "concentration_level": "Low",
+    "supply_analysis": {
+      "current_ratio": 593.1,
+      "future_ratio": 677.1,
+      "current_gap": 533.1,
+      "future_gap": 617.1,
+      "gap_trend": "worsening",
+      "pressure_level": "high"
+    },
+    "historical": {
+      "quarterly_data": [
+        {
+          "quarter": "Q2 2023",
+          "licensed_places": 1354,
+          "operator_count": 12,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q3 2023",
+          "licensed_places": 1395,
+          "operator_count": 13,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q4 2023",
+          "licensed_places": 1437,
+          "operator_count": 13,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q1 2024",
+          "licensed_places": 1478,
+          "operator_count": 13,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q2 2024",
+          "licensed_places": 1464,
+          "operator_count": 13,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q3 2024",
+          "licensed_places": 1506,
+          "operator_count": 14,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q4 2024",
+          "licensed_places": 1547,
+          "operator_count": 14,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q1 2025",
+          "licensed_places": 1589,
+          "operator_count": 14,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q2 2025",
+          "licensed_places": 1575,
+          "operator_count": 14,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q3 2025",
+          "licensed_places": 1616,
+          "operator_count": 15,
+          "new_approvals": 0
+        },
+        {
+          "quarter": "Q4 2025",
+          "licensed_places": 1658,
+          "operator_count": 15,
+          "new_approvals": 1
+        },
+        {
+          "quarter": "Q1 2026",
+          "licensed_places": 1699,
+          "operator_count": 15,
+          "new_approvals": 1
+        }
+      ],
+      "trends": {
+        "places_cagr_3y": 7.9,
+        "operators_cagr_3y": 7.7,
+        "recent_approvals_4q": 2
+      },
+      "pipeline_pressure": {
+        "level": "medium",
+        "signal": "2 new approvals in last 4 quarters"
+      }
+    },
+    "median_income": 59072.0,
+    "income_growth_cagr": 3.3,
+    "irsd_decile": 4,
+    "irsd_label": "disadvantaged",
+    "gap_fee_daily": 14.3,
+    "fee_sensitivity": "moderate",
+    "ccs_rate": 0.9,
+    "nfp_percentage": 46.0,
+    "kinder_percentage": 8.0,
+    "nfp_count": 6,
+    "kinder_count": 1,
+    "competitors": [
+      {
+        "service_name": "Edge Early Learning Higgins",
+        "operator_name": "EDGE EARLY LEARNING ACT PTY LTD",
+        "approved_places": 178,
+        "nqs_rating": "Working Towards NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "HIGGINS",
+        "postcode": "2615",
+        "phone": "0251156760",
+        "service_approval": "SE-40011068",
+        "market_share": 12.9
+      },
+      {
+        "service_name": "Edge Early Learning Charnwood",
+        "operator_name": "EDGE EARLY LEARNING ACT PTY LTD",
+        "approved_places": 158,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "CHARNWOOD",
+        "postcode": "2615",
+        "phone": "0251156761",
+        "service_approval": "SE-40014603",
+        "market_share": 11.4
+      },
+      {
+        "service_name": "Bright Steps Academy MacGregor",
+        "operator_name": "BRIGHT STEPS PTY LTD",
+        "approved_places": 146,
+        "nqs_rating": "Meeting NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "MACGREGOR",
+        "postcode": "2615",
+        "phone": "0251147474",
+        "service_approval": "SE-00016741",
+        "market_share": 10.6
+      },
+      {
+        "service_name": "Flynn Early Childhood Education Centre",
+        "operator_name": "North Belconnen Community Association Incorporated",
+        "approved_places": 140,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "FLYNN",
+        "postcode": "2615",
+        "phone": "0262583044",
+        "service_approval": "SE-00011291",
+        "market_share": 10.1
+      },
+      {
+        "service_name": "Baringa Early Learning Centre",
+        "operator_name": "Baringa Childcare Centre Incorporated",
+        "approved_places": 120,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "SPENCE",
+        "postcode": "2615",
+        "phone": "0262588891",
+        "service_approval": "SE-00009748",
+        "market_share": 8.7
+      },
+      {
+        "service_name": "Poplars Early Learning",
+        "operator_name": "Caerus Early Learning Pty Ltd",
+        "approved_places": 120,
+        "nqs_rating": "Working Towards NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "HOLT",
+        "postcode": "2615",
+        "phone": "0409747850",
+        "service_approval": "SE-40008661",
+        "market_share": 8.7
+      },
+      {
+        "service_name": "Move Early Learning Holt",
+        "operator_name": "MOVE EARLY LEARNING PTY LTD",
+        "approved_places": 113,
+        "nqs_rating": "nan",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "HOLT",
+        "postcode": "2615",
+        "phone": "0261477227",
+        "service_approval": "SE-40030510",
+        "market_share": 8.2
+      },
+      {
+        "service_name": "YMCA Early Learning Centre Strathnairn",
+        "operator_name": "Young Men's Christian Association of Canberra Ltd",
+        "approved_places": 113,
+        "nqs_rating": "nan",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "STRATHNAIRN",
+        "postcode": "2615",
+        "phone": "0418537569",
+        "service_approval": "SE-00018594",
+        "market_share": 8.2
+      },
+      {
+        "service_name": "YMCA Early Learning Centre Holt",
+        "operator_name": "Young Men's Christian Association of Canberra Ltd",
+        "approved_places": 88,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "HOLT",
+        "postcode": "2615",
+        "phone": "0262547545",
+        "service_approval": "SE-40004371",
+        "market_share": 6.4
+      },
+      {
+        "service_name": "Cooinda Cottage",
+        "operator_name": "North Belconnen Community Association Incorporated",
+        "approved_places": 80,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": true,
+        "has_kinder": false,
+        "suburb": "CHARNWOOD",
+        "postcode": "2615",
+        "phone": "0262591880",
+        "service_approval": "SE-00009769",
+        "market_share": 5.8
+      },
+      {
+        "service_name": "Walla Walla Bing Bang Early Learning Centre",
+        "operator_name": "HZY EDUCATION GROUP PTY LTD",
+        "approved_places": 57,
+        "nqs_rating": "Meeting NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "HARWOOD",
+        "postcode": "2465",
+        "phone": "1300262180",
+        "service_approval": "SE-40017311",
+        "market_share": 4.1
+      },
+      {
+        "service_name": "St Thomas Aquinas Early Learning Centre  West Belconnen",
+        "operator_name": "CATHOLIC ARCHDIOCESE OF CANBERRA  AND GOULBURN EDUCATION LIMITED",
+        "approved_places": 44,
+        "nqs_rating": "Exceeding NQS",
+        "is_nfp": true,
+        "has_kinder": true,
+        "suburb": "CHARNWOOD",
+        "postcode": "2615",
+        "phone": "0427439931",
+        "service_approval": "SE-00009840",
+        "market_share": 3.2
+      },
+      {
+        "service_name": "Spence Children's Cottage",
+        "operator_name": "YWCA Canberra",
+        "approved_places": 25,
+        "nqs_rating": "Meeting NQS",
+        "is_nfp": false,
+        "has_kinder": false,
+        "suburb": "SPENCE",
+        "postcode": "2615",
+        "phone": "0262582077",
+        "service_approval": "SE-00009836",
+        "market_share": 1.8
+      }
+    ],
+    "search_terms": [
+      "charnwood",
+      "spence",
+      "2615",
+      "801011004"
+    ]
+  }
+];
+    
+        
+        // Operator data
+        window.operatorData = [];
+        
+        // Panel switching
+        function showPanel(panelName) {
+            document.querySelectorAll('.panel').forEach(p => p.style.display = 'none');
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            
+            document.getElementById('panel-' + panelName).style.display = 'block';
+            event.target.classList.add('active');
+        }
+        
+        // Initialize - show Catchment Explorer by default
+        document.addEventListener('DOMContentLoaded', function() {
+            showPanel('catchments');
+        });
+        
+        
+    // Enhanced Panel 3: Catchment Explorer with Historical Intelligence
+    function searchCatchments() {
+        const query = document.getElementById('catchment-search').value.toLowerCase();
+        const results = window.catchmentData.filter(catchment => {
+            return catchment.search_terms.some(term => term.includes(query));
+        });
+        
+        displayCatchmentResults(results.slice(0, 5));
+    }
+    
+    function displayCatchmentResults(results) {
+        const container = document.getElementById('catchment-results');
+        
+        if (results.length === 0) {
+            container.innerHTML = '<div class="no-results">No catchments found</div>';
+            return;
+        }
+        
+        const resultsHtml = results.map(catchment => generateEnhancedCatchmentCard(catchment)).join('');
+        container.innerHTML = resultsHtml;
+    }
+    
+    function generateEnhancedCatchmentCard(catchment) {
+        // Historical trend chart (simplified)
+        const chartData = catchment.historical.quarterly_data;
+        const chartHtml = generateHistoricalChart(chartData);
+        
+        // Pipeline pressure indicator
+        const pressure = catchment.historical.pipeline_pressure;
+        const pressureClass = pressure.level;
+        
+        // Gap analysis
+        const gaps = catchment.supply_analysis;
+        const gapTrendIcon = gaps.gap_trend === 'improving' ? '↗️' : gaps.gap_trend === 'worsening' ? '↘️' : '→';
+        
+        // Top competitors
+        const topCompetitors = catchment.competitors.slice(0, 8);
+        
+        return `
+            <div class="catchment-card">
+                <div class="catchment-header">
+                    <h3>${catchment.sa2_name} <span class="sa2-code">(${catchment.sa2_code})</span></h3>
+                    <div class="catchment-summary">${catchment.total_centres} centres • ${catchment.total_places.toLocaleString()} places • ${catchment.concentration_level} concentration</div>
+                    <div class="pipeline-indicator pressure-${pressureClass}">
+                        <span class="pipeline-label">Pipeline Pressure</span>
+                        <span class="pipeline-value">${pressure.level.toUpperCase()}</span>
+                        <span class="pipeline-detail">${pressure.signal}</span>
+                    </div>
+                </div>
+                
+                <!-- Enhanced Metrics Grid -->
+                <div class="catchment-metrics">
+                    <div class="metric-card">
+                        <div class="metric-label">Under-5 Population</div>
+                        <div class="metric-value">${catchment.population_0_4.toLocaleString()}</div>
+                        <div class="metric-trend ${catchment.pop_growth_label.replace('_', '-')}">${catchment.pop_growth_label} • ${catchment.pop_growth_cagr > 0 ? '+' : ''}${catchment.pop_growth_cagr}% CAGR</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Supply Gap</div>
+                        <div class="metric-value">${gaps.current_gap > 0 ? '+' : ''}${gaps.current_gap}%</div>
+                        <div class="metric-trend gap-trend-${gaps.gap_trend}">${gapTrendIcon} ${gaps.gap_trend} to ${gaps.future_gap > 0 ? '+' : ''}${gaps.future_gap}% by 2027</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Supply Growth</div>
+                        <div class="metric-value">${catchment.historical.trends.places_cagr_3y > 0 ? '+' : ''}${catchment.historical.trends.places_cagr_3y}%</div>
+                        <div class="metric-trend">3-year CAGR • ${catchment.total_places} places</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Median Income</div>
+                        <div class="metric-value">${Math.round(catchment.median_income / 1000)}k</div>
+                        <div class="metric-trend">IRSD ${catchment.irsd_decile}/10 • ${catchment.irsd_label}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Gap Fee</div>
+                        <div class="metric-value">$${catchment.gap_fee_daily}</div>
+                        <div class="metric-trend">${catchment.fee_sensitivity} sensitivity • ${Math.round(catchment.ccs_rate * 100)}% CCS rate</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Market Composition</div>
+                        <div class="metric-value">${catchment.nfp_percentage}% NFP</div>
+                        <div class="metric-trend">${catchment.kinder_percentage}% Kinder • ${catchment.concentration_level} concentration</div>
+                    </div>
+                </div>
+                
+                <!-- Historical Trend Section -->
+                <div class="historical-section">
+                    <div class="section-header">
+                        Supply Trend (3 Years)
+                        <span class="trend-summary">
+                            Places: ${chartData[0].licensed_places} → ${chartData[chartData.length-1].licensed_places} • 
+                            Operators: ${chartData[0].operator_count} → ${chartData[chartData.length-1].operator_count}
+                        </span>
+                    </div>
+                    <div class="historical-chart">
+                        ${chartHtml}
+                    </div>
+                </div>
+                
+                <!-- Enhanced Competition Analysis -->
+                <div class="competition-section">
+                    <div class="section-header">
+                        All Centres (${catchment.total_centres})
+                        <span class="competition-summary">
+                            ${catchment.total_places.toLocaleString()} total places • 
+                            ${Math.round(catchment.total_places / catchment.population_0_4 * 100)}% supply ratio •
+                            Top 3: ${topCompetitors.slice(0,3).reduce((sum, c) => sum + c.market_share, 0).toFixed(1)}%
+                        </span>
+                    </div>
+                    <div class="centres-list">
+                        ${topCompetitors.map((centre, idx) => `
+                            <div class="centre-row" onclick="navigateToCatchment('${centre.suburb}', '${centre.postcode}')" title="Click to explore ${centre.suburb} catchment">
+                                <div class="centre-main">
+                                    <div class="centre-name">${centre.service_name}</div>
+                                    <div class="centre-operator">${centre.operator_name}</div>
+                                    <div class="centre-location">${centre.suburb} • ${centre.postcode}</div>
+                                </div>
+                                <div class="centre-stats">
+                                    <span class="centre-places">${centre.approved_places} places</span>
+                                    <span class="centre-share">${centre.market_share}% share</span>
+                                    <span class="centre-type">${centre.is_nfp ? 'NFP' : 'For-Profit'}</span>
+                                    <span class="centre-kinder">${centre.has_kinder ? 'Kinder' : 'LDC only'}</span>
+                                    <span class="centre-rating nqs-${(centre.nqs_rating || 'not-rated').toLowerCase().replace(/\s+/g, '-')}">${centre.nqs_rating || 'Not Rated'}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    function generateHistoricalChart(data) {
+        if (!data || data.length === 0) return '<div class="no-chart">No historical data</div>';
+        
+        const maxPlaces = Math.max(...data.map(d => d.licensed_places));
+        const maxOperators = Math.max(...data.map(d => d.operator_count));
+        
+        const points = data.map((d, i) => {
+            const x = (i / Math.max(data.length - 1, 1)) * 100;
+            const yPlaces = maxPlaces > 0 ? ((d.licensed_places / maxPlaces) * 60) : 30;
+            const yOperators = maxOperators > 0 ? ((d.operator_count / maxOperators) * 60) : 30;
+            return { x, yPlaces, yOperators, quarter: d.quarter };
+        });
+        
+        const placesPath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${70 - p.yPlaces}`).join(' ');
+        const operatorsPath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${70 - p.yOperators}`).join(' ');
+        
+        return `
+            <svg viewBox="0 0 100 70" class="trend-chart">
+                <path d="${placesPath}" stroke="var(--accent)" stroke-width="2" fill="none" opacity="0.8" />
+                <path d="${operatorsPath}" stroke="var(--accent2)" stroke-width="2" fill="none" stroke-dasharray="3,3" opacity="0.8" />
+            </svg>
+            <div class="chart-legend">
+                <span><span class="legend-places"></span>Licensed Places</span>
+                <span><span class="legend-operators"></span>Operators</span>
+            </div>
+        `;
+    }
+    
+    function navigateToCatchment(suburb, postcode) {
+        // Search for the new catchment
+        const searchTerm = suburb || postcode;
+        if (searchTerm) {
+            document.getElementById('catchment-search').value = searchTerm;
+            searchCatchments();
+        }
+    }
+    
+    function searchOperator(operatorName) {
+        // Switch to Panel 2 and search for this operator
+        showPanel('operators');
+        document.getElementById('op-search').value = operatorName;
+        filterOperators();
+    }
+    
+        
+        // Panel 2 functions
+        function filterOperators() {
+            const query = document.getElementById('op-search').value.toLowerCase();
+            if (query.length < 2) {
+                document.getElementById('operator-results').innerHTML = `
+                    <div class="search-prompt">
+                        <h3>Operator Intelligence</h3>
+                        <p>Search 0 operators by name, ABN, or location</p>
+                        <p>Click 🔍 Search ABR → links to lookup missing ABNs</p>
+                        <p>Type to search and explore operator details</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const results = window.operatorData.filter(op => {
+                const searchStr = [
+                    op.legal_name,
+                    op.abn || '',
+                    op.acn || '',
+                    ...op.states
+                ].join(' ').toLowerCase();
+                return searchStr.includes(query);
+            });
+            
+            displayOperatorResults(results.slice(0, 10));
+        }
+        
+        function displayOperatorResults(results) {
+            const container = document.getElementById('operator-results');
+            
+            if (results.length === 0) {
+                container.innerHTML = '<div class="no-results">No operators found</div>';
+                return;
+            }
+            
+            const resultsHtml = results.map(op => `
+                <div class="operator-card">
+                    <div class="op-header">
+                        <div class="op-name">${op.legal_name}</div>
+                        <div class="op-stats">
+                            <span class="tier tier-${op.tier}">${op.tier}</span>
+                            <span>${op.n_centres} centres</span>
+                            <span>${op.states.join(', ') || 'Unknown'}</span>
+                        </div>
+                    </div>
+                    <div class="op-detail">
+                        <div class="detail-grid">
+                            <div class="detail-block">
+                                <div class="detail-block-label">ABN</div>
+                                <div class="detail-block-value">
+                                    ${op.abn ? 
+                                        `<span class="abr-value">${op.abn}</span>` : 
+                                        `<a class="abr-search-link" href="https://abr.business.gov.au/Tools/Search?SearchText=${encodeURIComponent(op.legal_name)}" target="_blank">🔍 Search ABR →</a>`
+                                    }
+                                </div>
+                            </div>
+                            <div class="detail-block">
+                                <div class="detail-block-label">Entity Type</div>
+                                <div class="detail-block-value">${op.entity_type || '—'}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            container.innerHTML = resultsHtml;
+        }
+        
+    </script>
+</body>
+</html>
