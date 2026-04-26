@@ -1,7 +1,12 @@
 """
-review_server.py  (v5)
-────────────────────────────────────────────────────────────────
+review_server.py  (v6)
+─────────────────────────────────────────────────────────────────────
 Local-only web server for Kintell ownership review.
+
+v6 changes:
+  - /api/centre/<service_id>       GET: consolidated payload for the
+                                        centre detail page (Phase 2).
+                                        Backed by centre_page.get_centre_payload().
 
 v5 changes:
   - /api/operator/<gid>            GET: consolidated payload for the
@@ -53,13 +58,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import apply_decisions  # noqa: E402
 import group_labels      # noqa: E402
 import operator_page     # noqa: E402
+import centre_page       # noqa: E402  (v6)
 
 ROOT     = Path(__file__).resolve().parent
 DOCS_DIR = ROOT / "docs"
 DB_PATH  = ROOT / "data" / "kintell.db"
 
 
-# ─── Read helpers ───────────────────────────────────────────────────
+# ─── Read helpers ─────────────────────────────────────────────────────
 
 def _conn():
     return sqlite3.connect(str(DB_PATH))
@@ -438,7 +444,7 @@ def bulk_accept_cluster(brand, exclude_cids=None, actor="patrick"):
     }
 
 
-# ─── HTTP ───────────────────────────────────────────────────────────
+# ─── HTTP ─────────────────────────────────────────────────────────────
 
 API_ACCEPT  = re.compile(r"^/api/accept/(\d+)/?$")
 API_REJECT  = re.compile(r"^/api/reject/(\d+)/?$")
@@ -451,6 +457,8 @@ API_GROUP_RENAME = re.compile(r"^/api/group/(\d+)/rename/?$")
 API_GROUP_GET    = re.compile(r"^/api/group/(\d+)/?$")
 # v5:
 API_OPERATOR     = re.compile(r"^/api/operator/(\d+)/?$")
+# v6:
+API_CENTRE       = re.compile(r"^/api/centre/(\d+)/?$")
 
 
 class ReviewHandler(BaseHTTPRequestHandler):
@@ -598,6 +606,19 @@ class ReviewHandler(BaseHTTPRequestHandler):
                 self._send_json({"ok": False, "msg": str(e)}, 500)
             return
 
+        # v6: consolidated payload for the centre detail page
+        m = API_CENTRE.match(path)
+        if m:
+            try:
+                payload = centre_page.get_centre_payload(int(m.group(1)))
+                if payload is None:
+                    self._send_json({"ok": False, "msg": "not found"}, 404)
+                else:
+                    self._send_json({"ok": True, "centre": payload})
+            except Exception as e:
+                self._send_json({"ok": False, "msg": str(e)}, 500)
+            return
+
         # static
         if path == "/" or path == "":
             target = DOCS_DIR / "index.html"
@@ -671,7 +692,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
         self._send_text("Not found", 404)
 
 
-# ─── Entry point ────────────────────────────────────────────────────
+# ─── Entry point ──────────────────────────────────────────────────────
 
 def run(port=8001, open_browser=True):
     if not DOCS_DIR.exists():
@@ -683,8 +704,8 @@ def run(port=8001, open_browser=True):
     httpd = ThreadingHTTPServer(addr, ReviewHandler)
     url = f"http://localhost:{port}/"
 
-    print(f"\n  Kintell review server (v5)")
-    print(f"  ───────────────────────────")
+    print(f"\n  Kintell review server (v6)")
+    print(f"  ─────────────────────────")
     print(f"  Serving : {DOCS_DIR}")
     print(f"  Database: {DB_PATH}")
     print(f"  Dashboard : {url}")

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- operator.html v8 -->
+<!-- operator.html v9 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -2910,7 +2910,7 @@ function renderCentresTable() {
     const isStale = ratingIso && ratingIso < staleCutoffIso;
     return `
       <tr>
-        <td><b>${htmlEscape(s.service_name || "")}</b>
+        <td><a href="centre.html?id=${s.service_id}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;" title="Open centre detail in new tab"><b>${htmlEscape(s.service_name || "")}</b></a>
           <div style="color:var(--text-mute);font-size:11px;">
             ${htmlEscape(s.entity_legal_name || "")}
           </div>

@@ -18,3 +18,4 @@ test.txt
 operator_page.py.v7_backup
 docs/operator.html.v?_backup_*
 docs/operator.html.v?_backup_*
+*.v?_backup_*

@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<!-- centre.html v1 -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kintell — Centre</title>
+<style>
+  /* Inherits the visual language of operator.html v8 — same CSS vars,
+     same .op-section / .fact / .km-badge / .nqs-pill / .com-line classes
+     so look-and-feel is automatic. */
+  :root {
+    --bg: #0f1419;
+    --panel: #1a1f26;
+    --panel-2: #232933;
+    --panel-3: #2a313c;
+    --border: #2d343f;
+    --text: #e6e8eb;
+    --text-dim: #9aa4b1;
+    --text-mute: #6b7684;
+    --accent: #4a9eff;
+    --green: #4ade80;
+    --green-bg: #14301e;
+    --amber: #fbbf24;
+    --amber-bg: #2f2310;
+    --red: #f87171;
+    --red-bg: #2e1414;
+    --purple: #a78bfa;
+    --purple-bg: #1f1a2e;
+    --grey: #94a3b8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* App header */
+  header.app {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: 16px;
+  }
+  header.app h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  header.app .breadcrumb { color: var(--text-mute); font-size: 13px; }
+  header.app .breadcrumb a { color: var(--text-dim); }
+  header.app .breadcrumb a:hover { color: var(--accent); }
+  header.app .right { margin-left: auto; display: flex; gap: 12px; font-size: 13px; }
+  body.embed header.app { display: none; }
+
+  main {
+    padding: 18px 24px 60px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  body.embed main { padding: 8px 16px 28px; }
+
+  /* States */
+  .state-msg {
+    text-align: center; padding: 60px 20px;
+    color: var(--text-mute); font-size: 14px;
+  }
+  .state-msg.error {
+    color: var(--red); background: var(--red-bg);
+    border: 1px solid #5c2626; border-radius: 8px;
+    padding: 24px; margin: 40px 0;
+  }
+
+  /* Centre header card */
+  .centre-header {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 26px;
+    margin-bottom: 18px;
+  }
+  .centre-name {
+    font-size: 26px; font-weight: 600; line-height: 1.2;
+    margin: 0;
+  }
+  .centre-address {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-top: 6px;
+  }
+  .centre-meta-row {
+    display: flex; flex-wrap: wrap; gap: 10px 18px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--text-dim);
+    align-items: center;
+  }
+  .centre-meta-row .sep { color: var(--text-mute); }
+  .centre-meta-row b { color: var(--text); font-weight: 500; }
+
+  /* Quick-fact strip */
+  .scale-strip {
+    display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px;
+  }
+  .chip {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 12px 6px;
+    display: flex; flex-direction: column;
+    min-width: 96px;
+  }
+  .chip .n {
+    font-size: 18px; font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .chip .l {
+    font-size: 10px; color: var(--text-mute);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  /* External tools row */
+  .ext-tools {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px;
+  }
+  .ext-tools a {
+    font-size: 12px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 4px 10px; border-radius: 3px;
+  }
+  .ext-tools a:hover { color: var(--accent); text-decoration: none; }
+
+  /* Section cards (mirrors operator.html) */
+  .section-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  .op-section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px 14px;
+    margin-bottom: 14px;
+  }
+  .op-section h3 {
+    margin: 0 0 10px 0;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 700;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+  }
+  .op-section h3 .note {
+    float: right;
+    font-size: 10px;
+    color: var(--text-mute);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+  }
+  .placeholder {
+    color: var(--text-mute); font-size: 13px;
+    font-style: italic;
+    padding: 6px 0;
+  }
+  .placeholder .will-show {
+    display: block;
+    margin-top: 6px;
+    color: var(--text-dim); font-style: normal;
+    font-size: 12px;
+  }
+
+  .fact {
+    display: flex; justify-content: space-between;
+    padding: 4px 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: 13px;
+    gap: 12px;
+    align-items: baseline;
+  }
+  .fact:last-child { border-bottom: none; }
+  .fact b { font-variant-numeric: tabular-nums; color: var(--text); }
+  .fact .k { color: var(--text-dim); flex-shrink: 0; }
+  .fact .v {
+    text-align: right;
+    display: inline-flex; gap: 8px; align-items: center;
+    flex-wrap: wrap; justify-content: flex-end;
+  }
+  .fact .v b { font-weight: 500; }
+
+  /* NQS pill */
+  .nqs-pill {
+    display: inline-block;
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 3px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .nqs-pill.excellent     { background: #14301e; color: #22c55e; }
+  .nqs-pill.exceeding     { background: var(--green-bg); color: var(--green); }
+  .nqs-pill.meeting       { background: rgba(74,222,128,0.15); color: #a7f3b8; }
+  .nqs-pill.working       { background: var(--amber-bg); color: var(--amber); }
+  .nqs-pill.significant   { background: var(--red-bg); color: var(--red); }
+  .nqs-pill.provisional   { background: var(--panel-3); color: var(--text-dim); }
+  .nqs-pill.notrated      { background: var(--panel-3); color: var(--text-mute); font-style: italic; }
+
+  /* Status pills (cadence, tenure) */
+  .status-pill {
+    display: inline-block;
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 3px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .status-pill.green  { background: var(--green-bg); color: var(--green); }
+  .status-pill.amber  { background: var(--amber-bg); color: var(--amber); }
+  .status-pill.red    { background: var(--red-bg);   color: var(--red); }
+  .status-pill.grey   { background: var(--panel-3);  color: var(--text-dim); }
+
+  .brand-chip {
+    font-size: 11px; color: var(--purple);
+    background: var(--purple-bg); border: 1px solid #352957;
+    padding: 0 6px; border-radius: 3px; font-weight: 500;
+  }
+  .brand-chip.none {
+    color: var(--text-mute);
+    background: var(--panel-3);
+    border-color: var(--border);
+    font-style: italic;
+    font-weight: 400;
+  }
+
+  .ownership-pill {
+    display: inline-block;
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 3px;
+    background: var(--panel-3);
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+
+  /* QA scores grid */
+  .qa-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .qa-row {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    gap: 10px;
+    align-items: baseline;
+    padding: 5px 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: 12.5px;
+  }
+  .qa-row:last-child { border-bottom: none; }
+  .qa-row .qa-key {
+    color: var(--text-mute);
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .qa-row .qa-label { color: var(--text-dim); }
+  .qa-empty {
+    color: var(--text-mute);
+    font-style: italic;
+    font-size: 12.5px;
+    padding: 6px 0;
+  }
+
+  /* OBS/DER/COM badges (copied verbatim from operator.html v8) */
+  .km-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    padding: 2px 5px;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    line-height: 1;
+    vertical-align: middle;
+    cursor: help;
+    user-select: none;
+    position: relative;
+  }
+  .km-badge.obs {
+    color: var(--text-mute);
+    background: rgba(107, 118, 132, 0.10);
+    border-color: rgba(107, 118, 132, 0.35);
+  }
+  .km-badge.der {
+    color: var(--accent);
+    background: rgba(74, 158, 255, 0.10);
+    border-color: rgba(74, 158, 255, 0.35);
+  }
+  .km-badge.com {
+    color: var(--amber);
+    background: rgba(251, 191, 36, 0.10);
+    border-color: rgba(251, 191, 36, 0.35);
+  }
+  .km-badge .km-tip {
+    visibility: hidden; opacity: 0;
+    transition: opacity 0.12s ease;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 30;
+    width: 320px;
+    padding: 10px 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+    color: var(--text);
+    font-size: 11.5px;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-align: left;
+    pointer-events: none;
+    cursor: default;
+  }
+  .km-badge:hover .km-tip,
+  .km-badge:focus-within .km-tip {
+    visibility: visible; opacity: 1;
+  }
+  .km-tip .km-row {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    column-gap: 8px;
+    padding: 3px 0;
+  }
+  .km-tip .km-row + .km-row { border-top: 1px dashed var(--border); }
+  .km-tip .km-key {
+    color: var(--text-mute);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding-top: 2px;
+  }
+  .km-tip .km-val { color: var(--text); }
+  .km-tip .km-val code {
+    font-family: "SF Mono", "Consolas", monospace;
+    font-size: 10.5px;
+    background: rgba(74, 158, 255, 0.08);
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: var(--text);
+  }
+  .km-badge.right-anchor .km-tip { left: auto; right: 0; }
+
+  /* Methodology legend */
+  .methodology-legend {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 14px;
+    padding: 8px 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 11.5px;
+    color: var(--text-dim);
+    flex-wrap: wrap;
+  }
+  .methodology-legend .ml-label {
+    color: var(--text-mute);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding-right: 4px;
+    border-right: 1px solid var(--border);
+    margin-right: 4px;
+  }
+  .methodology-legend .ml-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* COM commentary line */
+  .com-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 14px;
+    padding: 10px 12px;
+    background: var(--amber-bg);
+    border: 1px solid rgba(251, 191, 36, 0.30);
+    border-radius: 6px;
+    font-size: 12.5px;
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .com-line.severity-green { background: var(--green-bg); border-color: rgba(74,222,128,0.30); }
+  .com-line.severity-red   { background: var(--red-bg);   border-color: rgba(248,113,113,0.30); }
+  .com-line.severity-info  { background: var(--panel-2);  border-color: var(--border); }
+  .com-line .km-badge { flex-shrink: 0; margin-top: 1px; }
+  .com-line .com-text { flex: 1; }
+
+  /* Responsive */
+  @media (max-width: 960px) {
+    .section-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header class="app">
+  <h1>Kintell</h1>
+  <span class="breadcrumb" id="breadcrumb">Centre</span>
+  <span class="right">
+    <a href="review.html">Review queue</a>
+  </span>
+</header>
+
+<main id="main">
+  <div class="state-msg" id="loading">Loading centre…</div>
+</main>
+
+<script>
+const API = "/api";
+const params = new URLSearchParams(location.search);
+const SERVICE_ID = params.get("id");
+const EMBED = params.get("embed") === "1";
+if (EMBED) document.body.classList.add("embed");
+
+// ── Helpers (mirrored from operator.html v8) ────────────────────────
+function htmlEscape(s) {
+  if (s == null) return "";
+  return String(s).replace(/[&<>"]/g,
+    c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+}
+function fmtN(n) {
+  if (n == null) return "—";
+  return Number(n).toLocaleString();
+}
+async function api(path, opts={}) {
+  const r = await fetch(API + path, {
+    ...opts,
+    headers: { "Content-Type": "application/json", ...(opts.headers||{}) }
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+function urlGoogle(name, extra="") {
+  return "https://www.google.com/search?q=" +
+    encodeURIComponent(`${name} ${extra}`.trim());
+}
+function urlAcecqa(serviceApprovalNumber) {
+  return "https://www.acecqa.gov.au/resources/national-registers/services?service_search=" +
+    encodeURIComponent(serviceApprovalNumber || "");
+}
+function urlAbn(name) {
+  return "https://abr.business.gov.au/Search/Run?searchText=" +
+    encodeURIComponent(name);
+}
+
+const NQS_CLASSES = {
+  "Excellent":                         "excellent",
+  "Exceeding NQS":                     "exceeding",
+  "Meeting NQS":                       "meeting",
+  "Working Towards NQS":               "working",
+  "Significant Improvement Required":  "significant",
+  "Provisional — Not Yet Assessed":    "provisional",
+  "(not rated)":                       "notrated",
+};
+function nqsClass(label) {
+  return NQS_CLASSES[label] || "notrated";
+}
+function nqsPill(label) {
+  if (!label) return `<span class="nqs-pill notrated">(not rated)</span>`;
+  return `<span class="nqs-pill ${nqsClass(label)}">${htmlEscape(label)}</span>`;
+}
+
+// Format date helpers — accept DD/MM/YYYY or YYYY-MM-DD, return "Mon YYYY"
+const MON_NUM = { Jan:"01",Feb:"02",Mar:"03",Apr:"04",May:"05",Jun:"06",
+                  Jul:"07",Aug:"08",Sep:"09",Oct:"10",Nov:"11",Dec:"12" };
+const MON_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function parseAusToIso(s) {
+  if (!s) return null;
+  const str = String(s).trim();
+  let m = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(str);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  m = /^(\d{4})-(\d{2})-(\d{2})/.exec(str);
+  if (m) return m[0];
+  return null;
+}
+function formatMonYYYY(s) {
+  const iso = parseAusToIso(s);
+  if (!iso) return s || "—";
+  const [y, m] = iso.split("-");
+  const mi = parseInt(m, 10) - 1;
+  if (mi < 0 || mi > 11) return s;
+  return `${MON_SHORT[mi]} ${y}`;
+}
+
+// ── OBS/DER/COM badge renderer ──────────────────────────────────────
+function renderBadge(classification, methodology, rightAnchor=false) {
+  const cls = String(classification || "").toLowerCase();
+  if (!["obs","der","com"].includes(cls)) return "";
+  const m = methodology || {};
+  const rows = [];
+  if (m.source)    rows.push({ k: "Source",    v: m.source });
+  if (m.formula)   rows.push({ k: "Formula",   v: m.formula });
+  if (m.rule)      rows.push({ k: "Rule",      v: m.rule });
+  if (m.inputs)    rows.push({ k: "Inputs",    v: m.inputs });
+  if (m.threshold) rows.push({ k: "Threshold", v: m.threshold });
+  if (m.asAt)      rows.push({ k: "As at",     v: m.asAt });
+  const tipHtml = rows.length === 0 ? "" : `
+    <span class="km-tip" role="tooltip">
+      ${rows.map(r => `
+        <span class="km-row">
+          <span class="km-key">${htmlEscape(r.k)}</span>
+          <span class="km-val">${r.v}</span>
+        </span>
+      `).join("")}
+    </span>
+  `;
+  const anchorCls = rightAnchor ? " right-anchor" : "";
+  return `<span class="km-badge ${cls}${anchorCls}" tabindex="0" aria-label="${cls.toUpperCase()} metric">${cls.toUpperCase()}${tipHtml}</span>`;
+}
+
+function renderMethodologyLegend() {
+  return `
+    <div class="methodology-legend">
+      <span class="ml-label">methodology</span>
+      <span class="ml-item">${renderBadge("OBS")} <span>Observed — primary-source data</span></span>
+      <span class="ml-item">${renderBadge("DER")} <span>Derived — transparent formula</span></span>
+      <span class="ml-item">${renderBadge("COM")} <span>Commentary — rule-based interpretation</span></span>
+    </div>
+  `;
+}
+
+// ── Render functions ────────────────────────────────────────────────
+
+function renderHeader(centre) {
+  const h = centre.header;
+  const addr = h.address || {};
+  const addrStr = [addr.address_line, addr.suburb, addr.state, addr.postcode]
+    .filter(Boolean).join(", ");
+  const grp = h.parent_group || {};
+  const ent = h.entity || {};
+  const brand = h.brand;
+
+  const brandChip = brand
+    ? `<span class="brand-chip">${htmlEscape(brand.name)}</span>`
+    : `<span class="brand-chip none">no brand</span>`;
+
+  const groupLink = grp.group_id
+    ? `<a href="operator.html?id=${grp.group_id}">${htmlEscape(grp.name || "—")}</a>`
+    : htmlEscape(grp.name || "—");
+
+  const sapn = h.service_approval_number || "";
+  const tools = [
+    sapn ? { label: `acecqa: ${htmlEscape(sapn)}`, href: urlAcecqa(sapn) } : null,
+    ent.legal_name ? { label: `abr: ${htmlEscape(ent.legal_name)}`,
+                       href: urlAbn(ent.legal_name) } : null,
+    h.service_name ? { label: "google",
+                       href: urlGoogle(h.service_name, addr.suburb || "") } : null,
+  ].filter(Boolean);
+
+  const chips = [
+    { l: "Approved places", n: fmtN(centre.places.approved_places.value) },
+    { l: "Subtype",         n: centre.places.service_sub_type.code || "—" },
+    { l: "SEIFA decile",    n: centre.catchment.seifa_decile.value ?? "—" },
+    { l: "Remoteness",      n: centre.catchment.remoteness.label || "—" },
+  ];
+
+  return `
+    <div class="centre-header">
+      <h2 class="centre-name">${htmlEscape(h.service_name || "Unnamed centre")}</h2>
+      ${addrStr ? `<div class="centre-address">${htmlEscape(addrStr)}</div>` : ""}
+      <div class="centre-meta-row">
+        <span>operator: <b>${groupLink}</b></span>
+        <span class="sep">·</span>
+        <span class="ownership-pill">${htmlEscape(grp.ownership_type_label || "Not classified")}</span>
+        <span class="sep">·</span>
+        <span>${brandChip}</span>
+        ${ent.legal_name ? `<span class="sep">·</span><span>entity: <b>${htmlEscape(ent.legal_name)}</b></span>` : ""}
+      </div>
+      <div class="scale-strip">
+        ${chips.map(c => `
+          <div class="chip">
+            <span class="n">${htmlEscape(String(c.n))}</span>
+            <span class="l">${htmlEscape(c.l)}</span>
+          </div>
+        `).join("")}
+      </div>
+      ${tools.length ? `
+        <div class="ext-tools">
+          ${tools.map(t => `<a href="${t.href}" target="_blank" rel="noopener">${t.label}</a>`).join("")}
+        </div>
+      ` : ""}
+      ${renderMethodologyLegend()}
+    </div>
+  `;
+}
+
+function renderNqsCard(centre) {
+  const n = centre.nqs;
+  const cadence = n.inspection_cadence || {};
+  const cadenceColour = ({
+    current: "green",
+    due_soon: "amber",
+    stale: "red",
+    no_rating: "grey",
+  })[cadence.status] || "grey";
+
+  const ratingValue = n.overall_rating?.value;
+  const issuedDate = n.rating_issued_date?.value;
+
+  return `
+    <section class="op-section">
+      <h3>NQS Rating</h3>
+      <div class="fact">
+        <span class="k">Overall rating</span>
+        <span class="v">
+          ${nqsPill(ratingValue)}
+          ${renderBadge("OBS", {
+            source: "ACECQA national register",
+            asAt: issuedDate ? formatMonYYYY(issuedDate) : "—"
+          }, true)}
+        </span>
+      </div>
+      <div class="fact">
+        <span class="k">Rating issued</span>
+        <span class="v">
+          <b>${htmlEscape(formatMonYYYY(issuedDate))}</b>
+          ${renderBadge("OBS", {
+            source: "ACECQA national register",
+            asAt: issuedDate ? formatMonYYYY(issuedDate) : "—"
+          }, true)}
+        </span>
+      </div>
+      <div class="fact">
+        <span class="k">Inspection cadence</span>
+        <span class="v">
+          <span class="status-pill ${cadenceColour}">${htmlEscape(cadence.label || "—")}</span>
+          ${renderBadge("DER", {
+            rule: "Stale ≥ 24 months since rating; due soon ≥ 18 months.",
+            inputs: "<code>rating_issued_date</code>",
+            threshold: "Stale: 24m; Due soon: 18m"
+          }, true)}
+        </span>
+      </div>
+    </section>
+  `;
+}
+
+function renderPlacesCard(centre) {
+  const p = centre.places;
+  const subtype = p.service_sub_type;
+  const excludedNote = subtype.excluded_from_workforce
+    ? `<div class="placeholder">${htmlEscape(subtype.exclusion_reason || "Excluded from workforce model")}</div>`
+    : "";
+
+  return `
+    <section class="op-section">
+      <h3>Places &amp; Service Type</h3>
+      <div class="fact">
+        <span class="k">Approved places</span>
+        <span class="v">
+          <b>${fmtN(p.approved_places.value)}</b>
+          ${renderBadge("OBS", { source: "ACECQA national register" }, true)}
+        </span>
+      </div>
+      <div class="fact">
+        <span class="k">Subtype</span>
+        <span class="v">
+          <b>${htmlEscape(subtype.label)}</b>
+          ${subtype.code ? `<span style="color:var(--text-mute);font-size:11px;">(${htmlEscape(subtype.code)})</span>` : ""}
+          ${renderBadge("OBS", { source: "ACECQA service_sub_type" }, true)}
+        </span>
+      </div>
+      ${p.provider_management_type?.value ? `
+        <div class="fact">
+          <span class="k">Management type</span>
+          <span class="v">
+            <b>${htmlEscape(p.provider_management_type.value)}</b>
+            ${renderBadge("OBS", { source: "ACECQA national register" }, true)}
+          </span>
+        </div>
+      ` : ""}
+      <div class="fact">
+        <span class="k">Long day care flag</span>
+        <span class="v"><b>${p.long_day_care_flag ? "Yes" : "No"}</b></span>
+      </div>
+      ${p.kinder_approved?.value !== null ? `
+        <div class="fact">
+          <span class="k">Kinder approved</span>
+          <span class="v">
+            <b>${p.kinder_approved.value ? "Yes" : "No"}</b>
+            ${p.kinder_approved.source ? `<span style="color:var(--text-mute);font-size:11px;">(${htmlEscape(p.kinder_approved.source)})</span>` : ""}
+            ${renderBadge("OBS", { source: p.kinder_approved.source || "ACECQA" }, true)}
+          </span>
+        </div>
+      ` : ""}
+      ${excludedNote}
+    </section>
+  `;
+}
+
+function renderCatchmentCard(centre) {
+  const c = centre.catchment;
+  return `
+    <section class="op-section">
+      <h3>Catchment</h3>
+      <div class="fact">
+        <span class="k">SEIFA decile</span>
+        <span class="v">
+          <b>${c.seifa_decile.value ?? "—"}</b>
+          ${c.seifa_decile.value != null ? '<span style="color:var(--text-mute);font-size:11px;">/10</span>' : ""}
+          ${renderBadge("OBS", { source: "ABS SEIFA, joined via SA2" }, true)}
+        </span>
+      </div>
+      <div class="fact">
+        <span class="k">Remoteness</span>
+        <span class="v">
+          <b>${htmlEscape(c.remoteness.label)}</b>
+          ${renderBadge("OBS", { source: "ABS ARIA+ remoteness classification" }, true)}
+        </span>
+      </div>
+      ${c.sa2.code ? `
+        <div class="fact">
+          <span class="k">SA2</span>
+          <span class="v">
+            <b>${htmlEscape(c.sa2.name || c.sa2.code)}</b>
+            ${renderBadge("OBS", { source: "ABS Australian Statistical Geography Standard" }, true)}
+          </span>
+        </div>
+      ` : ""}
+      <div class="placeholder" style="margin-top:8px;">
+        Service-level catchment metrics (under-5 population, supply ratio, competitor density)
+        <span class="will-show">awaiting Tier 3 service_catchment_cache build.</span>
+      </div>
+    </section>
+  `;
+}
+
+function renderQaCard(centre) {
+  const qa = centre.qa_scores || [];
+  if (qa.length === 0) {
+    return `
+      <section class="op-section">
+        <h3>Quality Assessment Areas</h3>
+        <div class="qa-empty">No quality assessment scores on record.</div>
+      </section>
+    `;
+  }
+  return `
+    <section class="op-section">
+      <h3>Quality Assessment Areas <span class="note">${qa.length} populated</span></h3>
+      <div class="qa-grid">
+        ${qa.map(q => `
+          <div class="qa-row">
+            <span class="qa-key">${htmlEscape(q.key.toUpperCase())}</span>
+            <span class="qa-label">${htmlEscape(q.label)}</span>
+            <span>${nqsPill(q.rating)}</span>
+          </div>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderTenureCard(centre) {
+  const t = centre.tenure;
+  const isBrown = t.status === "brownfield";
+  const pillClass = isBrown ? "amber" : "green";
+  const transferLine = isBrown && t.transfer_date
+    ? `<div class="fact">
+        <span class="k">Last transfer</span>
+        <span class="v">
+          <b>${htmlEscape(formatMonYYYY(t.transfer_date))}</b>
+          <span style="color:var(--text-mute);font-size:11px;">(${t.months_since_transfer} months ago)</span>
+          ${renderBadge("OBS", { source: "ACECQA last_transfer_date" }, true)}
+        </span>
+      </div>`
+    : "";
+
+  const approvalLine = t.approval_granted_date
+    ? `<div class="fact">
+        <span class="k">Original approval</span>
+        <span class="v">
+          <b>${htmlEscape(formatMonYYYY(t.approval_granted_date))}</b>
+          ${renderBadge("OBS", { source: "ACECQA approval_granted_date" }, true)}
+        </span>
+      </div>`
+    : "";
+
+  return `
+    <section class="op-section">
+      <h3>Tenure</h3>
+      <div class="fact">
+        <span class="k">Acquisition type</span>
+        <span class="v">
+          <span class="status-pill ${pillClass}">${htmlEscape(t.label)}</span>
+          ${renderBadge("DER", {
+            rule: "Brownfield iff last_transfer_date > approval_granted_date.",
+            inputs: "<code>approval_granted_date, last_transfer_date</code>"
+          }, true)}
+        </span>
+      </div>
+      ${approvalLine}
+      ${transferLine}
+    </section>
+  `;
+}
+
+function renderCommentary(centre) {
+  const lines = centre.commentary || [];
+  if (lines.length === 0) return "";
+  return lines.map(l => `
+    <div class="com-line severity-${htmlEscape(l.severity || "info")}">
+      ${renderBadge("COM", {
+        rule: "Auto-generated from centre payload.",
+        asAt: "real-time"
+      })}
+      <div class="com-text">${htmlEscape(l.text)}</div>
+    </div>
+  `).join("");
+}
+
+// ── Main render ─────────────────────────────────────────────────────
+function render(centre) {
+  const breadcrumb = document.getElementById("breadcrumb");
+  const grpId = centre.header.parent_group?.group_id;
+  const grpName = centre.header.parent_group?.name || "Operator";
+  if (grpId) {
+    breadcrumb.innerHTML = `<a href="operator.html?id=${grpId}">${htmlEscape(grpName)}</a> › ${htmlEscape(centre.header.service_name || "Centre")}`;
+  } else {
+    breadcrumb.textContent = centre.header.service_name || "Centre";
+  }
+
+  const main = document.getElementById("main");
+  main.innerHTML = `
+    ${renderHeader(centre)}
+    <div class="section-row">
+      ${renderNqsCard(centre)}
+      ${renderPlacesCard(centre)}
+    </div>
+    <div class="section-row">
+      ${renderCatchmentCard(centre)}
+      ${renderTenureCard(centre)}
+    </div>
+    ${renderQaCard(centre)}
+    ${renderCommentary(centre)}
+  `;
+}
+
+async function load() {
+  if (!SERVICE_ID) {
+    document.getElementById("main").innerHTML =
+      `<div class="state-msg error">No <code>?id=&lt;service_id&gt;</code> in URL.</div>`;
+    return;
+  }
+  try {
+    const r = await api(`/centre/${SERVICE_ID}`);
+    if (!r.ok || !r.centre) {
+      document.getElementById("main").innerHTML =
+        `<div class="state-msg error">Centre not found (service_id ${htmlEscape(SERVICE_ID)}).</div>`;
+      return;
+    }
+    render(r.centre);
+  } catch (e) {
+    document.getElementById("main").innerHTML =
+      `<div class="state-msg error">Failed to load centre: ${htmlEscape(String(e.message || e))}</div>`;
+  }
+}
+
+load();
+</script>
+</body>
+</html>
