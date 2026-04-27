@@ -44,12 +44,11 @@ from rapidfuzz import fuzz, process
 # CONFIG
 # ─────────────────────────────────────────────
 
-BASE_DIR          = Path(__file__).parent
-ABS_DIR           = BASE_DIR / "abs_data"
-DATA_DIR          = BASE_DIR / "data"
-INPUT_FILE        = BASE_DIR / "leads_enriched.json"
-ALL_OPERATORS_FILE = BASE_DIR / "operators_target_list.json"
-OUTPUT_FILE       = BASE_DIR / "leads_catchment.json"
+BASE_DIR     = Path(__file__).parent
+ABS_DIR      = BASE_DIR / "abs_data"
+DATA_DIR     = BASE_DIR / "data"
+INPUT_FILE   = BASE_DIR / "leads_enriched.json"
+OUTPUT_FILE  = BASE_DIR / "leads_catchment.json"
 
 POP_FILE     = ABS_DIR / "Population and People Database.xlsx"
 INCOME_FILE  = ABS_DIR / "Income Database.xlsx"
@@ -67,8 +66,8 @@ IRSAD_COL    = "SEIFA Index of relative socio-economic advantage and disadvantag
 # CAGR periods
 POP_BASE_YEAR   = "2020"
 POP_END_YEAR    = "2024"
-INC_BASE_YEAR   = "2016"   # Census year
-INC_END_YEAR    = "2021"   # Census year (income only updates every 5 years)
+INC_BASE_YEAR   = "2021"
+INC_END_YEAR    = "2024"   # last year with real income data
 
 # CCS income thresholds (2024-25 rates, weekly household income)
 # Source: Services Australia CCS rate table
@@ -353,9 +352,8 @@ def is_nfp(provider_name: str) -> bool:
 
 def compute_supply_and_nfp(concordance: pd.DataFrame) -> dict:
     """
-    Compute per-SA2 LDC supply stats, NFP ratio, and full centre list.
-    Returns: {sa2_code: {total_centres, total_places, nfp_count, nfp_ratio, centres[]}}
-    Each centre in centres[]: name, operator, address, phone, places, nqs, approval_no
+    Compute per-SA2 LDC supply stats and NFP ratio.
+    Returns: {sa2_code: {total_centres, total_places, nfp_count, nfp_ratio}}
     """
     snap_path = DATA_DIR / "services_snapshot.csv"
     if not snap_path.exists():
@@ -375,15 +373,8 @@ def compute_supply_and_nfp(concordance: pd.DataFrame) -> dict:
             errors="coerce"
         ).fillna(0)
 
+        # NFP flag
         svc["is_nfp"] = svc.get("providerlegalname", pd.Series(dtype=str)).apply(is_nfp)
-
-        # Kinder approval flag
-        svc["has_kinder"] = (
-            (svc.get("preschool/kindergarten_-_stand_alone", pd.Series(dtype=str))
-                .fillna("").str.upper() == "YES") |
-            (svc.get("preschool/kindergarten_-_part_of_a_school", pd.Series(dtype=str))
-                .fillna("").str.upper() == "YES")
-        )
 
         merged = svc.merge(
             concordance[["POSTCODE", "SA2_CODE"]].dropna(),
@@ -394,41 +385,13 @@ def compute_supply_and_nfp(concordance: pd.DataFrame) -> dict:
         for sa2, grp in merged.groupby("SA2_CODE"):
             if pd.isna(sa2) or not sa2:
                 continue
-            total     = len(grp)
+            total = len(grp)
             nfp_count = int(grp["is_nfp"].sum())
-
-            # Build centre list — sorted by places descending
-            centres = []
-            for _, row in grp.sort_values("places", ascending=False).iterrows():
-                phone = str(row.get("phone", "") or "").strip()
-                # Clean phone — remove .0 suffix from float conversion
-                if phone.endswith(".0"):
-                    phone = phone[:-2]
-                centres.append({
-                    "service_name":      str(row.get("servicename", "") or "").strip(),
-                    "operator_name":     str(row.get("providerlegalname", "") or "").strip(),
-                    "service_address":   str(row.get("serviceaddress", "") or "").strip(),
-                    "suburb":            str(row.get("suburb", "") or "").strip(),
-                    "state":             str(row.get("state", "") or "").strip(),
-                    "postcode":          str(row.get("postcode", "") or "").strip(),
-                    "phone":             phone,
-                    "approved_places":   int(row["places"]),
-                    "nqs_rating":        str(row.get("overallrating", "") or "").strip(),
-                    "service_approval":  str(row.get("serviceapprovalnumber", "") or "").strip(),
-                    "is_nfp":            bool(row["is_nfp"]),
-                    "has_kinder":        bool(row.get("has_kinder", False)),
-                    "matched_contacts":  [],  # filled in enrich step
-                })
-
-            kinder_count = int(grp["has_kinder"].sum()) if "has_kinder" in grp.columns else 0
             supply[str(sa2)] = {
-                "total_centres":  total,
-                "total_places":   int(grp["places"].sum()),
-                "nfp_count":      nfp_count,
-                "nfp_ratio":      round(nfp_count / total, 3) if total > 0 else 0,
-                "kinder_count":   kinder_count,
-                "kinder_ratio":   round(kinder_count / total, 3) if total > 0 else 0,
-                "centres":        centres,
+                "total_centres": total,
+                "total_places":  int(grp["places"].sum()),
+                "nfp_count":     nfp_count,
+                "nfp_ratio":     round(nfp_count / total, 3) if total > 0 else 0,
             }
 
         log.info(f"Supply map: {len(supply):,} SA2 areas")
@@ -571,9 +534,7 @@ def format_qikreport(lead: dict) -> str:
         f"",
         f"  SUPPLY",
         f"  Centres (SA2):   {c.get('total_centres', 'n/a')} LDC  "
-            f"({f'{nfp_pct*100:.0f}%' if nfp_pct is not None else '?'} NFP  |  "
-            f"{f"{c.get('kinder_ratio',0)*100:.0f}%" if c.get('kinder_ratio') is not None else '?'} kinder-approved)",
-        f"  Lead kinder:     {'Yes' if c.get('lead_has_kinder') else 'No'}",
+            f"({f'{nfp_pct*100:.0f}%' if nfp_pct is not None else '?'} NFP)",
         f"  Licensed places: {_fmt_int(c.get('total_licensed_places'))}",
         f"  Supply ratio:    {_fmt_ratio(ratio)}x  [{supply_tier(ratio).upper()}]",
         f"",
@@ -666,18 +627,8 @@ def enrich_lead_catchment(
     # StartingBlocks
     sb = {} if dry_run else scrape_startingblocks_fees(operator, suburb)
 
-    # Contacts for the lead itself
+    # Contacts
     contacts = match_contacts(operator, suburb, contacts_df)
-
-    # Match contacts for competing centres in the catchment
-    competing_centres = supply.get("centres", [])
-    for centre in competing_centres:
-        centre_matches = match_contacts(
-            centre.get("operator_name", ""),
-            centre.get("suburb", ""),
-            contacts_df,
-        )
-        centre["matched_contacts"] = centre_matches
 
     catchment = {
         # Geography
@@ -706,10 +657,6 @@ def enrich_lead_catchment(
         "total_licensed_places":       total_places,
         "nfp_count":                   nfp_count,
         "nfp_ratio":                   nfp_ratio,
-        "kinder_count":                supply.get("kinder_count"),
-        "kinder_ratio":                supply.get("kinder_ratio"),
-        "lead_has_kinder":             lead.get("has_kinder", False),
-        "competing_centres":           competing_centres,
         "supply_ratio":                round(ratio, 3) if ratio is not None else None,
         "supply_tier":                 supply_tier(ratio),
         # Fees
@@ -730,67 +677,18 @@ def enrich_lead_catchment(
 # MAIN RUNNER
 # ─────────────────────────────────────────────
 
-def normalise_operator_to_leads(operators: list) -> list:
-    """
-    Explode operators_target_list.json (operator-level) into service-level
-    lead records compatible with enrich_lead_catchment().
-
-    Each operator has a 'centres' list. We create one lead record per centre,
-    carrying through the operator-level fields needed for enrichment.
-    """
-    leads = []
-    for op in operators:
-        centres = op.get("centres", [])
-        if not centres:
-            # Operator with no centre detail — skip, can't enrich without postcode
-            continue
-        for centre in centres:
-            lead = {
-                # Service-level identity
-                "service_name":          centre.get("service_name", op.get("legal_name", "")),
-                "operator_name":         op.get("legal_name", ""),
-                "suburb":                centre.get("suburb", ""),
-                "state":                 centre.get("state", ""),
-                "postcode":              str(centre.get("postcode", "") or "").strip(),
-                "approved_places":       centre.get("places"),
-                "service_approval_number": centre.get("approval_number", ""),
-                "overall_rating":        centre.get("nqs_rating", ""),
-                # Operator-level signals (carried through for dashboard use)
-                "priority_tier":         op.get("priority_tier", ""),
-                "score":                 op.get("score"),
-                "product_fit":           op.get("product_fit", ""),
-                "is_nfp":                op.get("is_nfp", False),
-                "has_kinder":            op.get("has_kinder", False),
-                "n_centres":             op.get("n_centres"),
-                "total_places":          op.get("total_places"),
-                "states":                op.get("states", []),
-                "growing":               op.get("growing", False),
-            }
-            leads.append(lead)
-    return leads
-
-
-def run(dry_run: bool = True, use_all_operators: bool = False):
+def run(dry_run: bool = True):
     log.info("=" * 55)
-    log.info(f"module2b_catchment  [dry_run={dry_run}]  [all_operators={use_all_operators}]")
+    log.info(f"module2b_catchment  [dry_run={dry_run}]")
     log.info("=" * 55)
 
-    if use_all_operators:
-        if not ALL_OPERATORS_FILE.exists():
-            log.error(f"operators_target_list.json not found: {ALL_OPERATORS_FILE}")
-            sys.exit(1)
-        with open(ALL_OPERATORS_FILE) as f:
-            operators = json.load(f)
-        log.info(f"Input: {len(operators)} operator groups from {ALL_OPERATORS_FILE.name}")
-        leads = normalise_operator_to_leads(operators)
-        log.info(f"Exploded to {len(leads)} individual centre records for enrichment")
-    else:
-        if not INPUT_FILE.exists():
-            log.error(f"Input not found: {INPUT_FILE}")
-            sys.exit(1)
-        with open(INPUT_FILE) as f:
-            leads = json.load(f)
-        log.info(f"Input: {len(leads)} leads from {INPUT_FILE.name}")
+    if not INPUT_FILE.exists():
+        log.error(f"Input not found: {INPUT_FILE}")
+        sys.exit(1)
+
+    with open(INPUT_FILE) as f:
+        leads = json.load(f)
+    log.info(f"Input: {len(leads)} leads from {INPUT_FILE.name}")
 
     concordance = load_concordance()
     pop_ts      = load_abs_timeseries(POP_FILE, POP_0_4_COL)
@@ -854,6 +752,5 @@ def run(dry_run: bool = True, use_all_operators: bool = False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Remara module2b -- catchment enrichment")
     parser.add_argument("--live", action="store_true", help="Enable live StartingBlocks scraping")
-    parser.add_argument("--all",  action="store_true", help="Process all operators from operators_target_list.json (not just leads_enriched.json)")
     args = parser.parse_args()
-    run(dry_run=not args.live, use_all_operators=args.all)
+    run(dry_run=not args.live)
