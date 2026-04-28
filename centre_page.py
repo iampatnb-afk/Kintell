@@ -1,17 +1,34 @@
 """
 centre_page.py — Phase 2 backend helper for centre.html
-Version: v2 (2026-04-26)
+Version: v3 (2026-04-28) — Layer 4 POSITION block
 
 Provides get_centre_payload(service_id) -> dict
 Returns full single-centre detail: service + entity + group + brand,
 with OBS/DER/COM treatment matching operator_page.py conventions.
 
+v3 changes (2026-04-28, Layer 4 NOW + POSITION):
+  - New constants LAYER3_METRIC_META / COHORT_LABEL_TEMPLATES /
+    RA_BAND_SHORT_LABELS / STATE_SHORT_LABELS — display name, direction,
+    band-copy triple, source label, and cohort-phrase template for the 12
+    Layer 4 metrics (10 live from layer3_sa2_metric_banding + 2 deferred
+    slots, sa2_under5_growth_5y and jsa_vacancy_rate).
+  - New helper _layer3_position(con, sa2_code): single indexed point-read
+    against layer3_sa2_metric_banding plus sibling read against
+    sa2_cohort. Returns the structured POSITION payload organised by
+    card (population / labour_market). Per-row confidence value drives
+    the cohort_n display rule from D1 (insufficient / low / normal),
+    plus 'deferred' for slots not yet in Layer 3 and 'unavailable' for
+    SA2s with no matching layer3 row.
+  - New: payload["position"] = {"population": {...}, "labour_market": {...}}
+    sibling to the existing CATCHMENT block.
+  - TRAJECTORY band rendered as a "Will show" placeholder in
+    docs/centre.html; raw historical reads from abs_sa2_* sources will
+    be added in the next Layer 4 pass.
+
 v2 fixes (2026-04-26):
-  - aria_plus column stores label strings (e.g. "Major Cities of Australia"),
-    not codes. ARIA_LABELS now maps both label-form and code-form to a
-    canonical short label, with passthrough for any unmapped value.
-  - _parse_date() now recognises DD/MM/YYYY (the format
-    services.approval_granted_date actually uses).
+  - aria_plus column stores label strings, not codes — ARIA_LABELS
+    accepts both forms.
+  - _parse_date() recognises DD/MM/YYYY (services.approval_granted_date).
 
 Read-only. No DB mutations.
 """
@@ -58,6 +75,215 @@ ARIA_LABELS = {
     "2": "Outer regional",
     "3": "Remote",
     "4": "Very remote",
+}
+
+# ─────────────────────────────────────────────────────────────────────
+# Layer 4 — POSITION block constants
+# ─────────────────────────────────────────────────────────────────────
+
+# Short labels for ABS Remoteness Area bands (sa2_cohort.ra_band).
+# Kept short to fit cleanly in cohort phrases like
+# "vs other Major Cities SA2s in NSW".
+RA_BAND_SHORT_LABELS = {
+    1: "Major Cities",
+    2: "Inner Regional",
+    3: "Outer Regional",
+    4: "Remote",
+    5: "Very Remote",
+}
+
+# Short state labels for cohort phrasing (NSW vs "New South Wales").
+STATE_SHORT_LABELS = {
+    "New South Wales": "NSW",
+    "Victoria": "Vic",
+    "Queensland": "Qld",
+    "South Australia": "SA",
+    "Western Australia": "WA",
+    "Tasmania": "Tas",
+    "Northern Territory": "NT",
+    "Australian Capital Territory": "ACT",
+    "Other Territories": "Other Territories",
+}
+
+# Cohort-phrase templates. Keys match layer3_sa2_metric_banding.cohort_def.
+COHORT_LABEL_TEMPLATES = {
+    "state":              "vs other SA2s in {state_name}",
+    "remoteness":         "vs other {ra_name} SA2s nationwide",
+    "state_x_remoteness": "vs other {ra_name} SA2s in {state_name}",
+    "national":           "vs all SA2s nationwide",
+}
+
+# Per-metric metadata for Layer 4 POSITION rendering.
+# - display:       human label
+# - card:          'population' | 'labour_market' (UI grouping)
+# - value_format:  'int' | 'percent' | 'currency_annual' | 'currency_weekly'
+# - direction:     'high_is_positive' | 'high_is_concerning'
+#                  (semantics carried in band_copy text only — visual
+#                   palette stays neutral per Layer 4 design §11.2)
+# - status:        optional 'deferred' for metrics not yet in Layer 3
+# - source:        OBS-badge attribution string for the raw value
+# - band_copy:     {'low': ..., 'mid': ..., 'high': ...} interpretive text
+LAYER3_METRIC_META = {
+    # ── Population card ─────────────────────────────────────────────
+    "sa2_under5_count": {
+        "display": "Under-5 population",
+        "card": "population",
+        "value_format": "int",
+        "direction": "high_is_positive",
+        "source": "ABS ERP at SA2 (abs_sa2_erp_annual)",
+        "band_copy": {
+            "low":  "thin demand pool",
+            "mid":  "average demand pool",
+            "high": "deep demand pool",
+        },
+    },
+    "sa2_total_population": {
+        "display": "Total population",
+        "card": "population",
+        "value_format": "int",
+        "direction": "high_is_positive",
+        "source": "ABS ERP at SA2 (abs_sa2_erp_annual)",
+        "band_copy": {
+            "low":  "small SA2",
+            "mid":  "mid-sized SA2",
+            "high": "large SA2",
+        },
+    },
+    "sa2_births_count": {
+        "display": "Births (leading demand)",
+        "card": "population",
+        "value_format": "int",
+        "direction": "high_is_positive",
+        "source": "ABS Births at SA2 (abs_sa2_births_annual)",
+        "band_copy": {
+            "low":  "low forward demand",
+            "mid":  "average forward demand",
+            "high": "strong forward demand",
+        },
+    },
+    "sa2_under5_growth_5y": {
+        "display": "Under-5 5y growth",
+        "card": "population",
+        "value_format": "percent",
+        "direction": "high_is_positive",
+        "status": "deferred",
+        "source": "Derived from abs_sa2_erp_annual (Layer 3 patch pending)",
+        "band_copy": {"low": "—", "mid": "—", "high": "—"},
+    },
+    # ── Labour market card ──────────────────────────────────────────
+    "sa2_unemployment_rate": {
+        "display": "Unemployment rate",
+        "card": "labour_market",
+        "value_format": "percent",
+        "direction": "high_is_concerning",
+        "source": "ABS SALM SA2 (abs_sa2_unemployment_quarterly)",
+        "band_copy": {
+            "low":  "tight labour market",
+            "mid":  "typical labour market",
+            "high": "loose labour market — fee-sensitivity flag",
+        },
+    },
+    "sa2_median_employee_income": {
+        "display": "Median employee income",
+        "card": "labour_market",
+        "value_format": "currency_annual",
+        "direction": "high_is_positive",
+        "source": "ABS Income at SA2 (median_employee_income_annual)",
+        "band_copy": {
+            "low":  "price-sensitive",
+            "mid":  "typical",
+            "high": "price-tolerant",
+        },
+    },
+    "sa2_median_household_income": {
+        "display": "Median household income",
+        "card": "labour_market",
+        "value_format": "currency_weekly",
+        "direction": "high_is_positive",
+        "source": "ABS Census 2021 (median_equiv_household_income_weekly)",
+        "band_copy": {
+            "low":  "price-sensitive",
+            "mid":  "typical",
+            "high": "price-tolerant",
+        },
+    },
+    "sa2_median_total_income": {
+        "display": "Median total income (excl. pensions)",
+        "card": "labour_market",
+        "value_format": "currency_annual",
+        "direction": "high_is_positive",
+        "source": "ABS Income at SA2 (median_total_income_excl_pensions_annual)",
+        "band_copy": {
+            "low":  "price-sensitive",
+            "mid":  "typical",
+            "high": "price-tolerant",
+        },
+    },
+    "sa2_lfp_persons": {
+        "display": "Labour force participation",
+        "card": "labour_market",
+        "value_format": "percent",
+        "direction": "high_is_positive",
+        "source": "ABS Education + Employment SA2 (ee_lfp_persons_pct)",
+        "band_copy": {
+            "low":  "low workforce demand",
+            "mid":  "typical workforce demand",
+            "high": "high workforce demand",
+        },
+    },
+    "sa2_lfp_females": {
+        "display": "LFP — females",
+        "card": "labour_market",
+        "value_format": "percent",
+        "direction": "high_is_positive",
+        "source": "ABS Census 2021 T33 (census_lfp_females_pct)",
+        "band_copy": {
+            "low":  "low",
+            "mid":  "typical",
+            "high": "high (dual-income signal)",
+        },
+    },
+    "sa2_lfp_males": {
+        "display": "LFP — males",
+        "card": "labour_market",
+        "value_format": "percent",
+        "direction": "high_is_positive",
+        "source": "ABS Census 2021 T33 (census_lfp_males_pct)",
+        "band_copy": {
+            "low":  "low",
+            "mid":  "typical",
+            "high": "high",
+        },
+    },
+    "jsa_vacancy_rate": {
+        "display": "JSA vacancy rate",
+        "card": "labour_market",
+        "value_format": "percent",
+        "direction": "high_is_positive",
+        "status": "deferred",
+        "source": "JSA IVI (state-level, computed at read time — pending)",
+        "band_copy": {"low": "—", "mid": "—", "high": "—"},
+    },
+}
+
+# Display order within each card (drives section order in the UI).
+POSITION_CARD_ORDER = {
+    "population": [
+        "sa2_under5_count",
+        "sa2_total_population",
+        "sa2_births_count",
+        "sa2_under5_growth_5y",
+    ],
+    "labour_market": [
+        "sa2_unemployment_rate",
+        "sa2_median_employee_income",
+        "sa2_median_household_income",
+        "sa2_median_total_income",
+        "sa2_lfp_persons",
+        "sa2_lfp_females",
+        "sa2_lfp_males",
+        "jsa_vacancy_rate",
+    ],
 }
 
 
@@ -239,6 +465,150 @@ def _qa_scores(service_row: dict) -> list:
     return out
 
 
+# ─────────────────────────────────────────────────────────────────────
+# Layer 4 — POSITION block helpers
+# ─────────────────────────────────────────────────────────────────────
+
+
+def _confidence_for_cohort_n(n: Optional[int]) -> str:
+    """DER. Cohort_n display rule (D1, design §3).
+
+    n  < 10   -> 'insufficient' (suppress decile-strip; show "insufficient
+                                  peer cohort (n=N)")
+    n 10-19   -> 'low'          (full strip + low-confidence pill)
+    n >= 20   -> 'normal'       (standard render)
+    n is None -> 'unavailable'  (no row for this metric/SA2)
+    """
+    if n is None:
+        return "unavailable"
+    if n < 10:
+        return "insufficient"
+    if n < 20:
+        return "low"
+    return "normal"
+
+
+def _build_cohort_label(cohort_def: Optional[str], cohort_row: Optional[dict]) -> str:
+    """COM. Human-readable cohort phrase from cohort_def + sa2_cohort row."""
+    if not cohort_def:
+        return "vs peer cohort"
+    cohort_row = cohort_row or {}
+    state_name = cohort_row.get("state_name") or ""
+    state_short = STATE_SHORT_LABELS.get(state_name, state_name or "—")
+    ra_band = cohort_row.get("ra_band")
+    ra_short = RA_BAND_SHORT_LABELS.get(
+        ra_band, cohort_row.get("ra_name") or "—"
+    )
+    template = COHORT_LABEL_TEMPLATES.get(cohort_def, "vs peer cohort")
+    try:
+        return template.format(state_name=state_short, ra_name=ra_short)
+    except (KeyError, IndexError):
+        return template
+
+
+def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str]) -> dict:
+    """
+    DER. Read Layer 3 banding rows for this SA2 + sa2_cohort row for cohort
+    labelling. Organises by card (population / labour_market) per
+    LAYER3_METRIC_META. Always returns a dict with both card keys; metrics
+    not in the DB (or whose SA2 has no row) get confidence='unavailable';
+    metrics flagged 'deferred' in LAYER3_METRIC_META get confidence='deferred'.
+    Per-row confidence drives the cohort_n display rule (D1).
+
+    Returns:
+        {
+          "population":    {metric_name: position_entry, ...},
+          "labour_market": {metric_name: position_entry, ...},
+        }
+
+    Each populated entry contains: display, value_format, direction, card,
+    raw_value, year, period_label, decile, band, percentile, cohort_def,
+    cohort_key, cohort_n, cohort_label, band_copy (full triple), confidence,
+    source.
+    """
+    out: dict = {"population": {}, "labour_market": {}}
+
+    # Helper to seed a metric slot with status (deferred / unavailable)
+    def _stub(meta: dict, confidence: str) -> dict:
+        return {
+            "display": meta["display"],
+            "card": meta["card"],
+            "value_format": meta.get("value_format"),
+            "direction": meta.get("direction"),
+            "confidence": confidence,
+            "source": meta.get("source"),
+            "band_copy": meta.get("band_copy", {}),
+        }
+
+    # If no SA2, every metric is 'unavailable' or 'deferred'
+    if not sa2_code:
+        for metric_name, meta in LAYER3_METRIC_META.items():
+            confidence = "deferred" if meta.get("status") == "deferred" else "unavailable"
+            out[meta["card"]][metric_name] = _stub(meta, confidence)
+        return out
+
+    # Sibling read: sa2_cohort for cohort labelling (state, ra_band)
+    try:
+        cohort_row = con.execute(
+            "SELECT state_code, state_name, ra_code, ra_name, ra_band "
+            "  FROM sa2_cohort WHERE sa2_code = ?",
+            (sa2_code,),
+        ).fetchone()
+        cohort_dict = _row_to_dict(cohort_row) or {}
+    except sqlite3.OperationalError:
+        cohort_dict = {}
+
+    # Main read: all Layer 3 rows for this SA2
+    try:
+        rows = con.execute(
+            "SELECT metric, year, period_label, cohort_def, cohort_key, "
+            "       cohort_n, raw_value, percentile, decile, band "
+            "  FROM layer3_sa2_metric_banding "
+            " WHERE sa2_code = ?",
+            (sa2_code,),
+        ).fetchall()
+    except sqlite3.OperationalError:
+        rows = []  # Table doesn't exist (pre-Layer-3 DB)
+
+    by_metric = {r["metric"]: _row_to_dict(r) for r in rows}
+
+    for metric_name, meta in LAYER3_METRIC_META.items():
+        card = meta["card"]
+        if meta.get("status") == "deferred":
+            out[card][metric_name] = _stub(meta, "deferred")
+            continue
+
+        row = by_metric.get(metric_name)
+        if not row:
+            out[card][metric_name] = _stub(meta, "unavailable")
+            continue
+
+        confidence = _confidence_for_cohort_n(row.get("cohort_n"))
+        band = row.get("band") or "mid"
+
+        out[card][metric_name] = {
+            "display": meta["display"],
+            "card": card,
+            "value_format": meta.get("value_format"),
+            "direction": meta.get("direction"),
+            "raw_value": row.get("raw_value"),
+            "year": row.get("year"),
+            "period_label": row.get("period_label"),
+            "decile": row.get("decile"),
+            "band": band,
+            "percentile": row.get("percentile"),
+            "cohort_def": row.get("cohort_def"),
+            "cohort_key": row.get("cohort_key"),
+            "cohort_n": row.get("cohort_n"),
+            "cohort_label": _build_cohort_label(row.get("cohort_def"), cohort_dict),
+            "band_copy": meta["band_copy"],  # full triple; JS picks via band
+            "confidence": confidence,
+            "source": meta["source"],
+        }
+
+    return out
+
+
 def get_centre_payload(service_id: int) -> Optional[dict]:
     """
     Top-level entry point. Returns a fully-hydrated centre payload, or
@@ -378,6 +748,9 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
             },
         }
 
+        # --- POSITION block (Layer 3 banding) ---
+        position = _layer3_position(conn, r.get("sa2_code"))
+
         # --- QA SCORES block ---
         qa_scores = _qa_scores(r)
 
@@ -390,12 +763,13 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
 
         # --- ASSEMBLE ---
         payload = {
-            "schema_version": "centre_payload_v1",
+            "schema_version": "centre_payload_v3",
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "header": header,
             "nqs": nqs,
             "places": places,
             "catchment": catchment,
+            "position": position,
             "qa_scores": qa_scores,
             "tenure": tenure,
             "commentary": _commentary_lines(header, nqs, places, tenure, subtype),

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- centre.html v1 -->
+<!-- centre.html v2.1 (2026-04-28) — Layer 4.1: cohort scope inline in metric title -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -750,6 +750,302 @@ function renderCatchmentCard(centre) {
   `;
 }
 
+// ── Layer 4 — POSITION rendering ────────────────────────────────────
+//
+// Visual primitive adapted from the operator.html SEIFA pattern
+// (renderCatchment in docs/operator.html v8): decile-aware horizontal
+// element + low/mid/high band split + decile-style headline. At centre
+// level we have one SA2 per metric, so the histogram becomes a
+// "you-are-here" 10-cell strip with all cells in the same neutral tone
+// (truly neutral palette per design doc §11.2 / D2 — no red/green
+// valence in cells; semantics live in band-copy text only).
+
+function _formatPositionValue(p) {
+  const raw = p.raw_value;
+  if (raw == null) return "—";
+  const fmt = p.value_format;
+  if (fmt === "int")              return fmtN(raw);
+  if (fmt === "percent")          return `${Number(raw).toFixed(1)}%`;
+  if (fmt === "currency_annual")  return `$${fmtN(Math.round(raw))} p.a.`;
+  if (fmt === "currency_weekly")  return `$${fmtN(Math.round(raw))}/week`;
+  return fmtN(raw);
+}
+
+function _formatPositionPeriod(p) {
+  if (p.period_label) return p.period_label;
+  if (p.year != null) return String(p.year);
+  return "";
+}
+
+// Build a short bracketed cohort label for the metric title — e.g.
+// "vs Qld", "vs Outer Regional Qld", "vs all Outer Regional", "vs Australia".
+// Source: cohort_def + the cohort_label string already on the payload
+// (which is e.g. "vs other Outer Regional SA2s in Qld"). Keep this short
+// enough to sit in brackets after the metric display name.
+function _buildCohortShortLabel(p) {
+  if (!p || !p.cohort_def) return "";
+  // Extract the bits we need from the long-form cohort_label.
+  // Long-form examples (from centre_page.py _build_cohort_label):
+  //   state              -> "vs other SA2s in {state_name}"
+  //   remoteness         -> "vs other {ra_name} SA2s nationwide"
+  //   state_x_remoteness -> "vs other {ra_name} SA2s in {state_name}"
+  //   national           -> "vs all SA2s nationwide"
+  const long = p.cohort_label || "";
+  if (p.cohort_def === "state") {
+    const m = /in\s+([A-Z]{2,3}|[A-Z][a-z]+|Other Territories)\s*$/i.exec(long);
+    return m ? `vs ${m[1]}` : "vs state";
+  }
+  if (p.cohort_def === "remoteness") {
+    const m = /vs other\s+(.+?)\s+SA2s/i.exec(long);
+    return m ? `vs all ${m[1]}` : "vs remoteness";
+  }
+  if (p.cohort_def === "state_x_remoteness") {
+    const m = /vs other\s+(.+?)\s+SA2s in\s+([A-Z]{2,3}|[A-Z][a-z]+|Other Territories)\s*$/i.exec(long);
+    if (m) return `vs ${m[1]} ${m[2]}`;
+    return "vs state-x-remoteness";
+  }
+  if (p.cohort_def === "national") return "vs Australia";
+  return "";
+}
+
+function _renderDecileStrip(decile) {
+  const cells = [];
+  for (let d = 1; d <= 10; d++) {
+    const isHere = (d === decile);
+    // Truly neutral palette: every cell shares --panel-2 background.
+    // The SA2's cell is the only one carrying --accent treatment.
+    const baseStyle =
+      "flex:1;min-width:18px;height:24px;background:var(--panel-2);" +
+      "border:1px solid var(--border);display:flex;align-items:center;" +
+      "justify-content:center;font-size:10px;color:var(--text-mute);" +
+      "font-variant-numeric:tabular-nums;border-radius:2px;";
+    const hereStyle = isHere
+      ? "border:2px solid var(--accent);box-shadow:inset 0 0 0 1px var(--accent);" +
+        "color:var(--text);font-weight:700;background:rgba(74,158,255,0.10);"
+      : "";
+    // Slight gap between bands (3↔4, 6↔7) — band dividers are structural,
+    // not coloured. No valence implied.
+    const gapBefore = (d === 4 || d === 7) ? "margin-left:6px;" : "";
+    cells.push(
+      `<div title="Decile ${d}" style="${baseStyle}${hereStyle}${gapBefore}">${d}</div>`
+    );
+  }
+  return `<div style="display:flex;gap:2px;margin-top:8px;">${cells.join("")}</div>`;
+}
+
+function _renderBandChips(p) {
+  const bands = ["low", "mid", "high"];
+  const bc = p.band_copy || {};
+  return `
+    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+      ${bands.map(b => {
+        const isActive = (b === p.band);
+        const color = isActive ? "var(--text)" : "var(--text-dim)";
+        const borderColor = isActive ? "var(--accent)" : "var(--border)";
+        const fontWeight = isActive ? "600" : "400";
+        const text = bc[b] || b;
+        const labelPrefix = `<span style="color:var(--text-mute);font-size:9.5px;letter-spacing:0.06em;text-transform:uppercase;font-weight:700;margin-right:4px;">${b}</span>`;
+        return `<span style="font-size:11.5px;background:var(--panel-2);` +
+               `border:1px solid ${borderColor};padding:2px 8px;` +
+               `border-radius:99px;color:${color};font-weight:${fontWeight};` +
+               `display:inline-flex;align-items:center;">` +
+               `${labelPrefix}${htmlEscape(text)}</span>`;
+      }).join("")}
+    </div>
+  `;
+}
+
+function renderPositionRow(metric, p) {
+  if (!p) return "";
+  const baseDisplay = htmlEscape(p.display || metric);
+  const conf = p.confidence || "unavailable";
+
+  // Short cohort label for the metric title — only when there's a cohort.
+  // Deferred rows get no label (no cohort yet); unavailable rows get none
+  // (no row to band against). Insufficient rows DO get one — the cohort
+  // is known, we're just suppressing the strip because n<10.
+  const cohortShort = (conf === "deferred" || conf === "unavailable")
+    ? ""
+    : _buildCohortShortLabel(p);
+  const display = cohortShort
+    ? `${baseDisplay} <span style="color:var(--text-mute);font-size:11.5px;font-weight:400;">(${htmlEscape(cohortShort)})</span>`
+    : baseDisplay;
+
+  // Deferred slot — coming-next placeholder
+  if (conf === "deferred") {
+    return `
+      <div class="fact" style="opacity:.55;">
+        <span class="k">${display}</span>
+        <span class="v">
+          <span style="color:var(--text-mute);font-style:italic;font-size:12px;">
+            (coming next)
+          </span>
+        </span>
+      </div>
+    `;
+  }
+
+  // No Layer 3 row for this SA2 / metric
+  if (conf === "unavailable") {
+    return `
+      <div class="fact">
+        <span class="k">${display}</span>
+        <span class="v">
+          <span style="color:var(--text-mute);font-style:italic;font-size:12px;">—</span>
+        </span>
+      </div>
+    `;
+  }
+
+  const rawStr = _formatPositionValue(p);
+  const periodStr = _formatPositionPeriod(p);
+  const periodTag = periodStr
+    ? `<span style="color:var(--text-mute);font-size:11px;">(${htmlEscape(periodStr)})</span>`
+    : "";
+
+  // OBS badge for the raw value (NOW)
+  const obsBadge = renderBadge("OBS", { source: p.source || "—" }, true);
+
+  // cn < 10 — suppress the strip, keep the value + suppression notice
+  if (conf === "insufficient") {
+    return `
+      <div style="padding:10px 0;border-bottom:1px dashed var(--border);">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;">
+          <span style="color:var(--text-dim);font-size:13px;">${display}</span>
+          <span style="display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+            <b style="font-variant-numeric:tabular-nums;color:var(--text);font-weight:500;">${rawStr}</b>
+            ${periodTag}
+            ${obsBadge}
+          </span>
+        </div>
+        <div style="color:var(--text-mute);font-style:italic;font-size:11.5px;margin-top:6px;">
+          insufficient peer cohort (n=${p.cohort_n}) — peer comparison suppressed
+        </div>
+      </div>
+    `;
+  }
+
+  // Normal / low — full strip + headline + chips + DER + COM badges
+  const decile = p.decile;
+  const band = p.band || "mid";
+  // Cohort scope now lives in the metric title (in brackets) — keep
+  // just the cohort_n in the headline. Long cohort phrase remains in
+  // the DER badge tooltip for full provenance.
+  const cohortLine = `n=${p.cohort_n}`;
+  const lowConfPill = (conf === "low")
+    ? `<span style="background:var(--amber-bg);color:var(--amber);font-size:10px;` +
+      `font-weight:600;padding:1px 6px;border-radius:3px;letter-spacing:.04em;` +
+      `margin-left:6px;">low confidence</span>`
+    : "";
+
+  const headlineHtml =
+    `<b style="color:var(--text);font-weight:600;">Decile ${decile}</b> ` +
+    `<span style="color:var(--text-mute);">·</span> ` +
+    `<span style="color:var(--text-dim);">${htmlEscape(band)}</span> ` +
+    `<span style="color:var(--text-mute);">·</span> ` +
+    `<span style="color:var(--text-mute);font-size:11.5px;">${cohortLine}</span>` +
+    `${lowConfPill}`;
+
+  const derBadge = renderBadge("DER", {
+    source: `<code>layer3_sa2_metric_banding</code> (cohort_def=<code>${htmlEscape(p.cohort_def || "")}</code>, key=<code>${htmlEscape(p.cohort_key || "")}</code>)`,
+    rule: htmlEscape(p.cohort_label || ""),
+    formula: "decile = NTILE(10) within cohort; band = low (1–3) / mid (4–6) / high (7–10).",
+    inputs: `<code>raw_value=${htmlEscape(String(p.raw_value))}</code>, <code>percentile=${htmlEscape(String((p.percentile != null) ? Number(p.percentile).toFixed(1) : ""))}</code>`,
+    threshold: "Suppress if cohort_n < 10; low-confidence pill if 10 ≤ cohort_n < 20."
+  }, true);
+  const comBadge = renderBadge("COM", {
+    rule: `band-copy from <code>LAYER3_METRIC_META[${htmlEscape(metric)}].band_copy["${htmlEscape(band)}"]</code>`,
+    source: "Rule-based, see centre_page.py LAYER3_METRIC_META."
+  }, true);
+
+  return `
+    <div style="padding:10px 0;border-bottom:1px dashed var(--border);">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">
+        <span style="color:var(--text-dim);font-size:13px;">${display}</span>
+        <span style="display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+          <b style="font-variant-numeric:tabular-nums;color:var(--text);font-weight:500;">${rawStr}</b>
+          ${periodTag}
+          ${obsBadge}
+        </span>
+      </div>
+      <div style="margin-top:6px;font-size:12px;">${headlineHtml}</div>
+      ${_renderDecileStrip(decile)}
+      ${_renderBandChips(p)}
+      <div style="margin-top:8px;display:flex;justify-content:flex-end;gap:6px;">
+        ${derBadge}
+        ${comBadge}
+      </div>
+    </div>
+  `;
+}
+
+function renderPopulationCard(centre) {
+  const pos = (centre.position && centre.position.population) || {};
+  const order = [
+    "sa2_under5_count",
+    "sa2_total_population",
+    "sa2_births_count",
+    "sa2_under5_growth_5y",
+  ];
+  // True if at least one slot has live Layer 3 data
+  const hasAny = order.some(k => {
+    const e = pos[k];
+    return e && !["unavailable", "deferred"].includes(e.confidence);
+  });
+
+  return `
+    <section class="op-section">
+      <h3>Population <span class="note">SA2 peer position</span></h3>
+      ${hasAny
+        ? order.map(k => renderPositionRow(k, pos[k])).join("")
+        : `<div class="placeholder">SA2 peer-position metrics
+            <span class="will-show">Will show: under-5 population, total population, births,
+            and 5-year growth — banded against same-state and same-remoteness peer cohorts.</span>
+          </div>`
+      }
+      <div class="placeholder" style="margin-top:14px;font-size:11.5px;border-top:1px dashed var(--border);padding-top:10px;">
+        Trajectory band (5y CAGR, 10y sparkline, births trend)
+        <span class="will-show">arriving in the next Layer 4 pass.</span>
+      </div>
+    </section>
+  `;
+}
+
+function renderLabourMarketCard(centre) {
+  const pos = (centre.position && centre.position.labour_market) || {};
+  const order = [
+    "sa2_unemployment_rate",
+    "sa2_median_employee_income",
+    "sa2_median_household_income",
+    "sa2_median_total_income",
+    "sa2_lfp_persons",
+    "sa2_lfp_females",
+    "sa2_lfp_males",
+    "jsa_vacancy_rate",
+  ];
+  const hasAny = order.some(k => {
+    const e = pos[k];
+    return e && !["unavailable", "deferred"].includes(e.confidence);
+  });
+
+  return `
+    <section class="op-section">
+      <h3>Labour market <span class="note">SA2 peer position</span></h3>
+      ${hasAny
+        ? order.map(k => renderPositionRow(k, pos[k])).join("")
+        : `<div class="placeholder">SA2 peer-position metrics
+            <span class="will-show">Will show: unemployment, the income trio, the LFP triplet,
+            and JSA vacancy rate — banded against the relevant peer cohort.</span>
+          </div>`
+      }
+      <div class="placeholder" style="margin-top:14px;font-size:11.5px;border-top:1px dashed var(--border);padding-top:10px;">
+        Trajectory band (12m delta, 36m sparkline, decadal LFP trajectory, JSA trend)
+        <span class="will-show">arriving in the next Layer 4 pass.</span>
+      </div>
+    </section>
+  `;
+}
+
 function renderQaCard(centre) {
   const qa = centre.qa_scores || [];
   if (qa.length === 0) {
@@ -856,6 +1152,8 @@ function render(centre) {
       ${renderCatchmentCard(centre)}
       ${renderTenureCard(centre)}
     </div>
+    ${renderPopulationCard(centre)}
+    ${renderLabourMarketCard(centre)}
     ${renderQaCard(centre)}
     ${renderCommentary(centre)}
   `;
