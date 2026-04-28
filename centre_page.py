@@ -1,34 +1,39 @@
 """
 centre_page.py — Phase 2 backend helper for centre.html
-Version: v3 (2026-04-28) — Layer 4 POSITION block
+Version: v4 (2026-04-28) — Layer 4.2-B: trajectory + cohort histogram
 
 Provides get_centre_payload(service_id) -> dict
 Returns full single-centre detail: service + entity + group + brand,
 with OBS/DER/COM treatment matching operator_page.py conventions.
 
+v4 changes (2026-04-28, Layer 4.2-B):
+  - New constant LAYER3_METRIC_TRAJECTORY_SOURCE — maps each Layer 4 metric
+    to its trajectory source (abs_sa2_erp_annual, abs_sa2_births_annual,
+    abs_sa2_unemployment_quarterly, abs_sa2_socioeconomic_annual,
+    abs_sa2_education_employment_annual). Probed in
+    recon/layer4_2_probe.md before this build.
+  - New helper _metric_trajectory(con, sa2_code, metric_name): reads the
+    metric's source table for this SA2, returns the historical series
+    suitable for sparkline / dot-trajectory rendering. Drops NULL/empty
+    points so the chart shows only real data.
+  - New helper _cohort_distribution(con, metric, cohort_def, cohort_key,
+    n_bins=20): reads all raw_value rows for the cohort from
+    layer3_sa2_metric_banding, bins them into 20 equal-width bins,
+    returns the bin counts plus this SA2's bin index. Surfaces shape
+    (skew, modality) rather than the artificially-uniform decile
+    distribution.
+  - _layer3_position now augments each populated entry with
+    "trajectory", "trajectory_kind", "cohort_distribution".
+    Suppressed for confidence in {insufficient, unavailable, deferred}.
+
 v3 changes (2026-04-28, Layer 4 NOW + POSITION):
-  - New constants LAYER3_METRIC_META / COHORT_LABEL_TEMPLATES /
-    RA_BAND_SHORT_LABELS / STATE_SHORT_LABELS — display name, direction,
-    band-copy triple, source label, and cohort-phrase template for the 12
-    Layer 4 metrics (10 live from layer3_sa2_metric_banding + 2 deferred
-    slots, sa2_under5_growth_5y and jsa_vacancy_rate).
-  - New helper _layer3_position(con, sa2_code): single indexed point-read
-    against layer3_sa2_metric_banding plus sibling read against
-    sa2_cohort. Returns the structured POSITION payload organised by
-    card (population / labour_market). Per-row confidence value drives
-    the cohort_n display rule from D1 (insufficient / low / normal),
-    plus 'deferred' for slots not yet in Layer 3 and 'unavailable' for
-    SA2s with no matching layer3 row.
-  - New: payload["position"] = {"population": {...}, "labour_market": {...}}
-    sibling to the existing CATCHMENT block.
-  - TRAJECTORY band rendered as a "Will show" placeholder in
-    docs/centre.html; raw historical reads from abs_sa2_* sources will
-    be added in the next Layer 4 pass.
+  - LAYER3_METRIC_META / COHORT_LABEL_TEMPLATES / RA_BAND_SHORT_LABELS /
+    STATE_SHORT_LABELS for the 12 Layer 4 metrics.
+  - _layer3_position helper, payload["position"] block.
 
 v2 fixes (2026-04-26):
-  - aria_plus column stores label strings, not codes — ARIA_LABELS
-    accepts both forms.
-  - _parse_date() recognises DD/MM/YYYY (services.approval_granted_date).
+  - aria_plus column stores label strings, not codes.
+  - _parse_date() recognises DD/MM/YYYY.
 
 Read-only. No DB mutations.
 """
@@ -286,6 +291,95 @@ POSITION_CARD_ORDER = {
     ],
 }
 
+# ─────────────────────────────────────────────────────────────────────
+# Layer 4.2-B — trajectory source mapping
+# ─────────────────────────────────────────────────────────────────────
+# Each entry maps a Layer 4 metric to its historical source table. The
+# trajectory helper reads the SA2's series for sparkline / dot-trajectory
+# rendering. Probed in recon/layer4_2_probe.md before this constant was
+# written; column names are confirmed against actual schema.
+#
+# kind = "annual" | "quarterly" — controls the JS x-axis treatment.
+#
+# Long-format tables (abs_sa2_socioeconomic_annual,
+# abs_sa2_education_employment_annual) need a metric_name filter as well.
+LAYER3_METRIC_TRAJECTORY_SOURCE = {
+    "sa2_under5_count": {
+        "table":         "abs_sa2_erp_annual",
+        "value_col":     "persons",
+        "period_col":    "year",
+        "filter_clause": "age_group = 'under_5_persons'",
+        "kind":          "annual",
+    },
+    "sa2_total_population": {
+        "table":         "abs_sa2_erp_annual",
+        "value_col":     "persons",
+        "period_col":    "year",
+        "filter_clause": "age_group = 'total_persons'",
+        "kind":          "annual",
+    },
+    "sa2_births_count": {
+        "table":         "abs_sa2_births_annual",
+        "value_col":     "births_count",
+        "period_col":    "year",
+        "filter_clause": None,
+        "kind":          "annual",
+    },
+    "sa2_unemployment_rate": {
+        "table":         "abs_sa2_unemployment_quarterly",
+        "value_col":     "rate",
+        "period_col":    "year_qtr",
+        "filter_clause": None,
+        "kind":          "quarterly",
+    },
+    "sa2_median_employee_income": {
+        "table":         "abs_sa2_socioeconomic_annual",
+        "value_col":     "value",
+        "period_col":    "year",
+        "filter_clause": "metric_name = 'median_employee_income_annual'",
+        "kind":          "annual",
+    },
+    "sa2_median_household_income": {
+        "table":         "abs_sa2_socioeconomic_annual",
+        "value_col":     "value",
+        "period_col":    "year",
+        "filter_clause": "metric_name = 'median_equiv_household_income_weekly'",
+        "kind":          "annual",
+    },
+    "sa2_median_total_income": {
+        "table":         "abs_sa2_socioeconomic_annual",
+        "value_col":     "value",
+        "period_col":    "year",
+        "filter_clause": "metric_name = 'median_total_income_excl_pensions_annual'",
+        "kind":          "annual",
+    },
+    "sa2_lfp_persons": {
+        "table":         "abs_sa2_education_employment_annual",
+        "value_col":     "value",
+        "period_col":    "year",
+        "filter_clause": "metric_name = 'ee_lfp_persons_pct'",
+        "kind":          "annual",
+    },
+    "sa2_lfp_females": {
+        "table":         "abs_sa2_education_employment_annual",
+        "value_col":     "value",
+        "period_col":    "year",
+        "filter_clause": "metric_name = 'census_lfp_females_pct'",
+        "kind":          "annual",
+    },
+    "sa2_lfp_males": {
+        "table":         "abs_sa2_education_employment_annual",
+        "value_col":     "value",
+        "period_col":    "year",
+        "filter_clause": "metric_name = 'census_lfp_males_pct'",
+        "kind":          "annual",
+    },
+    # sa2_under5_growth_5y, jsa_vacancy_rate — deferred metrics, no
+    # trajectory source yet. Their LAYER3_METRIC_META entry already has
+    # status='deferred', so _layer3_position never reaches the trajectory
+    # branch for them.
+}
+
 
 def _connect():
     conn = sqlite3.connect(DB_PATH)
@@ -506,6 +600,167 @@ def _build_cohort_label(cohort_def: Optional[str], cohort_row: Optional[dict]) -
         return template
 
 
+def _metric_trajectory(con: sqlite3.Connection,
+                       sa2_code: str,
+                       metric_name: str) -> tuple[list[dict], Optional[str]]:
+    """
+    DER. Read this SA2's historical series for `metric_name` from the
+    appropriate source table per LAYER3_METRIC_TRAJECTORY_SOURCE.
+
+    Returns (points, kind) where:
+      - points = list of {"period": <year|year_qtr>, "value": <number>}
+                 sorted ascending by period, NULL/empty values dropped
+      - kind   = "annual" | "quarterly" | None (None if no source mapping)
+
+    Returns ([], None) if the metric isn't in the trajectory source map.
+    Returns ([], <kind>) if the source is mapped but the SA2 has no rows.
+    Never raises on missing tables — returns empty list instead.
+    """
+    src = LAYER3_METRIC_TRAJECTORY_SOURCE.get(metric_name)
+    if not src:
+        return [], None
+    table = src["table"]
+    value_col = src["value_col"]
+    period_col = src["period_col"]
+    filter_clause = src["filter_clause"]
+    kind = src["kind"]
+
+    where_parts = ["sa2_code = ?"]
+    if filter_clause:
+        where_parts.append(filter_clause)
+    where_sql = " AND ".join(where_parts)
+
+    sql = (
+        f"SELECT {period_col} AS period, {value_col} AS value "
+        f"  FROM {table} "
+        f" WHERE {where_sql} "
+        f" ORDER BY {period_col}"
+    )
+    try:
+        rows = con.execute(sql, (sa2_code,)).fetchall()
+    except sqlite3.OperationalError:
+        return [], kind
+
+    points: list[dict] = []
+    for r in rows:
+        v = r["value"]
+        if v is None:
+            continue
+        # Coerce numeric strings to numbers where possible
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            continue
+        points.append({"period": r["period"], "value": v})
+    return points, kind
+
+
+def _cohort_distribution(con: sqlite3.Connection,
+                         metric: str,
+                         cohort_def: str,
+                         cohort_key: str,
+                         self_value: Optional[float],
+                         n_bins: int = 20) -> Optional[dict]:
+    """
+    DER. Build a 20-bin distribution of raw_value for the cohort.
+
+    Reads layer3_sa2_metric_banding for all rows matching (metric,
+    cohort_def, cohort_key). Bins their raw_values into n_bins
+    equal-width bins between cohort min and max. Returns:
+
+      {
+        "bins": [{"bin_min": ..., "bin_max": ..., "count": ...}, ...],
+        "self_bin": <int 0..n_bins-1>,
+        "cohort_n": <int>,
+        "min": <float>,
+        "max": <float>,
+      }
+
+    Returns None if cohort has < 5 rows (too sparse to bin meaningfully)
+    or on any DB error.
+
+    n_bins=20 per Decision D2 — equal-width on raw_value, not decile-
+    aligned. Decile-aligned bins are uniform by construction (NTILE) and
+    don't surface skew/modality, which is the new information here.
+    """
+    try:
+        rows = con.execute(
+            "SELECT raw_value FROM layer3_sa2_metric_banding "
+            " WHERE metric = ? AND cohort_def = ? AND cohort_key = ? "
+            "   AND raw_value IS NOT NULL",
+            (metric, cohort_def, cohort_key),
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return None
+
+    values = []
+    for r in rows:
+        try:
+            values.append(float(r["raw_value"]))
+        except (TypeError, ValueError):
+            continue
+    n = len(values)
+    if n < 5:
+        return None
+
+    vmin = min(values)
+    vmax = max(values)
+    if vmin == vmax:
+        # Degenerate cohort (every member has the same value).
+        return {
+            "bins": [{"bin_min": vmin, "bin_max": vmax, "count": n}],
+            "self_bin": 0,
+            "cohort_n": n,
+            "min": vmin,
+            "max": vmax,
+        }
+
+    width = (vmax - vmin) / n_bins
+    counts = [0] * n_bins
+    for v in values:
+        # Last bin is right-inclusive so vmax doesn't fall outside.
+        if v >= vmax:
+            idx = n_bins - 1
+        else:
+            idx = int((v - vmin) / width)
+            if idx >= n_bins:
+                idx = n_bins - 1
+            elif idx < 0:
+                idx = 0
+        counts[idx] += 1
+
+    self_bin: Optional[int] = None
+    if self_value is not None:
+        try:
+            sv = float(self_value)
+            if sv >= vmax:
+                self_bin = n_bins - 1
+            elif sv <= vmin:
+                self_bin = 0
+            else:
+                self_bin = int((sv - vmin) / width)
+                if self_bin >= n_bins:
+                    self_bin = n_bins - 1
+        except (TypeError, ValueError):
+            self_bin = None
+
+    bins = [
+        {
+            "bin_min": vmin + i * width,
+            "bin_max": vmin + (i + 1) * width,
+            "count":   counts[i],
+        }
+        for i in range(n_bins)
+    ]
+    return {
+        "bins":     bins,
+        "self_bin": self_bin,
+        "cohort_n": n,
+        "min":      vmin,
+        "max":      vmax,
+    }
+
+
 def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str]) -> dict:
     """
     DER. Read Layer 3 banding rows for this SA2 + sa2_cohort row for cohort
@@ -586,7 +841,7 @@ def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str]) -> dict:
         confidence = _confidence_for_cohort_n(row.get("cohort_n"))
         band = row.get("band") or "mid"
 
-        out[card][metric_name] = {
+        entry = {
             "display": meta["display"],
             "card": card,
             "value_format": meta.get("value_format"),
@@ -605,6 +860,29 @@ def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str]) -> dict:
             "confidence": confidence,
             "source": meta["source"],
         }
+
+        # Layer 4.2-B: trajectory + cohort distribution.
+        # Only populate for normal/low confidence — for insufficient,
+        # the strip is suppressed anyway, and rendering a histogram or
+        # a single-point trajectory would be misleading.
+        if confidence in ("normal", "low"):
+            traj_points, traj_kind = _metric_trajectory(con, sa2_code, metric_name)
+            if traj_points:
+                entry["trajectory"] = traj_points
+                entry["trajectory_kind"] = traj_kind
+
+            dist = _cohort_distribution(
+                con,
+                metric_name,
+                row.get("cohort_def"),
+                row.get("cohort_key"),
+                row.get("raw_value"),
+                n_bins=20,
+            )
+            if dist:
+                entry["cohort_distribution"] = dist
+
+        out[card][metric_name] = entry
 
     return out
 
@@ -763,7 +1041,7 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
 
         # --- ASSEMBLE ---
         payload = {
-            "schema_version": "centre_payload_v3",
+            "schema_version": "centre_payload_v4",
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "header": header,
             "nqs": nqs,
