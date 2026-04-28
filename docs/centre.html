@@ -1,10 +1,14 @@
 <!DOCTYPE html>
-<!-- centre.html v2.1 (2026-04-28) — Layer 4.1: cohort scope inline in metric title -->
+<!-- centre.html v3.2 (2026-04-28) — Layer 4.2-B-fix2: global trajectory range buttons (3Y/5Y/10Y/All) -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kintell — Centre</title>
+<!-- Chart.js for trend rendering. Same version as index.html / dashboard.html
+     so trajectory charts on this page visually match the industry-snapshot
+     and dashboard charts. Per visual_consistency_audit Option 1 / E1. -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   /* Inherits the visual language of operator.html v8 — same CSS vars,
      same .op-section / .fact / .km-badge / .nqs-pill / .com-line classes
@@ -414,6 +418,47 @@
   @media (max-width: 960px) {
     .section-row { grid-template-columns: 1fr; }
   }
+
+  /* Layer 4.2-B-fix2: trajectory range buttons.
+     Lifted from index.html .range-btn pattern; mapped onto Palette A
+     tokens (--accent / --panel-2 / --border / --text). */
+  .range-btn {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 4px 12px;
+    font: inherit;
+    font-size: 11.5px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .range-btn:hover { color: var(--text); border-color: var(--accent); }
+  .range-btn.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+    font-weight: 500;
+  }
+  .traj-range-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 8px 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 11px;
+    color: var(--text-mute);
+  }
+  .traj-range-bar .label {
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 600;
+    font-size: 10.5px;
+  }
+  .traj-range-bar .btns { display: flex; gap: 6px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
@@ -808,23 +853,341 @@ function _buildCohortShortLabel(p) {
   return "";
 }
 
+// ── Layer 4.2-B-fix2: Trajectory range state ─────────────────────────
+//
+// Single global window applied to every trajectory chart on the page.
+// 0 = "All" (no clipping). For non-zero values, we filter points whose
+// period falls within the last N years from the most recent point in
+// that series. Each metric's series may have a different "most recent
+// point" (e.g. unemployment 2025-Q4 vs LFP 2021), so the window is
+// applied per-chart relative to its own end.
+//
+// Default window: 0 (All) — gives a complete-history view on first load.
+let _TRAJECTORY_RANGE_YEARS = 0;
+let _LAST_CENTRE = null; // captured by render() so setRange can re-render
+
+function _setTrajectoryRange(years, btnEl) {
+  _TRAJECTORY_RANGE_YEARS = years;
+  // Update active state on the button row
+  document.querySelectorAll(".traj-range-bar .range-btn").forEach(b => {
+    b.classList.remove("active");
+  });
+  if (btnEl) btnEl.classList.add("active");
+  // Re-render the page so charts pick up the new window
+  if (_LAST_CENTRE) render(_LAST_CENTRE);
+}
+
+function _renderTrajectoryRangeBar() {
+  // Renders only when there's data to show — skipped if no SA2 / no Layer 3.
+  const opts = [
+    { years: 3,  label: "3Y" },
+    { years: 5,  label: "5Y" },
+    { years: 10, label: "10Y" },
+    { years: 0,  label: "All" },
+  ];
+  const btns = opts.map(o => {
+    const isActive = (o.years === _TRAJECTORY_RANGE_YEARS);
+    return `<button class="range-btn${isActive ? " active" : ""}" `
+         + `onclick="_setTrajectoryRange(${o.years}, this)">${o.label}</button>`;
+  }).join("");
+  return `
+    <div class="traj-range-bar">
+      <span class="label">Trend window</span>
+      <div class="btns">${btns}</div>
+      <span style="margin-left:auto;font-size:10.5px;color:var(--text-mute);">
+        applies to all trajectory charts below
+      </span>
+    </div>
+  `;
+}
+
+// Filter trajectory points to those within the last N years from the
+// series' most recent point. Handles both annual ("2024") and quarterly
+// ("2024-Q3") period formats.
+function _filterTrajectoryByRange(points, years) {
+  if (!years || years <= 0 || !points.length) return points;
+  // Extract the year portion of each point's period
+  const yearOf = (period) => {
+    const s = String(period);
+    const m = /^(\d{4})/.exec(s);
+    return m ? parseInt(m[1], 10) : NaN;
+  };
+  const lastYear = yearOf(points[points.length - 1].period);
+  if (isNaN(lastYear)) return points;
+  const cutoff = lastYear - years;
+  return points.filter(pt => yearOf(pt.period) > cutoff);
+}
+
+// ── Layer 4.2-B-fix: Chart.js trajectory ───────────────────────────
+//
+// Previous v3 used bespoke SVG for the trajectory. v3.1 replaces it with
+// Chart.js — same library, same makeLine / makeDataset / makeOpts helpers
+// as index.html and dashboard.html. Cohort histogram and decile strip
+// remain bespoke SVG (they're position indicators, not trends; Chart.js
+// is heavier than needed for a 30px shape strip).
+//
+// Per-metric stroke colours follow the index.html "chart-catch-combined"
+// convention (System B palette intentionally embedded inside this System
+// A page — embedded "industry-style" mini-charts inside the centre
+// drilldown context). Stroke colour does NOT carry valence; valence
+// lives only in band-copy text per E2.
+//
+const _CHART_STROKE_BY_METRIC = {
+  // Population family — teal (matches index.html chart-catch-pop)
+  sa2_under5_count:            "#00c9a7",
+  sa2_total_population:        "#00c9a7",
+  sa2_births_count:            "#00c9a7",
+  // Labour-market — multi-hue per index.html convention
+  sa2_unemployment_rate:       "#e05c3a", // hot — index uses for new-approvals etc.
+  sa2_median_employee_income:  "#3d7eff", // primary blue
+  sa2_median_household_income: "#3d7eff",
+  sa2_median_total_income:     "#3d7eff",
+  sa2_lfp_persons:             "#9b59b6", // purple — index uses for supply demand
+  sa2_lfp_females:             "#9b59b6",
+  sa2_lfp_males:               "#9b59b6",
+};
+const _CHART_FILL_BY_METRIC = {
+  sa2_under5_count:            "rgba(0,201,167,0.08)",
+  sa2_total_population:        "rgba(0,201,167,0.08)",
+  sa2_births_count:            "rgba(0,201,167,0.08)",
+  sa2_unemployment_rate:       "rgba(224,92,58,0.08)",
+  sa2_median_employee_income:  "rgba(61,126,255,0.08)",
+  sa2_median_household_income: "rgba(61,126,255,0.08)",
+  sa2_median_total_income:     "rgba(61,126,255,0.08)",
+  sa2_lfp_persons:             "rgba(155,89,182,0.08)",
+  sa2_lfp_females:             "rgba(155,89,182,0.08)",
+  sa2_lfp_males:               "rgba(155,89,182,0.08)",
+};
+
+// Chart.js helpers — verbatim from index.html so behaviour matches.
+function _kintell_makeOpts(yLabel, extra) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: "rgba(15,17,23,0.95)",
+        titleColor: "#e8eaf0",
+        bodyColor: "#e8eaf0",
+        borderColor: "#2a2f3f",
+        borderWidth: 1,
+        padding: 8,
+        titleFont: { size: 11 },
+        bodyFont: { size: 11, family: "inherit" },
+        displayColors: false,
+      },
+    },
+    scales: {
+      x: {
+        grid: { display: false, drawBorder: false },
+        ticks: {
+          color: "#6b7684",
+          font: { size: 9 },
+          maxRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 8,
+        },
+      },
+      y: {
+        grid: { color: "rgba(45,52,63,0.4)", drawBorder: false },
+        ticks: { color: "#6b7684", font: { size: 9 } },
+        title: {
+          display: !!yLabel,
+          text: yLabel || "",
+          color: "#8890a8",
+          font: { size: 9 },
+        },
+      },
+      ...(extra || {}),
+    },
+  };
+}
+
+function _kintell_makeLine(label, data, color, fill) {
+  return {
+    label,
+    data,
+    borderColor: color,
+    backgroundColor: fill || "transparent",
+    fill: !!fill,
+    tension: 0,
+    pointRadius: 0,
+    borderWidth: 2,
+    spanGaps: true,
+  };
+}
+
+// Registry + queue: chart instances rendered AFTER main.innerHTML is set,
+// because Chart.js needs the canvas attached to the DOM. _pendingCharts
+// is drained by render() at the end of its single-shot render.
+const _CHART_INSTANCES = {};
+const _CHART_PENDING = [];
+
+function _flushPendingCharts() {
+  // Destroy any previous chart instances first (defensive — render() is
+  // single-shot today but if we ever re-render this avoids leaks).
+  Object.keys(_CHART_INSTANCES).forEach(id => {
+    try { _CHART_INSTANCES[id].destroy(); } catch (e) {}
+    delete _CHART_INSTANCES[id];
+  });
+  while (_CHART_PENDING.length) {
+    const fn = _CHART_PENDING.shift();
+    try { fn(); } catch (e) { console.warn("chart init failed:", e); }
+  }
+}
+
+// Layer 4.2-B-fix: Chart.js-backed trajectory.
+//
+// Returns a <canvas> wrapper element with a unique id. The actual Chart.js
+// instantiation is queued in _CHART_PENDING and runs after main.innerHTML
+// is set (Chart.js needs the canvas attached to the DOM).
+//
+// Threshold logic preserved from v3:
+//   >= 7 points -> sparkline-style (no point markers, area fill)
+//   <  7 points -> dot trajectory (point markers visible)
+//
+// All charts get hover tooltip with per-point period+value via Chart.js's
+// built-in tooltip — replaces the bespoke <title> attribute from v3.
+function _renderTrajectory(metric, p) {
+  const allPoints = (p && p.trajectory) || [];
+  if (!allPoints.length) return "";
+
+  // Apply global trend-window filter (3Y/5Y/10Y/All). Per metric,
+  // window is relative to that series' most recent point.
+  const points = _filterTrajectoryByRange(allPoints, _TRAJECTORY_RANGE_YEARS);
+  if (!points.length) {
+    // Selected window contains no points for this metric — render an
+    // honest empty-state rather than a misleading flat-line chart.
+    return `
+      <div style="margin-top:6px;padding:8px;background:var(--panel-2);
+                  border:1px dashed var(--border);border-radius:4px;
+                  color:var(--text-mute);font-size:11px;font-style:italic;
+                  text-align:center;">
+        no points in selected window — try a wider range
+      </div>
+    `;
+  }
+
+  // Per-metric stroke fallback to default blue
+  const stroke = _CHART_STROKE_BY_METRIC[metric] || "#3d7eff";
+  const fill = _CHART_FILL_BY_METRIC[metric] || "rgba(61,126,255,0.08)";
+
+  const isSparkline = points.length >= 7;
+  const labels = points.map(pt => String(pt.period));
+  const data = points.map(pt => Number(pt.value));
+
+  // Unique id per row (metric + service-id keeps it stable on re-renders)
+  const canvasId = `traj-${metric}-${Math.random().toString(36).slice(2, 8)}`;
+  // Sparkline taller — has no x-axis labels; dot trajectory shorter to
+  // make room for x-axis ticks.
+  const canvasHeight = isSparkline ? 48 : 56;
+
+  // Queue the chart init to run after the canvas is in the DOM.
+  _CHART_PENDING.push(() => {
+    const el = document.getElementById(canvasId);
+    if (!el) return;
+
+    const dataset = _kintell_makeLine(p.display || metric, data, stroke, fill);
+    // For dot-trajectory mode, show point markers
+    if (!isSparkline) {
+      dataset.pointRadius = 3;
+      dataset.pointHoverRadius = 5;
+      dataset.pointBackgroundColor = stroke;
+      dataset.pointBorderColor = stroke;
+    } else {
+      // Sparkline: hide ticks/labels on x-axis to save space
+      dataset.pointHoverRadius = 4;
+    }
+
+    const opts = _kintell_makeOpts(null, null);
+    if (isSparkline) {
+      opts.scales.x.ticks.display = false;
+      opts.scales.x.ticks.maxTicksLimit = 0;
+    } else {
+      // Show all dot labels for short series
+      opts.scales.x.ticks.maxTicksLimit = points.length;
+      opts.scales.x.ticks.font = { size: 9 };
+    }
+
+    _CHART_INSTANCES[canvasId] = new Chart(el, {
+      type: "line",
+      data: { labels, datasets: [dataset] },
+      options: opts,
+    });
+  });
+
+  return `
+    <div style="margin-top:6px;height:${canvasHeight}px;position:relative;">
+      <canvas id="${canvasId}"></canvas>
+    </div>
+  `;
+}
+
+// Layer 4.2-B cohort distribution histogram. 20 equal-width bins of
+// raw_value across the cohort, with this SA2's bin highlighted. Reads
+// p.cohort_distribution from the payload (built server-side by
+// _cohort_distribution in centre_page.py per Decision D2).
+function _renderCohortHistogram(p) {
+  const dist = p && p.cohort_distribution;
+  if (!dist || !dist.bins || !dist.bins.length) return "";
+
+  const bins = dist.bins;
+  const maxCount = bins.reduce((m, b) => Math.max(m, b.count || 0), 0);
+  if (maxCount === 0) return "";
+  const selfBin = (dist.self_bin != null) ? dist.self_bin : -1;
+
+  // Each bar: height proportional to count/maxCount, bottom-aligned
+  const barHtml = bins.map((b, i) => {
+    const isSelf = (i === selfBin);
+    const heightPct = ((b.count || 0) / maxCount) * 100;
+    const bg = isSelf ? "var(--accent)" : "rgba(74,158,255,0.20)";
+    const titleTxt = `${b.bin_min.toFixed(2)} – ${b.bin_max.toFixed(2)}: ${b.count} SA2${b.count === 1 ? "" : "s"}${isSelf ? "  ← this SA2" : ""}`;
+    return `<div title="${htmlEscape(titleTxt)}" style="flex:1;min-width:6px;height:${heightPct.toFixed(1)}%;background:${bg};border-radius:1px 1px 0 0;${isSelf ? "box-shadow:0 0 0 1px var(--accent);" : ""}"></div>`;
+  }).join("");
+
+  const cohortNote = `cohort distribution · n=${dist.cohort_n} · range ${dist.min.toFixed(0)}–${dist.max.toFixed(0)}`;
+
+  return `
+    <div style="margin-top:8px;">
+      <div style="display:flex;align-items:flex-end;gap:1px;height:30px;background:transparent;">
+        ${barHtml}
+      </div>
+      <div style="font-size:9.5px;color:var(--text-mute);letter-spacing:0.04em;margin-top:2px;text-align:right;">
+        ${htmlEscape(cohortNote)}
+      </div>
+    </div>
+  `;
+}
+
+// Layer 4.2-B: gradient strip. Single-hue blue ramp per Decision D2 —
+// duller blue tints on non-active cells (low/mid/high), full --accent
+// outline on the SA2's cell. Pure positional gradient — no valence.
 function _renderDecileStrip(decile) {
   const cells = [];
+  // Per-decile background tones (RGBA, --accent decomposed = 74,158,255).
+  // Bottom band ~6%, mid ~13%, top ~20%. Visible at a glance, dull
+  // enough not to compete with the SA2's full-saturation cell.
+  const TONE_BY_DECILE = {
+    1: 0.06, 2: 0.06, 3: 0.06,
+    4: 0.13, 5: 0.13, 6: 0.13,
+    7: 0.20, 8: 0.20, 9: 0.20, 10: 0.20,
+  };
   for (let d = 1; d <= 10; d++) {
     const isHere = (d === decile);
-    // Truly neutral palette: every cell shares --panel-2 background.
-    // The SA2's cell is the only one carrying --accent treatment.
+    const tone = TONE_BY_DECILE[d];
     const baseStyle =
-      "flex:1;min-width:18px;height:24px;background:var(--panel-2);" +
+      "flex:1;min-width:18px;height:24px;" +
+      `background:rgba(74,158,255,${tone});` +
       "border:1px solid var(--border);display:flex;align-items:center;" +
       "justify-content:center;font-size:10px;color:var(--text-mute);" +
       "font-variant-numeric:tabular-nums;border-radius:2px;";
     const hereStyle = isHere
       ? "border:2px solid var(--accent);box-shadow:inset 0 0 0 1px var(--accent);" +
-        "color:var(--text);font-weight:700;background:rgba(74,158,255,0.10);"
+        "color:var(--text);font-weight:700;background:rgba(74,158,255,0.32);"
       : "";
-    // Slight gap between bands (3↔4, 6↔7) — band dividers are structural,
-    // not coloured. No valence implied.
+    // Slight gap between bands (3↔4, 6↔7) — band dividers are structural.
     const gapBefore = (d === 4 || d === 7) ? "margin-left:6px;" : "";
     cells.push(
       `<div title="Decile ${d}" style="${baseStyle}${hereStyle}${gapBefore}">${d}</div>`
@@ -968,7 +1331,9 @@ function renderPositionRow(metric, p) {
           ${obsBadge}
         </span>
       </div>
+      ${_renderTrajectory(metric, p)}
       <div style="margin-top:6px;font-size:12px;">${headlineHtml}</div>
+      ${_renderCohortHistogram(p)}
       ${_renderDecileStrip(decile)}
       ${_renderBandChips(p)}
       <div style="margin-top:8px;display:flex;justify-content:flex-end;gap:6px;">
@@ -996,6 +1361,7 @@ function renderPopulationCard(centre) {
   return `
     <section class="op-section">
       <h3>Population <span class="note">SA2 peer position</span></h3>
+      ${hasAny ? _renderTrajectoryRangeBar() : ""}
       ${hasAny
         ? order.map(k => renderPositionRow(k, pos[k])).join("")
         : `<div class="placeholder">SA2 peer-position metrics
@@ -1132,6 +1498,9 @@ function renderCommentary(centre) {
 
 // ── Main render ─────────────────────────────────────────────────────
 function render(centre) {
+  // Capture for trajectory-range button re-render (Layer 4.2-B-fix2)
+  _LAST_CENTRE = centre;
+
   const breadcrumb = document.getElementById("breadcrumb");
   const grpId = centre.header.parent_group?.group_id;
   const grpName = centre.header.parent_group?.name || "Operator";
@@ -1157,6 +1526,11 @@ function render(centre) {
     ${renderQaCard(centre)}
     ${renderCommentary(centre)}
   `;
+
+  // Layer 4.2-B-fix: instantiate any Chart.js canvases queued during
+  // string-template render. Canvases need to be in the DOM first, which
+  // is why this runs after main.innerHTML is set.
+  _flushPendingCharts();
 }
 
 async function load() {
