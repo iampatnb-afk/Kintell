@@ -4,9 +4,9 @@ The current state of the Kintell project. What has shipped, what is in flight, w
 
 This document is present-tense. For forward-looking scope, see `ROADMAP.md`. For session history, see `recon/PHASE_LOG.md`. For known issues, see `OPEN_ITEMS.md`.
 
-**Last updated:** 2026-04-29 (bundled round shipped + kinder always-render hotfix + visual integration + JSA IVI wire-up v3.6 → v3.9 & centre_page.py v7 → v8)
+**Last updated:** 2026-04-29 (bundled round shipped + JSA IVI wire-up + 4.3.2/4.3.3 probe dispositions resolved)
 **Current phase:** Phase 2.5 (Centre page buyer's-lens enhancement)
-**Active layer:** Layer 4.3 (sub-passes 4.3.1 + 4.3.6 + 4.3.8 + 4.3.9 + 4.3.7 shipped; 4.3.2 + 4.3.3 PROBE SHIPPED; 2 sub-passes remaining)
+**Active layer:** Layer 4.3 (sub-passes 4.3.1 + 4.3.6 + 4.3.7 + 4.3.8 + 4.3.9 SHIPPED; 4.3.2 PROBE COMPLETE — defer to V1.5; 4.3.3 PROBE COMPLETE — Industry view per DEC-36; 2 sub-passes remaining: 4.3.4 + 4.3.5)
 
 ---
 
@@ -53,8 +53,8 @@ What is **not** yet on the centre page: catchment-level supply ratio, competitor
 | **Layer 4.3 sub-pass 4.3.8 — Inline intent copy + trend-window % change display (bundled)** | **SHIPPED 2026-04-29 — `centre_page.py` v6 + `centre.html` v3.5** |
 | **Layer 4.3 sub-pass 4.3.9 — Workforce supply context block (DEC-76)** | **SHIPPED 2026-04-29 — `centre_page.py` v8 + `centre.html` v3.9** |
 | **Layer 4.3 sub-pass 4.3.7 — Perspective toggle infrastructure (DEC-74)** | **SHIPPED 2026-04-29 — `centre_page.py` v8 + `centre.html` v3.9 (dormant — activates with 4.2-A.3)** |
-| **Layer 4.3 sub-pass 4.3.2 — SALM LFP probe (Thread B)** | **PROBE SHIPPED 2026-04-29 — disposition pending operator script run** |
-| **Layer 4.3 sub-pass 4.3.3 — NCVER VET enrolments probe (Thread D)** | **PROBE SHIPPED 2026-04-29 — disposition pending operator script run** |
+| **Layer 4.3 sub-pass 4.3.2 — SALM LFP probe (Thread B)** | **PROBE COMPLETE 2026-04-29 — conditional positive; SALM-extension ingest deferred to V1.5 (bundled with OI-19). LFP triplet stays LITE for V1; promotes LFP-persons to FULL when V1.5 SALM-extension ships.** |
+| **Layer 4.3 sub-pass 4.3.3 — NCVER VET enrolments probe (Thread D)** | **PROBE COMPLETE 2026-04-29 — data exists in DB at `training_completions` (768 rows, state × remoteness × qualification × year, 2019–2024); kept at Industry view per DEC-36 (state-level data without current-tightness immediacy). OI-20 NCVER bullet closed.** |
 | Layer 4.3 — Implementation (sub-passes 4.3.4 + 4.3.5) | IN PROGRESS — 2 sub-passes remaining, ~0.4 sessions (see ROADMAP.md §1) |
 | Layer 4.4 — New ingests (NES, parent-cohort, schools) | DEFERRED to V1.5 (OI-19) |
 | Layer 5 — Doc restructuring | COMPLETE 2026-04-28 |
@@ -71,15 +71,14 @@ In recommended order:
    - 4.3.8 Inline intent copy + trend-% change (bundled) — **SHIPPED 2026-04-29**
    - 4.3.9 DEC-76 Workforce supply context block — **SHIPPED 2026-04-29**
    - 4.3.7 DEC-74 perspective toggle infrastructure — **SHIPPED 2026-04-29 (dormant; activates with 4.2-A.3)**
-   - 4.3.2 Thread B SALM LFP probe — **PROBE SHIPPED 2026-04-29; disposition pending script run**
-   - 4.3.3 Thread D NCVER probe — **PROBE SHIPPED 2026-04-29; disposition pending script run**
+   - 4.3.2 Thread B SALM LFP probe — **PROBE COMPLETE 2026-04-29; SALM-extension queued for V1.5 with OI-19**
+   - 4.3.3 Thread D NCVER probe — **PROBE COMPLETE 2026-04-29; data kept at Industry view per DEC-36; OI-20 NCVER bullet closed**
    - 4.3.4 Calibration function (`catchment_calibration.py`) — **next**
    - 4.3.5 Schema migration (7 new columns on `service_catchment_cache`)
-2. **JSA IVI table-name wire-up follow-up** — small renderer task. The Workforce supply block ships with defensive querying; the JSA IVI rows render as deferred until the actual table name in `kintell.db` is confirmed and added to `_IVI_TABLE_CANDIDATES` in `centre_page.py`. ~10-line follow-up, not blocking V1.
-3. **Layer 4.2-A implementation** (~2.2 sessions). Gated on 4.3 calibration function landing + Layer 2.5 cache build. Will activate the perspective toggle infrastructure shipped this round.
-4. **Layer 4.4** (~1.5 sessions, V1.5 — OI-19) — NES + parent-cohort + schools ingests. Closes the calibration function's documented `nes_share_pct` gap.
+2. **Layer 4.2-A implementation** (~2.2 sessions). Gated on 4.3 calibration function landing + Layer 2.5 cache build. Will activate the perspective toggle infrastructure shipped this round.
+3. **Layer 4.4 + V1.5 ingests** (~2.0 sessions, V1.5 — OI-19 + SALM-extension). NES + parent-cohort + schools, plus the SALM-extension ingest that promotes LFP-persons from LITE to FULL. Bundled because they share the "pure deepening" framing.
 
-V1 path remaining: ~5.0 sessions if all of Layer 4.3 (remainder) + 4.2-A + 4.4 land. L4.4 is pure deepening; V1 ships without it if needed.
+V1 path remaining: ~5.0 sessions if all of Layer 4.3 (remainder) + 4.2-A + V1.5 ingests land. V1 ships without V1.5 if needed.
 
 ---
 

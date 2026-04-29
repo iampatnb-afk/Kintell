@@ -4,7 +4,7 @@ Known bugs, open data quality issues, deferred fixes, and tracked residuals. Thi
 
 Items are organised by severity, then by date opened. Closed items are moved to the bottom of their section with a resolution note. Items are removed from this file only when their fix is committed AND verified — partial fixes stay visible.
 
-Last updated: 2026-04-29 (Layer 4.3 sub-pass re-sequence: OI-24 added).
+Last updated: 2026-04-29 (Layer 4.3 sub-pass 4.3.6: OI-23 closed).
 
 ---
 
@@ -46,11 +46,17 @@ The `service_catchment_cache` table schema is in place (well-designed, per Layer
 **Status:** intentional pending-state, not a bug. Tracked here so cross-references to "the catchment cache" don't surprise future sessions.
 
 ### OI-06 — LFP source is Census-only (3 points)
-**Severity:** Low · **Opened:** 2026-04-28b
+**Severity:** Low · **Opened:** 2026-04-28b · **Updated:** 2026-04-29 (Thread B probe complete)
 
 LFP (labour force participation) is currently derived from Census 2021 TSP only — 3 data points across 2011/2016/2021 (DEC-60). Per DEC-75, the LFP triplet now renders in **Lite** weight on the centre page (decile strip + chips + intent copy + as-at stamp; no trajectory chart) — three Census points is not a trajectory.
 
-**Fix path:** Layer 4.3 Thread B (SALM probe). If JSA SALM publishes LFP at SA2, upgrade to ~60 quarterly points and the row promotes back to Full weight. ~0.7 session if positive.
+**Probe outcome (2026-04-29 — sub-pass 4.3.2):** SALM source publishes `participation_rate` alongside the existing `unemployment_rate` series in the same workbooks. The existing `abs_sa2_unemployment_quarterly` ingest captured `labour_force` (LFP numerator) at SA2 × quarter for ~60 quarters back to ~2010 but did not capture participation rate itself. **Conditional positive** — the data is available from source; ingest scope just needs extending. See `recon/layer4_3_sub_pass_4_3_2_probe.md`.
+
+**Fix path (deferred to V1.5):** SALM-extended ingest, ~0.5–0.6 session. (1) Re-run SALM ingest pulling `participation_rate` column alongside existing series. (2) Layer 3 banding apply for `sa2_lfp_persons` against state-x-remoteness cohort per DEC-54. (3) `LAYER3_METRIC_META["sa2_lfp_persons"].row_weight` flips `lite` → `full` (~5 lines). (4) `LAYER4_TRAJECTORY_SOURCES` updated to point at SALM not Census TSP (~5 lines). LFP-persons promotes from LITE to FULL — trajectory chart returns, cohort histogram returns, trend-% label appears.
+
+**Sex-disaggregated LFP (LFP_F / LFP_M) stays LITE permanently.** SALM publishes persons-only at SA2; sex disaggregation is Census 2021 TSP T33A-H, structurally 3 points. DEC-61's "do not reconcile cross-product Census rates" justifies LFP-persons SALM + LFP-F/M Census split as internally consistent.
+
+Bundled with OI-19 in V1.5 — both pure-deepening ingests with similar cost/benefit profile.
 
 ### OI-07 — `participation_rate` not measured at SA2
 **Severity:** Tracking · **Opened:** 2026-04-28b
@@ -159,15 +165,16 @@ Layer 4.4 covers three new SA2-level ingests deferred from V1:
 **Fix path:** Promote to V1.5 immediately after V1 ships. Each is its own probe → ingest → Layer 3 banding → Layer 4 render. ~1.5 sessions total combined.
 
 ### OI-20 — Workforce supply context enrichments
-**Severity:** Low · **Opened:** 2026-04-29 · **Decision:** DEC-76
+**Severity:** Low · **Opened:** 2026-04-29 · **Updated:** 2026-04-29 (Thread D probe complete) · **Decision:** DEC-76
 
 V1.5 enrichments to the Workforce supply context block (DEC-76):
 
-- **Direct SEEK scrape for per-SA2 vacancy density and salary.** Originally scoped as Catchment Explorer Phase 2. Lifts the workforce supply read from state-level (current JSA IVI) to catchment-level. Composite signal: high `supply_ratio` + high SEEK vacancy density at SA2 = double credit risk.
-- **NCVER VET enrolments at SA2/remoteness for CHC30121 (Cert III) + CHC50121 (Diploma).** Pipeline of new educators entering the sector. **Probe needed** as the first step of any Thread D enrichment work — confirm whether NCVER data is already ingested in `kintell.db` from earlier panel3 work; if so, NCVER promotes to a V1 row in the Workforce supply context block.
-- **ANZSCO 4211 / 2411 advertised-wage data.** Wage pressure as a leading indicator of vacancy stress. Source: SEEK or JobOutlook.
+- **Direct SEEK scrape for per-SA2 vacancy density and salary.** Originally scoped as Catchment Explorer Phase 2. Lifts the workforce supply read from state-level (current JSA IVI) to catchment-level. Composite signal: high `supply_ratio` + high SEEK vacancy density at SA2 = double credit risk. Pickup triggers: (a) when SA2-level workforce signals become a tier of credit framing alongside the four catchment ratios in Layer 4.2-A; (b) if a SEEK API or partnership emerges that removes the scraper-engineering cost.
+- **ANZSCO 4211 / 2411 advertised-wage data.** Wage pressure as a leading indicator of vacancy stress. Source: SEEK or JobOutlook. V1.5.
 
-**Fix path:** V1.5 — promote after V1. NCVER probe is the first task; if the data is already in the DB, the NCVER row promotes immediately to V1 without an ingest.
+**Closed (2026-04-29):** ~~NCVER VET enrolments at SA2/remoteness for CHC30121 / CHC50121.~~ Probe complete (sub-pass 4.3.3) — data is already ingested in `training_completions` (768 rows, state × remoteness × qualification × year, 2019–2024 across all four CHC codes). Editorial disposition: **kept at Industry view per DEC-36.** State-level pipeline data lacks the current-tightness immediacy that DEC-76 admission requires; admitting it would dilute the credit-lens read on the Workforce supply context block. The data is preserved in DB at `training_completions`, ready for Industry-view consumption with the DEC-24 transition trough labelled. See `recon/layer4_3_sub_pass_4_3_3_probe.md`.
+
+**Fix path:** V1.5 — promote SEEK and advertised-wage when triggers above resolve. Both stay as deferred enrichments without active queue pressure.
 
 ### OI-21 — Future centre-page tab: quality elements
 **Severity:** Tracking · **Opened:** 2026-04-29
@@ -183,15 +190,6 @@ Ownership and corporate detail (cross-references into the operator graph, brand 
 
 **Fix path:** Not V1 or V1.5 — out of scope until the centre-page tabbing model is reviewed. See OI-21 for the prerequisite work.
 
-### OI-23 — Global trend-window bar disappears when Population card has no live data
-**Severity:** Low · **Opened:** 2026-04-29 · **Decision:** DEC-73 (extends)
-
-The global trend-window bar (DEC-73) renders only inside `renderPopulationCard`, gated by `hasAny === false` for that card's metrics. Post–Layer 4.3 sub-pass 4.3.1 (Thread A), an SA2 with unemployment data but no live Population metrics presents the unemployment row with only its per-chart 1Y/2Y override buttons — the global window control is unreachable. Clearing a per-chart override falls back to a control the user can no longer see.
-
-In practice this is rare. Population covers under-5 / total / births, which have effectively universal SA2 coverage via ABS ERP and Births. The brittleness is real but mild for V1 surface coverage.
-
-**Fix path:** when next opening `centre.html` for Population/Labour-Market layout work (e.g., Layer 4.3 sub-pass 4.3.6 row-weight reclassification per DEC-75), promote `_renderTrajectoryRangeBar()` to render at the page level (above both cards) rather than inside `renderPopulationCard`. ~10 lines; trivial in-file.
-
 ### OI-24 — Sub-pass dependency-ordering pass missing from design-closure protocol
 **Severity:** Tracking · **Opened:** 2026-04-29 (continued) · **Decision:** DEC-65 (amended)
 
@@ -206,6 +204,11 @@ DEC-65 (the Decision-65 pattern: probe → design doc → decisions closed → c
 ---
 
 ## Closed
+
+### OI-23 — Global trend-window bar disappears when Population card has no live data
+**Severity:** Low · **Opened:** 2026-04-29 · **CLOSED 2026-04-29** · **Decision:** DEC-73 (extends)
+
+Resolution: closed in Layer 4.3 sub-pass 4.3.6 (`centre.html` v3.4). `_renderTrajectoryRangeBar()` removed from inside `renderPopulationCard` and promoted to page level above both Position cards. Visibility gated on `_pageHasFullTrajectory(centre)` — render the bar whenever any Full-weight row on the page carries trajectory data; hide otherwise. Lite and Context-only rows have no trajectory by design and do not vote toward the gate. The unemployment per-chart 1Y/2Y override buttons (sub-pass 4.3.1) now sit beneath a globally-reachable control regardless of which Position card has data.
 
 ### OI-18 — Layer 4.3 design decisions G1–G4 + §9.4 awaiting closure
 **Severity:** Medium · **Opened:** 2026-04-28b · **CLOSED 2026-04-29**
