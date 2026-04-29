@@ -4,29 +4,31 @@ The current state of the Kintell project. What has shipped, what is in flight, w
 
 This document is present-tense. For forward-looking scope, see `ROADMAP.md`. For session history, see `recon/PHASE_LOG.md`. For known issues, see `OPEN_ITEMS.md`.
 
-**Last updated:** 2026-04-29 (sub-pass 4.3.8 shipped — bundled intent copy + trend-window % change)
+**Last updated:** 2026-04-29 (bundled round shipped + kinder always-render hotfix v3.6 → v3.7)
 **Current phase:** Phase 2.5 (Centre page buyer's-lens enhancement)
-**Active layer:** Layer 4.3 (sub-passes 4.3.1 + 4.3.6 + 4.3.8 shipped; 6 sub-passes remaining)
+**Active layer:** Layer 4.3 (sub-passes 4.3.1 + 4.3.6 + 4.3.8 + 4.3.9 + 4.3.7 shipped; 4.3.2 + 4.3.3 PROBE SHIPPED; 2 sub-passes remaining)
 
 ---
 
 ## Centre page — current state
 
-`centre_page.py` v6 (Python backend) + `centre.html` v3.5 (renderer) + payload schema `centre_payload_v4`.
+`centre_page.py` v7 (Python backend) + `centre.html` v3.7 (renderer) + payload schema `centre_payload_v4`.
 
 The centre page renders the three-temporal-mood pattern (DEC-32) at the leaf level:
 
-- **NOW block:** NQS rating + cadence (five-state classification per DEC-34); places + service sub-type + management type; catchment context (SEIFA + ARIA + SA2); tenure (greenfield/brownfield + transfer history).
+- **NOW block:** NQS rating + cadence (five-state classification per DEC-34); places + service sub-type + management type; **kinder recognition** (composite block with ACECQA flag + service-name regex match + four-state derived headline; mirrors operator-page treatment); catchment context (SEIFA + ARIA + SA2); tenure (greenfield/brownfield + transfer history).
 - **POSITION block:** 10 Layer 3-backed metrics across two cards (Population, Labour Market). Visual treatment is per-metric per DEC-75 — `row_weight: "full" | "lite" | "context"` on the metric registry switches the renderer:
   - **Full** (7 metrics — under-5 count, total population, births, unemployment, income trio): trajectory chart (Chart.js) + cohort distribution histogram (bespoke SVG) + gradient decile strip + low/mid/high band chips + inline intent copy + DER+COM badges.
   - **Lite** (3 metrics — LFP triplet): decile strip + chips + "as at YYYY" stamp + inline intent copy + DER+COM badges. No trajectory chart, no cohort histogram. Honest absence (P-2) — 3 Census points is not a trajectory.
   - **Context-only** (1 metric — `jsa_vacancy_rate`): single-fact line + state-level stamp + inline intent copy. Branch wired but currently dormant — the metric is `status='deferred'` and relocates to the Workforce supply context block in sub-pass 4.3.9 (DEC-76).
-- **Inline intent copy** (sub-pass 4.3.8): one-sentence interpretive prose per metric, italic muted-color, beneath the band chips. Tells the credit-lens reader why the metric matters for THIS centre's risk picture. Powered by the `LAYER3_METRIC_INTENT_COPY` constant in `centre_page.py` (22 entries: 10 live Position metrics + 6 catchment-ratio entries dormant for Layer 4.2-A.3 + 4 workforce supply entries dormant for sub-pass 4.3.9).
+- **Workforce supply context block** (sub-pass 4.3.9, DEC-76): default-open page-level section between Labour Market and QA cards. Four rows — Child carer vacancy index (ANZSCO 4211, JSA IVI state-monthly), ECT vacancy index (ANZSCO 2411, JSA IVI), ECEC Award minimum rates (Fair Work, national), Three-Day Guarantee policy (national, effective Jan 2026). Each row carries scope stamp + intent copy. JSA IVI rows render with state-level sparkline when data is live; render as deferred when the IVI table-name wire-up is pending (one-line follow-up).
+- **Perspective toggle infrastructure** (sub-pass 4.3.7, DEC-74): renderer hooks for reversible ratio pairs. Reads four optional fields on metric registry (`reversible`, `pair_with`, `default_perspective`, `perspective_labels`); locked band-copy templates per direction. **Dormant in V1** — no metric currently carries `reversible: true`. Activates per row when catchment ratios arrive in Layer 4.2-A.3 with no further renderer changes.
+- **Inline intent copy** (sub-pass 4.3.8): one-sentence interpretive prose per metric, italic muted-color, beneath the band chips. Tells the credit-lens reader why the metric matters for THIS centre's risk picture. Powered by the `LAYER3_METRIC_INTENT_COPY` constant in `centre_page.py` (22 entries: 10 live Position metrics + 6 catchment-ratio entries dormant for Layer 4.2-A.3 + 4 workforce supply entries live in 4.3.9 block).
 - **Trend window:** global 3Y/5Y/10Y/All button strip applied per-metric relative to each series' most recent point (DEC-73). The bar renders at page level above both Position cards (sub-pass 4.3.6 fix for OI-23). The unemployment row carries per-chart 1Y/2Y override buttons (sub-pass 4.3.1) — click-to-toggle; falls back to the global window when cleared.
-- **Trend-window % change** (sub-pass 4.3.8): each Full-weight chart shows a `+X.X% since YYYY` label top-right, plus the running % from window-start in the Chart.js hover tooltip. Both update live when any range button changes (global or per-chart). Lite rows do NOT carry the label (P-2: keeps with the no-trajectory framing). Renderer-implementation choice within DEC-73 scope.
+- **Trend-window % change** (sub-pass 4.3.8, prominence bumped 4.3.bundled-round): each Full-weight chart shows a `+X.X% since YYYY` label top-right (13px, value semibold), plus the running % from window-start in the Chart.js hover tooltip (12.5px body). Both update live when any range button changes. Lite rows do NOT carry the label (P-2: keeps with the no-trajectory framing).
 - **Empty-state copy:** unemployment rows for SA2s where SALM does not publish render a named small-population-suppression note rather than a silent em-dash (sub-pass 4.3.1).
 
-What is **not** yet on the centre page: catchment-level supply ratio, competitor density, the four catchment ratios from the Layer 4.2-A scope, the Workforce supply context block (DEC-76), and the perspective toggle on reversible ratios (DEC-74). All of these are the Layer 4.3 sub-passes 4.3.7 + 4.3.9 + Layer 4.2-A implementation queue.
+What is **not** yet on the centre page: catchment-level supply ratio, competitor density, the four catchment ratios from the Layer 4.2-A scope. All on the Layer 4.2-A implementation queue (gated on 4.3.4 calibration function landing + Layer 2.5 cache build).
 
 ---
 
@@ -49,7 +51,11 @@ What is **not** yet on the centre page: catchment-level supply ratio, competitor
 | **Layer 4.3 sub-pass 4.3.1 — Thread A (per-chart range buttons + SALM-missing empty-state)** | **SHIPPED 2026-04-29 — `centre.html` v3.3** |
 | **Layer 4.3 sub-pass 4.3.6 — DEC-75 row-weight reclassification (LFP triplet to Lite, jsa_vacancy_rate to Context-only) + OI-23 fix** | **SHIPPED 2026-04-29 — `centre_page.py` v5 + `centre.html` v3.4** |
 | **Layer 4.3 sub-pass 4.3.8 — Inline intent copy + trend-window % change display (bundled)** | **SHIPPED 2026-04-29 — `centre_page.py` v6 + `centre.html` v3.5** |
-| Layer 4.3 — Implementation (sub-passes 4.3.2–4.3.5, 4.3.7, 4.3.9) | IN PROGRESS — 6 sub-passes remaining, ~1.7 sessions (see ROADMAP.md §1) |
+| **Layer 4.3 sub-pass 4.3.9 — Workforce supply context block (DEC-76)** | **SHIPPED 2026-04-29 — `centre_page.py` v7 + `centre.html` v3.7** |
+| **Layer 4.3 sub-pass 4.3.7 — Perspective toggle infrastructure (DEC-74)** | **SHIPPED 2026-04-29 — `centre_page.py` v7 + `centre.html` v3.7 (dormant — activates with 4.2-A.3)** |
+| **Layer 4.3 sub-pass 4.3.2 — SALM LFP probe (Thread B)** | **PROBE SHIPPED 2026-04-29 — disposition pending operator script run** |
+| **Layer 4.3 sub-pass 4.3.3 — NCVER VET enrolments probe (Thread D)** | **PROBE SHIPPED 2026-04-29 — disposition pending operator script run** |
+| Layer 4.3 — Implementation (sub-passes 4.3.4 + 4.3.5) | IN PROGRESS — 2 sub-passes remaining, ~0.4 sessions (see ROADMAP.md §1) |
 | Layer 4.4 — New ingests (NES, parent-cohort, schools) | DEFERRED to V1.5 (OI-19) |
 | Layer 5 — Doc restructuring | COMPLETE 2026-04-28 |
 
@@ -59,20 +65,21 @@ What is **not** yet on the centre page: catchment-level supply ratio, competitor
 
 In recommended order:
 
-1. **Layer 4.3 implementation** — 6 sub-passes remaining per the revised ROADMAP §1 (re-sequenced 2026-04-29 continued: renderer best-practice before data plumbing). Total ~1.7 sessions remaining. Sub-pass ordering:
-   - 4.3.1 Thread A (per-chart range buttons on unemployment) — **SHIPPED 2026-04-29**
-   - 4.3.6 DEC-75 row-weight reclassification (LFP triplet to Lite) + OI-23 fix — **SHIPPED 2026-04-29**
-   - 4.3.8 Inline intent copy + trend-window % change display (bundled) — **SHIPPED 2026-04-29**
-   - 4.3.9 DEC-76 Workforce supply context block (default open) — **next**
-   - 4.3.7 DEC-74 perspective toggle on reversible ratios (infrastructure ready for Layer 4.2-A catchment ratios + parallel-stream daily-rate render)
-   - 4.3.2 Thread B (SALM probe for LFP)
-   - 4.3.3 Thread D probe (NCVER VET enrolments DB state)
-   - 4.3.4 Calibration function (`catchment_calibration.py`)
+1. **Layer 4.3 implementation** — 2 sub-passes remaining per the revised ROADMAP §1. Total ~0.4 sessions remaining.
+   - 4.3.1 Thread A — **SHIPPED 2026-04-29**
+   - 4.3.6 DEC-75 row-weight + OI-23 fix — **SHIPPED 2026-04-29**
+   - 4.3.8 Inline intent copy + trend-% change (bundled) — **SHIPPED 2026-04-29**
+   - 4.3.9 DEC-76 Workforce supply context block — **SHIPPED 2026-04-29**
+   - 4.3.7 DEC-74 perspective toggle infrastructure — **SHIPPED 2026-04-29 (dormant; activates with 4.2-A.3)**
+   - 4.3.2 Thread B SALM LFP probe — **PROBE SHIPPED 2026-04-29; disposition pending script run**
+   - 4.3.3 Thread D NCVER probe — **PROBE SHIPPED 2026-04-29; disposition pending script run**
+   - 4.3.4 Calibration function (`catchment_calibration.py`) — **next**
    - 4.3.5 Schema migration (7 new columns on `service_catchment_cache`)
-2. **Layer 4.2-A implementation** (~2.2 sessions). Gated on 4.3 calibration function landing + Layer 2.5 cache build.
-3. **Layer 4.4** (~1.5 sessions, V1.5 — OI-19) — NES + parent-cohort + schools ingests. Closes the calibration function's documented `nes_share_pct` gap.
+2. **JSA IVI table-name wire-up follow-up** — small renderer task. The Workforce supply block ships with defensive querying; the JSA IVI rows render as deferred until the actual table name in `kintell.db` is confirmed and added to `_IVI_TABLE_CANDIDATES` in `centre_page.py`. ~10-line follow-up, not blocking V1.
+3. **Layer 4.2-A implementation** (~2.2 sessions). Gated on 4.3 calibration function landing + Layer 2.5 cache build. Will activate the perspective toggle infrastructure shipped this round.
+4. **Layer 4.4** (~1.5 sessions, V1.5 — OI-19) — NES + parent-cohort + schools ingests. Closes the calibration function's documented `nes_share_pct` gap.
 
-V1 path remaining: ~5.4 sessions if all of Layer 4.3 (remainder) + 4.2-A + 4.4 land. L4.4 is pure deepening; V1 ships without it if needed.
+V1 path remaining: ~5.0 sessions if all of Layer 4.3 (remainder) + 4.2-A + 4.4 land. L4.4 is pure deepening; V1 ships without it if needed.
 
 ---
 

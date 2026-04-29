@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- centre.html v3.5 (2026-04-29) — Layer 4.3 sub-pass 4.3.8 (bundled): inline intent copy slot in all three row-weight branches (reads p.intent_copy from payload) + trend-window % change display ("+X.X% since YYYY" label top-right of each Full chart, plus running % from window-start in Chart.js tooltip via afterLabel callback). Renderer-implementation choice within DEC-73 scope, same pattern as Thread A's per-chart overrides. -->
+<!-- centre.html v3.7 (2026-04-29) — Hotfix on bundled round: kinder block always renders (D2 revision per operator browser review of v3.6 — LDCs with null ACECQA flag and no name match were hiding the block entirely; the not-flagged result is information worth showing). Block now hides only if the entire kinder payload subtree is missing (defensive against pre-v7 payloads). -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -743,18 +743,105 @@ function renderPlacesCard(centre) {
         <span class="k">Long day care flag</span>
         <span class="v"><b>${p.long_day_care_flag ? "Yes" : "No"}</b></span>
       </div>
-      ${p.kinder_approved?.value !== null ? `
-        <div class="fact">
-          <span class="k">Kinder approved</span>
-          <span class="v">
-            <b>${p.kinder_approved.value ? "Yes" : "No"}</b>
-            ${p.kinder_approved.source ? `<span style="color:var(--text-mute);font-size:11px;">(${htmlEscape(p.kinder_approved.source)})</span>` : ""}
-            ${renderBadge("OBS", { source: p.kinder_approved.source || "ACECQA" }, true)}
-          </span>
-        </div>
-      ` : ""}
+      ${_renderKinderBlock(p)}
       ${excludedNote}
     </section>
+  `;
+}
+
+// ── Kinder recognition block (mirrors operator-page treatment) ──────
+//
+// Renders a small 3-row composite:
+//   1. Headline (DER) — "Kinder: confirmed (ACECQA + name match)" etc.
+//   2. ACECQA flag evidence row (OBS) — Yes / No / Unknown
+//   3. Name-match evidence row (DER) — Yes "matched 'X'" / No
+//
+// Hidden entirely only when ACECQA has no record AND name doesn't
+// match — i.e. when there is genuinely nothing to say. Otherwise both
+// evidence rows render so the reader sees both signals explicitly.
+//
+// Headline state and signals come from p.kinder_summary in the payload
+// (computed in centre_page.py v7). The signals array is open — future
+// detection methods append entries; this renderer reads positive_keys
+// from the array but doesn't hardcode a fixed signal set in the
+// evidence rendering loop. Adding a third method = one entry in the
+// Python signals array + one optional tooltip-rule string here.
+function _renderKinderBlock(p) {
+  const summary = p && p.kinder_summary;
+  const acecqa = p && p.kinder_approved;
+  const nameMatch = p && p.kinder_name_match;
+
+  // v3.7 — always render. Kinder is a permanent fixture of the Places
+  // card so the reader sees we checked, even when the result is
+  // "Not flagged". (Original v3.6 D2 hid the block when ACECQA was
+  // null AND name didn't match, which was the dominant case for LDCs
+  // — practically invisible.) Defensive: still hide if the entire
+  // payload subtree is missing (pre-v7 payload).
+  if (!summary || !nameMatch) return "";
+
+  const acecqaUnknown = (acecqa?.value === null || acecqa?.value === undefined);
+  const acecqaPositive = !!acecqa?.value;
+  const namePositive = !!nameMatch?.value;
+
+  // Headline — green-ish accent if confirmed by any signal, muted otherwise
+  const stateClass =
+    (summary?.state === "confirmed_both" || summary?.state === "confirmed_acecqa") ? "confirmed"
+    : (summary?.state === "likely_name_only") ? "likely"
+    : "not_flagged";
+  const headlineColor =
+    stateClass === "confirmed" ? "var(--text)"
+    : stateClass === "likely"  ? "var(--text-dim)"
+    : "var(--text-mute)";
+  const headlineText = htmlEscape(summary?.headline || "Not flagged");
+  const summaryDerBadge = renderBadge("DER", {
+    rule: "Composite of ACECQA flag + service-name regex match. State is one of: confirmed_both, confirmed_acecqa, likely_name_only, not_flagged.",
+    inputs: `<code>kinder_approved=${acecqaUnknown ? "null" : (acecqaPositive ? "true" : "false")}</code>, <code>name_match=${namePositive ? "true" : "false"}</code>`,
+    formula: "ACECQA + name → confirmed_both; ACECQA only → confirmed_acecqa; name only → likely_name_only; neither → not_flagged.",
+    source: "centre_page.py kinder signals composition (v7)."
+  }, true);
+
+  // ACECQA evidence row
+  const acecqaValueText = acecqaUnknown ? "Unknown" : (acecqaPositive ? "Yes" : "No");
+  const acecqaSource = acecqa?.source || "ACECQA national register";
+  const acecqaObsBadge = renderBadge("OBS", { source: htmlEscape(acecqaSource) }, true);
+
+  // Name-match evidence row
+  const matchedText = nameMatch?.matched_text;
+  const nameValueHtml = namePositive
+    ? `Yes <span style="color:var(--text-mute);font-size:11.5px;">— matched "${htmlEscape(matchedText || "")}"</span>`
+    : `No`;
+  const nameDerBadge = renderBadge("DER", {
+    rule: htmlEscape(nameMatch?.rule || "regex on services.service_name"),
+    formula: `<code>${htmlEscape(nameMatch?.pattern || "")}</code> case-insensitive, word-boundary`,
+    inputs: matchedText ? `Matched: <code>${htmlEscape(matchedText)}</code>` : "No match",
+    threshold: htmlEscape(nameMatch?.caveat || "Name evidence, not an official kinder approval record.")
+  }, true);
+
+  return `
+    <div style="margin-top:8px;padding:8px 10px;background:var(--panel-2);border:1px solid var(--border);border-radius:4px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">
+        <span style="color:var(--text-mute);font-size:11px;letter-spacing:0.06em;text-transform:uppercase;font-weight:600;">Kinder</span>
+        <span style="display:inline-flex;gap:8px;align-items:center;">
+          <b style="color:${headlineColor};font-weight:600;font-size:13px;">${headlineText}</b>
+          ${summaryDerBadge}
+        </span>
+      </div>
+      <div style="margin-top:6px;display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:12px;">
+        <span style="color:var(--text-dim);">ACECQA flag</span>
+        <span style="display:inline-flex;gap:8px;align-items:center;">
+          <span style="color:var(--text);">${acecqaValueText}</span>
+          <span style="color:var(--text-mute);font-size:11px;">(${htmlEscape(acecqaSource)})</span>
+          ${acecqaObsBadge}
+        </span>
+      </div>
+      <div style="margin-top:4px;display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:12px;">
+        <span style="color:var(--text-dim);">Name match</span>
+        <span style="display:inline-flex;gap:8px;align-items:center;">
+          <span style="color:var(--text);">${nameValueHtml}</span>
+          ${nameDerBadge}
+        </span>
+      </div>
+    </div>
   `;
 }
 
@@ -1120,8 +1207,8 @@ function _kintell_makeOpts(yLabel, extra) {
         borderColor: "#2a2f3f",
         borderWidth: 1,
         padding: 8,
-        titleFont: { size: 11 },
-        bodyFont: { size: 11, family: "inherit" },
+        titleFont: { size: 12 },
+        bodyFont: { size: 12.5, family: "inherit" },
         displayColors: false,
       },
     },
@@ -1210,10 +1297,13 @@ function _renderTrajectory(metric, p) {
   // (LEFT) and any per-chart range buttons (RIGHT). For metrics with
   // no per-chart buttons, the label sits alone right-aligned per the
   // "top-right of each chart" anchor confirmed in the previous round.
+  // v3.6 — prominence bump: 11→13px, --text-mute → --text-dim,
+  // value rendered semibold so the % reads as the headline.
   const trend = _computeTrendPctChange(points);
   const trendLabel = (trend && p.row_weight !== "lite" && p.row_weight !== "context")
-    ? `<span style="font-size:11px;color:var(--text-mute);font-variant-numeric:tabular-nums;">
-         ${_formatTrendPct(trend.pct)} since ${htmlEscape(String(_yearOfPeriod(trend.startPeriod)))}
+    ? `<span style="font-size:13px;color:var(--text-dim);font-variant-numeric:tabular-nums;">
+         <b style="font-weight:600;color:var(--text);">${_formatTrendPct(trend.pct)}</b>
+         <span style="color:var(--text-mute);"> since ${htmlEscape(String(_yearOfPeriod(trend.startPeriod)))}</span>
        </span>`
     : "";
   const perChartBtns = _renderPerChartRangeBarButtons(metric);
@@ -1416,9 +1506,13 @@ function _renderDecileStrip(decile) {
   return `<div style="display:flex;gap:2px;margin-top:8px;">${cells.join("")}</div>`;
 }
 
-function _renderBandChips(p) {
+function _renderBandChips(metric, p) {
   const bands = ["low", "mid", "high"];
-  const bc = p.band_copy || {};
+  // Sub-pass 4.3.7 — perspective-aware band copy lookup. For non-
+  // reversible metrics this just returns p.band_copy unchanged. For
+  // reversible metrics in inverse perspective, returns the locked
+  // template per DEC-74.
+  const bc = _bandCopyForPerspective(metric, p);
   return `
     <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
       ${bands.map(b => {
@@ -1458,6 +1552,98 @@ function _renderIntentCopy(p) {
       ${htmlEscape(String(copy))}
     </div>
   `;
+}
+
+// ── Layer 4.3 sub-pass 4.3.7 — perspective toggle (DEC-74) ──────────
+//
+// Infrastructure for the per-row perspective toggle that swaps a
+// reversible ratio's framing at render time. In V1 this sits inert
+// because no metric in the registry carries reversible:true. The
+// catchment ratios from Layer 4.2-A.3 will arrive with the field set
+// — at which point this toggle activates per row with no further
+// renderer changes.
+//
+// Reversible pairs (DEC-74):
+//   supply_ratio (high_is_concerning) ↔ child_to_place (high_is_positive)
+//   demand_supply (high_is_positive)  ↔ demand_supply_inv (high_is_concerning)
+//
+// State is kept in module-local memory keyed by metric. Default reads
+// from p.default_perspective; toggle button flips between the two
+// perspectives. No persistence across page loads in V1.
+//
+// Locked band-copy templates per DEC-74. The template per direction
+// is fixed: when the renderer swaps perspective, the band copy swaps
+// with it rather than reading stale text. Templates are merged with
+// the metric's own band_copy (centre_page.py side) at render time —
+// the registry's band_copy is for the metric's DEFAULT perspective;
+// the inverse perspective uses the locked template below.
+const _PERSPECTIVE_STATE = {};   // metric -> 'forward' | 'inverse'
+
+const _PERSPECTIVE_BAND_COPY_TEMPLATES = {
+  // Direction-keyed locked templates per DEC-74.
+  high_is_concerning: {
+    low:  "low — limited stress",
+    mid:  "moderate",
+    high: "elevated — flag for review",
+  },
+  high_is_positive: {
+    low:  "thin — caution",
+    mid:  "moderate",
+    high: "strong — supportive signal",
+  },
+};
+
+function _activePerspective(metric, p) {
+  if (!p?.reversible) return "forward";
+  return _PERSPECTIVE_STATE[metric] || (p.default_perspective || "forward");
+}
+
+function _togglePerspective(metric, ev) {
+  if (ev) ev.stopPropagation();
+  const cur = _PERSPECTIVE_STATE[metric] || "forward";
+  _PERSPECTIVE_STATE[metric] = (cur === "forward") ? "inverse" : "forward";
+  // Re-render the page — same single-shot render path used by the
+  // global trend-window bar, so this picks up cleanly.
+  if (typeof _LAST_CENTRE !== "undefined" && _LAST_CENTRE) {
+    render(_LAST_CENTRE);
+  }
+}
+
+function _renderPerspectiveToggle(metric, p) {
+  if (!p?.reversible) return "";
+  const labels = p.perspective_labels || { forward: "Forward", inverse: "Inverse" };
+  const active = _activePerspective(metric, p);
+  const fwdActive = (active === "forward");
+  return `
+    <span style="display:inline-flex;gap:4px;align-items:center;font-size:11px;">
+      <button class="range-btn${fwdActive ? " active" : ""}"
+              onclick="_togglePerspective('${metric}', event)"
+              title="Switch perspective">
+        ${htmlEscape(labels.forward || "Forward")}
+      </button>
+      <span style="color:var(--text-mute);">/</span>
+      <button class="range-btn${!fwdActive ? " active" : ""}"
+              onclick="_togglePerspective('${metric}', event)"
+              title="Switch perspective">
+        ${htmlEscape(labels.inverse || "Inverse")}
+      </button>
+    </span>
+  `;
+}
+
+// Returns the band-copy dict for the active perspective. If perspective
+// is 'forward' (or metric isn't reversible), uses the metric's own
+// band_copy. If 'inverse', uses the locked template for the INVERTED
+// direction (high_is_concerning becomes high_is_positive and vice versa).
+function _bandCopyForPerspective(metric, p) {
+  const active = _activePerspective(metric, p);
+  if (!p?.reversible || active === "forward") {
+    return p?.band_copy || {};
+  }
+  // Inverse perspective: flip direction
+  const inverseDirection = (p.direction === "high_is_concerning")
+    ? "high_is_positive" : "high_is_concerning";
+  return _PERSPECTIVE_BAND_COPY_TEMPLATES[inverseDirection] || {};
 }
 
 // ── Layer 4.3 sub-pass 4.3.6 — row_weight switch (DEC-75) ───────────
@@ -1612,6 +1798,7 @@ function _renderFullRow(p, ctx) {
       <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">
         <span style="color:var(--text-dim);font-size:13px;">${ctx.display}</span>
         <span style="display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+          ${_renderPerspectiveToggle(ctx.metric, p)}
           <b style="font-variant-numeric:tabular-nums;color:var(--text);font-weight:500;">${ctx.rawStr}</b>
           ${ctx.periodTag}
           ${ctx.obsBadge}
@@ -1621,7 +1808,7 @@ function _renderFullRow(p, ctx) {
       <div style="margin-top:6px;font-size:12px;">${headlineHtml}</div>
       ${_renderCohortHistogram(p)}
       ${_renderDecileStrip(decile)}
-      ${_renderBandChips(p)}
+      ${_renderBandChips(ctx.metric, p)}
       ${_renderIntentCopy(p)}
       <div style="margin-top:8px;display:flex;justify-content:flex-end;gap:6px;">
         ${derBadge}
@@ -1693,7 +1880,7 @@ function _renderLiteRow(p, ctx) {
       </div>
       <div style="margin-top:6px;font-size:12px;">${headlineHtml}</div>
       ${_renderDecileStrip(decile)}
-      ${_renderBandChips(p)}
+      ${_renderBandChips(ctx.metric, p)}
       ${asAtStamp}
       ${_renderIntentCopy(p)}
       <div style="margin-top:8px;display:flex;justify-content:flex-end;gap:6px;">
@@ -1834,6 +2021,125 @@ function renderLabourMarketCard(centre) {
   `;
 }
 
+// ── Workforce supply context block (DEC-76, sub-pass 4.3.9) ─────────
+//
+// Default-open page-level block alongside Population and Labour Market.
+// 4 rows from the workforce_supply payload:
+//   1. Child carer vacancy index (ANZSCO 4211) — JSA IVI, state-monthly
+//   2. Early childhood teacher vacancy index (ANZSCO 2411) — JSA IVI
+//   3. ECEC Award minimum rates — Fair Work, national
+//   4. Three-Day Guarantee policy — national policy fact (Jan 2026)
+//
+// All rows are Context-only weight per DEC-75 (no SA2 peer cohort).
+// Each row carries a "state-level" or "national" stamp + intent copy.
+// JSA IVI rows render a state-level sparkline when data is live; render
+// as deferred otherwise (the IVI table-name wire-up is the bundle's
+// follow-up task — see workforce_supply probe artefact).
+function renderWorkforceSupplyCard(centre) {
+  const ws = centre && centre.workforce_supply;
+  if (!ws || !Array.isArray(ws.rows) || !ws.rows.length) return "";
+
+  const rows = ws.rows.map(r => _renderWorkforceSupplyRow(r)).join("");
+
+  return `
+    <section class="op-section">
+      <h3>Workforce supply context
+        <span class="note">state &amp; national signals · default open</span>
+      </h3>
+      ${rows}
+    </section>
+  `;
+}
+
+function _renderWorkforceSupplyRow(r) {
+  const intentCopyHtml = r.intent_copy
+    ? `<div style="margin-top:6px;font-size:11.5px;font-style:italic;color:var(--text-mute);line-height:1.5;">
+         ${htmlEscape(String(r.intent_copy))}
+       </div>`
+    : "";
+
+  // Scope stamp — state-level or national
+  const scopeStampHtml = r.scope_stamp
+    ? `<span style="font-size:11px;color:var(--text-mute);font-style:italic;">${htmlEscape(r.scope_stamp)}</span>`
+    : "";
+
+  // Latest-value or fact, depending on row type
+  let valueHtml = "";
+  let trajectoryHtml = "";
+
+  if (r.confidence === "live" && r.latest) {
+    // JSA IVI live row: latest value + state-level sparkline
+    const latest = r.latest;
+    valueHtml = `
+      <span style="display:inline-flex;gap:8px;align-items:baseline;">
+        <b style="font-variant-numeric:tabular-nums;color:var(--text);font-weight:600;font-size:14px;">
+          ${(typeof latest.value === "number") ? latest.value.toFixed(1) : htmlEscape(String(latest.value))}
+        </b>
+        <span style="color:var(--text-mute);font-size:11px;">(${htmlEscape(String(latest.period))})</span>
+      </span>
+    `;
+    trajectoryHtml = _renderWorkforceSupplySparkline(r);
+  } else if (r.confidence === "live" && r.fact) {
+    // National policy fact row — single-line statement
+    valueHtml = `<span style="color:var(--text);font-size:13px;font-weight:500;">${htmlEscape(r.fact)}</span>`;
+  } else {
+    // Deferred / pending wire-up — render as honest placeholder
+    valueHtml = `<span style="color:var(--text-mute);font-style:italic;">— pending</span>`;
+  }
+
+  const obsBadge = renderBadge("OBS", { source: r.source || "—" }, true);
+  const statusNoteHtml = (r.status_note && r.confidence !== "live")
+    ? `<div style="margin-top:4px;font-size:11px;color:var(--text-mute);font-style:italic;">${htmlEscape(r.status_note)}</div>`
+    : "";
+
+  return `
+    <div style="padding:10px 0;border-bottom:1px dashed var(--border);">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">
+        <span style="color:var(--text-dim);font-size:13px;">${htmlEscape(r.display)}</span>
+        <span style="display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+          ${valueHtml}
+          ${obsBadge}
+        </span>
+      </div>
+      <div style="margin-top:4px;">${scopeStampHtml}</div>
+      ${trajectoryHtml}
+      ${intentCopyHtml}
+      ${statusNoteHtml}
+    </div>
+  `;
+}
+
+function _renderWorkforceSupplySparkline(r) {
+  const traj = (r && r.trajectory) || [];
+  if (traj.length < 2) return "";
+  const stroke = "#3d7eff";
+  const fill = "rgba(61,126,255,0.08)";
+  const labels = traj.map(pt => String(pt.period));
+  const data = traj.map(pt => Number(pt.value));
+
+  const canvasId = `wfs-${r.metric}-${Math.random().toString(36).slice(2, 8)}`;
+  _CHART_PENDING.push(() => {
+    const el = document.getElementById(canvasId);
+    if (!el) return;
+    const dataset = _kintell_makeLine(r.display, data, stroke, fill);
+    dataset.pointHoverRadius = 4;
+    const opts = _kintell_makeOpts(null, null);
+    opts.scales.x.ticks.display = false;
+    opts.scales.x.ticks.maxTicksLimit = 0;
+    _CHART_INSTANCES[canvasId] = new Chart(el, {
+      type: "line",
+      data: { labels, datasets: [dataset] },
+      options: opts,
+    });
+  });
+
+  return `
+    <div style="margin-top:6px;height:42px;position:relative;">
+      <canvas id="${canvasId}"></canvas>
+    </div>
+  `;
+}
+
 function renderQaCard(centre) {
   const qa = centre.qa_scores || [];
   if (qa.length === 0) {
@@ -1946,6 +2252,7 @@ function render(centre) {
     ${_pageHasFullTrajectory(centre) ? _renderTrajectoryRangeBar() : ""}
     ${renderPopulationCard(centre)}
     ${renderLabourMarketCard(centre)}
+    ${renderWorkforceSupplyCard(centre)}
     ${renderQaCard(centre)}
     ${renderCommentary(centre)}
   `;
