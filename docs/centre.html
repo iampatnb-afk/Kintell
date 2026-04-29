@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- centre.html v3.8 (2026-04-29) — Kinder visual integration: 3-row composite re-rendered as flat .fact rows matching the rest of the Places & Service Type card. Drops the panel-2 background box. Same font, same k/v structure, same badge alignment as Approved places / Subtype / Management type / Long day care flag. -->
+<!-- centre.html v3.9 (2026-04-29) — JSA IVI wire-up: workforce supply row value-formatter is now integer-aware. Raw counts (vacancy_count) render with thousands separator (6,543) rather than .toFixed(1) (6543.0). Decimals still render with one decimal place. Companion to centre_page.py v8. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -2072,12 +2072,19 @@ function _renderWorkforceSupplyRow(r) {
   let trajectoryHtml = "";
 
   if (r.confidence === "live" && r.latest) {
-    // JSA IVI live row: latest value + state-level sparkline
+    // JSA IVI live row: latest value + state-level sparkline.
+    // v3.9 — integer-aware formatting: raw counts (e.g. JSA IVI
+    // vacancy_count) render as "6,543" with thousands separator;
+    // decimal values render with 1 decimal place.
     const latest = r.latest;
+    const v = latest.value;
+    const formatted = (typeof v === "number")
+      ? (Number.isInteger(v) ? v.toLocaleString() : v.toFixed(1))
+      : htmlEscape(String(v));
     valueHtml = `
       <span style="display:inline-flex;gap:8px;align-items:baseline;">
         <b style="font-variant-numeric:tabular-nums;color:var(--text);font-weight:600;font-size:14px;">
-          ${(typeof latest.value === "number") ? latest.value.toFixed(1) : htmlEscape(String(latest.value))}
+          ${formatted}
         </b>
         <span style="color:var(--text-mute);font-size:11px;">(${htmlEscape(String(latest.period))})</span>
       </span>

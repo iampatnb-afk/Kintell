@@ -1,10 +1,43 @@
 """
 centre_page.py — Phase 2 backend helper for centre.html
-Version: v6 (2026-04-29) — Layer 4.3 sub-pass 4.3.8: LAYER3_METRIC_INTENT_COPY
+Version: v8 (2026-04-29) — JSA IVI wire-up: vacancy_count added to value column candidates
 
 Provides get_centre_payload(service_id) -> dict
 Returns full single-centre detail: service + entity + group + brand,
 with OBS/DER/COM treatment matching operator_page.py conventions.
+
+v8 changes (2026-04-29, post-bundle wire-up):
+  - JSA IVI Workforce supply rows now go live. The actual table in
+    Patrick's DB (jsa_ivi_state_monthly) uses column `vacancy_count`
+    for the numeric value, which wasn't in v7's _try_query_ivi value-
+    column candidate list. v8 adds it. State column is `state_code`
+    (already in v7 candidate list); period column is `year_month`
+    (already in v7 candidate list). The two ANZSCO-state-monthly
+    rows in workforce_supply now query the actual table and return
+    a live trajectory.
+
+v7 changes (2026-04-29, bundled round after 4.3.8):
+  - KINDER MIRRORING: KINDER_PAT regex (deliberately duplicated from
+    operator_page.py — see comment near constant for canonical-source
+    note). New `kinder_name_match` and `kinder_summary` blocks under
+    `places`. Three signals composed into a derived headline state
+    (confirmed both / confirmed ACECQA / likely name-only / not flagged).
+    The signals array is open — future detection methods append.
+  - WORKFORCE SUPPLY CONTEXT (DEC-76, sub-pass 4.3.9): new top-level
+    payload section `workforce_supply` with 4 rows — Child Carer
+    vacancy index (ANZSCO 4211), ECT vacancy index (ANZSCO 2411), ECEC
+    Award minimum rates, Three-Day Guarantee. Rows render gracefully
+    as deferred placeholders when source data isn't ingested. Block
+    renders default-open in centre.html. State for the first two rows
+    is read from the centre's address.
+  - PERSPECTIVE TOGGLE INFRASTRUCTURE (DEC-74, sub-pass 4.3.7): four
+    new optional fields on the metric registry contract — `reversible`,
+    `pair_with`, `default_perspective`, `perspective_labels`. The
+    fields are documented in the LAYER3_METRIC_META docstring; no
+    existing metric carries `reversible: true` because the four
+    catchment ratios from Layer 4.2-A scope aren't in the registry
+    yet. Renderer infrastructure in centre.html v3.6 picks up these
+    fields when catchment metrics ship.
 
 v6 changes (2026-04-29, Layer 4.3 sub-pass 4.3.8):
   - New LAYER3_METRIC_INTENT_COPY constant — one-sentence interpretive
@@ -77,6 +110,7 @@ v2 fixes (2026-04-26):
 Read-only. No DB mutations.
 """
 
+import re
 import sqlite3
 from datetime import datetime, timezone
 from typing import Optional
@@ -92,6 +126,17 @@ TAG_COM = "COM"
 # Stale-rating threshold (years). Aligned with operator_page.py v5+.
 STALE_RATING_YEARS = 2
 DUE_SOON_MONTHS = 18
+
+# Regex matching "kindergarten" / "kinder" / "preschool" / "pre-school"
+# in service names (case-insensitive, word-boundary). DELIBERATELY
+# DUPLICATED from operator_page.py — that file is the canonical source
+# (where it was first defined and where the operator-level
+# kinder_by_name aggregate consumes it). If the regex ever drifts
+# between the two files, operator_page.py's version is authoritative.
+# The duplication is preferred over a shared utility module here
+# because the pattern is small and stable, and a shared module would
+# be heavier than the problem.
+KINDER_PAT = re.compile(r'\b(kinder(garten)?|pre-?school)\b', re.I)
 
 # Ownership-type label map (Decision 9). Same as operator_page.py.
 OWNERSHIP_LABELS = {
@@ -175,6 +220,29 @@ COHORT_LABEL_TEMPLATES = {
 # - status:        optional 'deferred' for metrics not yet in Layer 3
 # - source:        OBS-badge attribution string for the raw value
 # - band_copy:     {'low': ..., 'mid': ..., 'high': ...} interpretive text
+#
+# ── Perspective toggle fields (DEC-74, sub-pass 4.3.7) ──────────────
+# Optional. Present only on metrics that have a meaningful inverse
+# (the canonical V1 cases are the four Layer 4.2-A catchment ratios:
+# supply_ratio ↔ child_to_place, demand_supply ↔ demand_supply_inv).
+# When present, centre.html's renderer surfaces a per-row "perspective"
+# toggle button that swaps the active perspective at render time.
+#
+# - reversible:           bool — true if this metric has an inverse pair
+# - pair_with:            str — registry key of the inverse metric
+# - default_perspective:  str — which perspective renders first ('forward' | 'inverse')
+# - perspective_labels:   {'forward': '...', 'inverse': '...'} — toggle button labels
+#
+# Locked band-copy templates (DEC-74): each direction has a fixed
+# template lookup — high_is_concerning vs high_is_positive — so when
+# the renderer swaps the perspective, the band copy swaps with it
+# rather than reading stale text. Templates live in centre.html
+# alongside the toggle infrastructure.
+#
+# In V1, NO metric in this registry carries reversible:true. The four
+# catchment ratios (which will) ship with sub-pass 4.2-A.3. The toggle
+# infrastructure in centre.html sits inert until those rows arrive —
+# zero retrofit cost on the renderer side at that point.
 LAYER3_METRIC_META = {
     # ── Population card ─────────────────────────────────────────────
     "sa2_under5_count": {
@@ -990,6 +1058,13 @@ def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str]) -> dict:
             "direction": meta.get("direction"),
             "row_weight": meta.get("row_weight", "full"),
             "intent_copy": LAYER3_METRIC_INTENT_COPY.get(metric_name),
+            # Sub-pass 4.3.7 perspective fields (DEC-74). Optional —
+            # propagated unconditionally so renderer reads p.reversible
+            # without needing a fallback. None / missing = no toggle.
+            "reversible":          meta.get("reversible", False),
+            "pair_with":           meta.get("pair_with"),
+            "default_perspective": meta.get("default_perspective"),
+            "perspective_labels":  meta.get("perspective_labels"),
             "confidence": confidence,
             "source": meta.get("source"),
             "band_copy": meta.get("band_copy", {}),
@@ -1048,6 +1123,11 @@ def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str]) -> dict:
             "direction": meta.get("direction"),
             "row_weight": meta.get("row_weight", "full"),
             "intent_copy": LAYER3_METRIC_INTENT_COPY.get(metric_name),
+            # Sub-pass 4.3.7 perspective fields (DEC-74).
+            "reversible":          meta.get("reversible", False),
+            "pair_with":           meta.get("pair_with"),
+            "default_perspective": meta.get("default_perspective"),
+            "perspective_labels":  meta.get("perspective_labels"),
             "raw_value": row.get("raw_value"),
             "year": row.get("year"),
             "period_label": row.get("period_label"),
@@ -1192,6 +1272,65 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
 
         # --- PLACES & SUBTYPE block ---
         subtype = _compute_subtype(r.get("service_sub_type"))
+
+        # Kinder recognition (mirrors operator_page.py portfolio-level
+        # treatment). Three signals:
+        #   - acecqa_flag: services.kinder_approved (bool|None)
+        #   - name_match:  KINDER_PAT regex against services.service_name
+        #   - (future)     other detection methods append to signals[]
+        # Headline mapping in centre.html reads kinder_summary.signals
+        # and produces a four-state headline (confirmed both / confirmed
+        # ACECQA / likely name-only / not flagged). Treats ACECQA=null
+        # the same as ACECQA=False for the headline (matches operator-
+        # page kinder_by_flag aggregate convention) but keeps the null
+        # state visible in the evidence row for provenance.
+        kinder_acecqa_raw = r.get("kinder_approved")
+        kinder_acecqa = (
+            None if kinder_acecqa_raw is None
+            else bool(kinder_acecqa_raw)
+        )
+        service_name = r.get("service_name") or ""
+        name_match = KINDER_PAT.search(str(service_name))
+        kinder_name_match_value = bool(name_match)
+        kinder_name_match_text = name_match.group(0) if name_match else None
+
+        # Compose signals array — order matters for headline preference
+        # (ACECQA listed first as the primary/official signal). Future
+        # detection methods append after these two.
+        kinder_signals = [
+            {
+                "key":      "acecqa",
+                "label":    "ACECQA flag",
+                "positive": bool(kinder_acecqa),  # None coerces to False
+                "source":   r.get("kinder_source") or "ACECQA national register",
+                "tag":      TAG_OBS,
+            },
+            {
+                "key":      "name_match",
+                "label":    "Name match",
+                "positive": kinder_name_match_value,
+                "source":   "Regex on services.service_name",
+                "tag":      TAG_DER,
+                "matched_text": kinder_name_match_text,
+            },
+        ]
+        any_positive = any(s["positive"] for s in kinder_signals)
+        positive_keys = [s["key"] for s in kinder_signals if s["positive"]]
+
+        # Four-state headline mapping per D1.
+        if "acecqa" in positive_keys and "name_match" in positive_keys:
+            kinder_headline = "Kinder: confirmed (ACECQA + name match)"
+            kinder_state = "confirmed_both"
+        elif "acecqa" in positive_keys:
+            kinder_headline = "Kinder: confirmed (ACECQA)"
+            kinder_state = "confirmed_acecqa"
+        elif "name_match" in positive_keys:
+            kinder_headline = "Kinder: likely (name match only — not in ACECQA)"
+            kinder_state = "likely_name_only"
+        else:
+            kinder_headline = "Not flagged"
+            kinder_state = "not_flagged"
+
         places = {
             "approved_places": {
                 "tag": TAG_OBS,
@@ -1201,8 +1340,23 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
             "long_day_care_flag": bool(r.get("long_day_care")) if r.get("long_day_care") is not None else None,
             "kinder_approved": {
                 "tag": TAG_OBS,
-                "value": bool(r.get("kinder_approved")) if r.get("kinder_approved") is not None else None,
+                "value": kinder_acecqa,
                 "source": r.get("kinder_source"),
+            },
+            "kinder_name_match": {
+                "tag": TAG_DER,
+                "value": kinder_name_match_value,
+                "matched_text": kinder_name_match_text,
+                "rule": r"regex \b(kinder(garten)?|pre-?school)\b on services.service_name (case-insensitive, word-boundary)",
+                "pattern": KINDER_PAT.pattern,
+                "caveat": "Name evidence, not an official kinder approval record.",
+            },
+            "kinder_summary": {
+                "tag": TAG_DER,
+                "state": kinder_state,
+                "headline": kinder_headline,
+                "any_signal": any_positive,
+                "signals": kinder_signals,
             },
             "provider_management_type": {
                 "tag": TAG_OBS,
@@ -1241,6 +1395,9 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
         )
         tenure["approval_granted_date"] = r.get("approval_granted_date")
 
+        # --- WORKFORCE SUPPLY CONTEXT (DEC-76, sub-pass 4.3.9) ---
+        workforce_supply = _build_workforce_supply(conn, r.get("state"))
+
         # --- ASSEMBLE ---
         payload = {
             "schema_version": "centre_payload_v4",
@@ -1250,6 +1407,7 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
             "places": places,
             "catchment": catchment,
             "position": position,
+            "workforce_supply": workforce_supply,
             "qa_scores": qa_scores,
             "tenure": tenure,
             "commentary": _commentary_lines(header, nqs, places, tenure, subtype),
@@ -1257,6 +1415,205 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
         return payload
     finally:
         conn.close()
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Layer 4.3 sub-pass 4.3.9 — Workforce supply context block (DEC-76)
+# ─────────────────────────────────────────────────────────────────────
+# Returns the workforce_supply payload section: 4 rows rendered in the
+# new default-open block on the centre page. State-level rows depend on
+# JSA IVI Step 5c data (ANZSCO 4211 + 2411). National rows are static
+# facts (ECEC Award rates, Three-Day Guarantee policy).
+#
+# DEFENSIVE: the JSA IVI table name is not known to this code at write
+# time. The query attempts a likely table name and tolerates absence
+# (sqlite3.OperationalError) or empty results — in either case the row
+# renders as deferred. The probe artefact for this bundle includes a
+# step for the operator to confirm the IVI table name; once confirmed,
+# the literal in _IVI_TABLE_CANDIDATES below is the only line to change
+# (or the candidate ordering becomes the lookup chain).
+#
+# Intent copy for these rows comes from LAYER3_METRIC_INTENT_COPY
+# (4 entries seeded in v6 sub-pass 4.3.8 — see jsa_ivi_4211_child_carer,
+# jsa_ivi_2411_ect, ecec_award_rates, three_day_guarantee).
+
+# Likely table names for JSA IVI state-monthly data. The query tries
+# each in order; first one that exists and returns rows wins. None
+# matching = row renders as deferred with a "data not yet wired" note.
+_IVI_TABLE_CANDIDATES = (
+    "jsa_ivi_state_monthly",
+    "abs_jsa_ivi_state_monthly",
+    "jsa_internet_vacancy_index_state_monthly",
+    "jsa_ivi_anzsco_state_monthly",
+)
+
+# State name → standard 2/3-letter abbrev for the JSA IVI 'state'
+# column, which typically uses short codes. Lookup is case-insensitive
+# at use time.
+_STATE_TO_CODE = {
+    "new south wales": "NSW",
+    "victoria": "VIC",
+    "queensland": "QLD",
+    "south australia": "SA",
+    "western australia": "WA",
+    "tasmania": "TAS",
+    "northern territory": "NT",
+    "australian capital territory": "ACT",
+}
+
+
+def _try_query_ivi(conn, anzsco_code: str, state_value: Optional[str]):
+    """Try each candidate IVI table for a state-monthly series.
+
+    Returns dict with {trajectory: [...], latest: {...}, table_used: str}
+    or None if no candidate yielded data.
+    """
+    if not state_value:
+        return None
+    state_short = _STATE_TO_CODE.get(str(state_value).strip().lower(), str(state_value).strip())
+
+    for table in _IVI_TABLE_CANDIDATES:
+        try:
+            # We don't know exact column names — try a flexible probe.
+            # Common shape would be (state, anzsco_code, period_year, period_month, vacancy_index)
+            # or a single 'period' (YYYY-MM) column.
+            cur = conn.execute(
+                f"SELECT name FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
+                (table,),
+            )
+            if not cur.fetchone():
+                continue
+
+            # Inspect columns to figure out the period field
+            cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+            period_col = None
+            for cand in ("period", "period_label", "year_month", "yyyymm"):
+                if cand in cols:
+                    period_col = cand
+                    break
+            value_col = None
+            for cand in ("vacancy_index", "ivi", "value", "index_value", "vacancy_count"):
+                if cand in cols:
+                    value_col = cand
+                    break
+            if not period_col or not value_col:
+                # Table exists but column shape doesn't match expectations —
+                # surface that in the probe rather than guess.
+                continue
+
+            anzsco_col = "anzsco_code" if "anzsco_code" in cols else (
+                "anzsco" if "anzsco" in cols else None
+            )
+            state_col = "state" if "state" in cols else (
+                "state_code" if "state_code" in cols else None
+            )
+            if not anzsco_col or not state_col:
+                continue
+
+            rows = conn.execute(
+                f"SELECT {period_col}, {value_col} FROM {table} "
+                f"WHERE {state_col}=? AND {anzsco_col}=? "
+                f"ORDER BY {period_col} ASC",
+                (state_short, anzsco_code),
+            ).fetchall()
+            if not rows:
+                continue
+
+            traj = [{"period": r[0], "value": r[1]} for r in rows if r[1] is not None]
+            if not traj:
+                continue
+            return {
+                "trajectory": traj,
+                "latest": traj[-1],
+                "table_used": table,
+            }
+        except sqlite3.OperationalError:
+            # Table doesn't exist or column shape is unexpected — try next.
+            continue
+        except Exception:
+            # Anything else, fall through and try next candidate.
+            continue
+    return None
+
+
+def _ivi_row(conn, metric_key: str, anzsco_code: str, display_label: str, state_value: Optional[str]) -> dict:
+    """Build a single workforce_supply row for a JSA IVI ANZSCO code."""
+    intent_copy = LAYER3_METRIC_INTENT_COPY.get(metric_key)
+    base = {
+        "metric": metric_key,
+        "display": display_label,
+        "scope": "state",
+        "anzsco_code": anzsco_code,
+        "intent_copy": intent_copy,
+        "row_weight": "context",
+        "source": "JSA Internet Vacancy Index (Step 5c)",
+        "scope_stamp": f"state-level ({state_value or 'unknown'}) — no SA2 peer cohort",
+    }
+    data = _try_query_ivi(conn, anzsco_code, state_value)
+    if data is None:
+        base["confidence"] = "deferred"
+        base["status_note"] = (
+            "JSA IVI ingest table name not confirmed in this build — "
+            "wire-up follow-up required. See bundle probe artefact."
+        )
+        return base
+    base["confidence"] = "live"
+    base["latest"] = data["latest"]
+    base["trajectory"] = data["trajectory"]
+    base["_table_used"] = data["table_used"]
+    return base
+
+
+def _build_workforce_supply(conn, state_value: Optional[str]) -> dict:
+    """Assemble the workforce_supply block. 4 rows per DEC-76."""
+    rows = [
+        _ivi_row(
+            conn,
+            metric_key="jsa_ivi_4211_child_carer",
+            anzsco_code="4211",
+            display_label="Child carer vacancy index (ANZSCO 4211)",
+            state_value=state_value,
+        ),
+        _ivi_row(
+            conn,
+            metric_key="jsa_ivi_2411_ect",
+            anzsco_code="2411",
+            display_label="Early childhood teacher vacancy index (ANZSCO 2411)",
+            state_value=state_value,
+        ),
+        # ECEC Award minimum rates — national, static. The numeric
+        # values come from the Fair Work Modern Award; exact rates can
+        # be wired in once a Fair Work source table is ingested.
+        # Until then, render the row with a "see Fair Work" pointer.
+        {
+            "metric":      "ecec_award_rates",
+            "display":     "ECEC Award minimum rates (CIII / Diploma / ECT)",
+            "scope":       "national",
+            "intent_copy": LAYER3_METRIC_INTENT_COPY.get("ecec_award_rates"),
+            "row_weight":  "context",
+            "source":      "Fair Work Modern Award (annual minimum rates)",
+            "scope_stamp": "national — no SA2 peer cohort",
+            "confidence":  "deferred",
+            "status_note": "Awaits Fair Work rates ingest. Rates change annually on 1 July.",
+        },
+        # Three-Day Guarantee — national policy fact, effective Jan 2026.
+        {
+            "metric":      "three_day_guarantee",
+            "display":     "Three-Day Guarantee policy",
+            "scope":       "national",
+            "intent_copy": LAYER3_METRIC_INTENT_COPY.get("three_day_guarantee"),
+            "row_weight":  "context",
+            "source":      "Australian Government policy (effective Jan 2026)",
+            "scope_stamp": "national — no SA2 peer cohort",
+            "confidence":  "live",
+            "fact":        "Effective Jan 2026: every child entitled to three subsidised days, irrespective of activity test.",
+        },
+    ]
+    return {
+        "tag": TAG_DER,
+        "default_open": True,
+        "rows": rows,
+    }
 
 
 def _commentary_lines(header, nqs, places, tenure, subtype) -> list:
