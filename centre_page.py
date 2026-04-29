@@ -1,10 +1,49 @@
 """
 centre_page.py — Phase 2 backend helper for centre.html
-Version: v4 (2026-04-28) — Layer 4.2-B: trajectory + cohort histogram
+Version: v6 (2026-04-29) — Layer 4.3 sub-pass 4.3.8: LAYER3_METRIC_INTENT_COPY
 
 Provides get_centre_payload(service_id) -> dict
 Returns full single-centre detail: service + entity + group + brand,
 with OBS/DER/COM treatment matching operator_page.py conventions.
+
+v6 changes (2026-04-29, Layer 4.3 sub-pass 4.3.8):
+  - New LAYER3_METRIC_INTENT_COPY constant — one-sentence interpretive
+    prose per metric, surfaced inline beneath the band chips on the
+    centre page (renderer side in centre.html v3.5). Covers all 10
+    currently-rendered Position metrics + the 4 catchment ratios from
+    the Layer 4.2-A scope (DEC-74) + 4 Workforce supply context rows
+    from DEC-76. Catchment + workforce entries sit dormant until their
+    respective sub-passes (4.2-A.3 and 4.3.9) wire the rows; centre.html
+    reads the constant via p.intent_copy and renders silently if the
+    field is missing (P-2 honest absence).
+  - _layer3_position propagates intent_copy onto every entry it emits
+    (stub + populated). Renderer reads p.intent_copy; missing field =
+    no slot rendered.
+  - This sub-pass is BUNDLED with the trend-window % change feature
+    (centre.html v3.4 -> v3.5), which is renderer-only and needs no
+    Python-side changes. Operator-requested bundle to ship both
+    renderer enhancements in one round.
+
+v5 changes (2026-04-29, Layer 4.3 sub-pass 4.3.6):
+  - New `row_weight` field on every LAYER3_METRIC_META entry per DEC-75:
+      "full"    — trajectory + cohort histogram + decile strip + chips
+      "lite"    — decile strip + chips + "as at YYYY" stamp (no
+                  trajectory, no cohort histogram). For metrics with an
+                  SA2 peer cohort but <5 dense series points.
+      "context" — single-fact line (optional state-level sparkline).
+                  For state-level / national metrics with no SA2 peer
+                  cohort.
+    Reclassifications applied:
+      sa2_lfp_persons / _females / _males  → "lite"
+      jsa_vacancy_rate                     → "context"
+      All other Position metrics           → "full"
+    The renderer in centre.html switches on this field. Field shape is
+    a string with explicit branches + default-to-"full" fallback in the
+    renderer; future row classes (e.g. daily-rate) add a 4th value
+    without retrofit. Closes G5 of recon/layer4_3_design.md.
+  - _layer3_position now propagates row_weight onto every entry it
+    emits, including stubs (deferred / unavailable). Renderer reads
+    p.row_weight.
 
 v4 changes (2026-04-28, Layer 4.2-B):
   - New constant LAYER3_METRIC_TRAJECTORY_SOURCE — maps each Layer 4 metric
@@ -125,6 +164,14 @@ COHORT_LABEL_TEMPLATES = {
 # - direction:     'high_is_positive' | 'high_is_concerning'
 #                  (semantics carried in band_copy text only — visual
 #                   palette stays neutral per Layer 4 design §11.2)
+# - row_weight:    'full' | 'lite' | 'context' per DEC-75 — controls
+#                  visual treatment in centre.html renderPositionRow.
+#                    full    = trajectory + cohort histogram + decile
+#                              strip + chips
+#                    lite    = decile strip + chips + "as at YYYY"
+#                    context = single-fact line
+#                  Renderer falls back to 'full' for any unknown value;
+#                  future row classes (daily-rate) add a 4th branch.
 # - status:        optional 'deferred' for metrics not yet in Layer 3
 # - source:        OBS-badge attribution string for the raw value
 # - band_copy:     {'low': ..., 'mid': ..., 'high': ...} interpretive text
@@ -135,6 +182,7 @@ LAYER3_METRIC_META = {
         "card": "population",
         "value_format": "int",
         "direction": "high_is_positive",
+        "row_weight": "full",
         "source": "ABS ERP at SA2 (abs_sa2_erp_annual)",
         "band_copy": {
             "low":  "thin demand pool",
@@ -147,6 +195,7 @@ LAYER3_METRIC_META = {
         "card": "population",
         "value_format": "int",
         "direction": "high_is_positive",
+        "row_weight": "full",
         "source": "ABS ERP at SA2 (abs_sa2_erp_annual)",
         "band_copy": {
             "low":  "small SA2",
@@ -159,6 +208,7 @@ LAYER3_METRIC_META = {
         "card": "population",
         "value_format": "int",
         "direction": "high_is_positive",
+        "row_weight": "full",
         "source": "ABS Births at SA2 (abs_sa2_births_annual)",
         "band_copy": {
             "low":  "low forward demand",
@@ -171,6 +221,7 @@ LAYER3_METRIC_META = {
         "card": "population",
         "value_format": "percent",
         "direction": "high_is_positive",
+        "row_weight": "full",
         "status": "deferred",
         "source": "Derived from abs_sa2_erp_annual (Layer 3 patch pending)",
         "band_copy": {"low": "—", "mid": "—", "high": "—"},
@@ -181,6 +232,7 @@ LAYER3_METRIC_META = {
         "card": "labour_market",
         "value_format": "percent",
         "direction": "high_is_concerning",
+        "row_weight": "full",
         "source": "ABS SALM SA2 (abs_sa2_unemployment_quarterly)",
         "band_copy": {
             "low":  "tight labour market",
@@ -193,6 +245,7 @@ LAYER3_METRIC_META = {
         "card": "labour_market",
         "value_format": "currency_annual",
         "direction": "high_is_positive",
+        "row_weight": "full",
         "source": "ABS Income at SA2 (median_employee_income_annual)",
         "band_copy": {
             "low":  "price-sensitive",
@@ -205,6 +258,7 @@ LAYER3_METRIC_META = {
         "card": "labour_market",
         "value_format": "currency_weekly",
         "direction": "high_is_positive",
+        "row_weight": "full",
         "source": "ABS Census 2021 (median_equiv_household_income_weekly)",
         "band_copy": {
             "low":  "price-sensitive",
@@ -217,6 +271,7 @@ LAYER3_METRIC_META = {
         "card": "labour_market",
         "value_format": "currency_annual",
         "direction": "high_is_positive",
+        "row_weight": "full",
         "source": "ABS Income at SA2 (median_total_income_excl_pensions_annual)",
         "band_copy": {
             "low":  "price-sensitive",
@@ -229,6 +284,7 @@ LAYER3_METRIC_META = {
         "card": "labour_market",
         "value_format": "percent",
         "direction": "high_is_positive",
+        "row_weight": "lite",
         "source": "ABS Education + Employment SA2 (ee_lfp_persons_pct)",
         "band_copy": {
             "low":  "low workforce demand",
@@ -241,6 +297,7 @@ LAYER3_METRIC_META = {
         "card": "labour_market",
         "value_format": "percent",
         "direction": "high_is_positive",
+        "row_weight": "lite",
         "source": "ABS Census 2021 T33 (census_lfp_females_pct)",
         "band_copy": {
             "low":  "low",
@@ -253,6 +310,7 @@ LAYER3_METRIC_META = {
         "card": "labour_market",
         "value_format": "percent",
         "direction": "high_is_positive",
+        "row_weight": "lite",
         "source": "ABS Census 2021 T33 (census_lfp_males_pct)",
         "band_copy": {
             "low":  "low",
@@ -265,6 +323,7 @@ LAYER3_METRIC_META = {
         "card": "labour_market",
         "value_format": "percent",
         "direction": "high_is_positive",
+        "row_weight": "context",
         "status": "deferred",
         "source": "JSA IVI (state-level, computed at read time — pending)",
         "band_copy": {"low": "—", "mid": "—", "high": "—"},
@@ -289,6 +348,143 @@ POSITION_CARD_ORDER = {
         "sa2_lfp_males",
         "jsa_vacancy_rate",
     ],
+}
+
+# ─────────────────────────────────────────────────────────────────────
+# Layer 4.3 sub-pass 4.3.8 — inline intent copy per DEC-75 / Layer 4.3
+# design.
+# ─────────────────────────────────────────────────────────────────────
+# One-sentence interpretive prose per metric, rendered inline beneath
+# the band chips on the centre page. Tells the credit-lens reader what
+# the metric means for THIS centre's risk picture, not the metric in
+# the abstract. Avoid restating the band chip text; the chip is "what
+# the band says", the intent line is "why it matters".
+#
+# Coverage:
+#   - All 10 currently-rendered Position metrics (Population + Labour
+#     Market cards). Live in centre.html v3.5 today.
+#   - 6 catchment-ratio entries covering the 4 ratios in the Layer 4.2-A
+#     scope: supply_ratio + its reversible inverse child_to_place,
+#     demand_supply + its reversible inverse demand_supply_inv,
+#     adjusted_demand, capture_rate (2 reversible pairs + 2 absolute).
+#     Sit dormant until sub-pass 4.2-A.3 wires the catchment row
+#     renderer; centre.html reads p.intent_copy and renders silently
+#     if the row entry is absent, so no retrofit needed when those
+#     rows ship.
+#   - 4 Workforce supply context rows per DEC-76. Sit dormant until
+#     sub-pass 4.3.9 wires the workforce block. The block has its own
+#     renderer (DEC-76) which will read these entries.
+#
+# Total: 22 entries across the three groups.
+#
+# Reversible-pair entries (DEC-74) — supply_ratio ↔ child_to_place and
+# demand_supply ↔ demand_supply_inv — each carry their own intent copy.
+# Sub-pass 4.3.7 wires the perspective toggle; the renderer there will
+# pick the appropriate entry based on the active perspective.
+#
+# Metrics not in this map render no intent slot (P-2 honest absence).
+LAYER3_METRIC_INTENT_COPY = {
+    # ── Population card ────────────────────────────────────────────
+    "sa2_under5_count":
+        "Under-5 count is the immediate addressable demand pool; "
+        "deeper pools support more places per centre and absorb local "
+        "competition without occupancy stress.",
+    "sa2_total_population":
+        "Total population sets the macro context for catchment depth "
+        "and adjacent-service traffic; small SA2s carry thinner "
+        "fallback demand if the under-5 pool weakens.",
+    "sa2_births_count":
+        "Births are the leading indicator for under-5 demand 0–4 years "
+        "out; a falling births trend is an early warning even when "
+        "current under-5 numbers look healthy.",
+    "sa2_under5_growth_5y":
+        "Five-year under-5 growth shows whether the demand pool is "
+        "expanding, holding, or contracting; flagged as a leading "
+        "signal for catchment trajectory.",
+    # ── Labour market card ─────────────────────────────────────────
+    "sa2_unemployment_rate":
+        "Unemployment rate is a fee-sensitivity signal — high "
+        "unemployment correlates with parents' price sensitivity and "
+        "with softer demand on premium price points.",
+    "sa2_median_employee_income":
+        "Employee income proxies the day-to-day spending power of the "
+        "earning parent cohort; higher income tolerates higher daily "
+        "rates without the catchment falling away.",
+    "sa2_median_household_income":
+        "Household income captures dual-income capacity; relevant for "
+        "fee tolerance on full-time placements where two earners "
+        "carry the cost.",
+    "sa2_median_total_income":
+        "Total income (excl. pensions) is the broadest fee-tolerance "
+        "signal — it includes investment and self-employment income "
+        "that employee-income alone misses.",
+    "sa2_lfp_persons":
+        "Labour-force participation is the workforce-demand baseline; "
+        "high LFP means more parents in paid work and more demand for "
+        "structured childcare hours.",
+    "sa2_lfp_females":
+        "Female LFP is the dominant driver of childcare demand; in "
+        "Australian data, mothers' return-to-work rates set most of "
+        "the demand-side variation.",
+    "sa2_lfp_males":
+        "Male LFP rounds out the dual-income signal — high female + "
+        "high male LFP indicates dual-earner households with full-time "
+        "childcare needs.",
+    "jsa_vacancy_rate":
+        "JSA vacancy rate is a state-level workforce-tightness signal; "
+        "high vacancy rates flag staffing pressure even where local "
+        "demand is healthy.",
+
+    # ── Catchment ratios (Layer 4.2-A scope; DEC-74) — dormant in V1
+    # until sub-pass 4.2-A.3 wires the renderer. Reversible-pair
+    # entries each carry their own intent copy; sub-pass 4.3.7 will
+    # pick the appropriate one based on the active perspective.
+    # ──────────────────────────────────────────────────────────────
+    "supply_ratio":
+        "Supply ratio (places per child) measures local competition "
+        "intensity; high values flag saturation risk and pressure on "
+        "fill rates, low values flag undersupplied catchments with "
+        "opportunity.",
+    "child_to_place":
+        "Child-to-place ratio is supply ratio inverted — frames the "
+        "same data as demand-headroom; high values flag strong demand "
+        "per place, low values flag thin demand per place.",
+    "adjusted_demand":
+        "Adjusted demand is the calibrated demand estimate after "
+        "participation rate and attendance factor — the realistic "
+        "demand the catchment can actually fill.",
+    "capture_rate":
+        "Capture rate is this centre's share of catchment demand; "
+        "high capture in a competitive market is a moat signal, low "
+        "capture in a thin market is a fill-risk signal.",
+    "demand_supply":
+        "Demand-supply ratio (adjusted demand / places) is the fill "
+        "expectation — high values flag demand pull and strong "
+        "expected fill, low values flag soft catchments.",
+    "demand_supply_inv":
+        "Demand-supply ratio inverted frames the same data as "
+        "spare-capacity headroom; high values flag abundant capacity, "
+        "low values flag tight capacity vs demand.",
+
+    # ── Workforce supply context (DEC-76; sub-pass 4.3.9) — dormant
+    # in V1 until the workforce block renderer ships.
+    # ──────────────────────────────────────────────────────────────
+    "jsa_ivi_4211_child_carer":
+        "Child carer (ANZSCO 4211) vacancy intensity at state level — "
+        "leading indicator of educator-supply pressure regardless of "
+        "local demand.",
+    "jsa_ivi_2411_ect":
+        "Early childhood teacher (ANZSCO 2411) vacancy intensity — "
+        "ECT shortfalls can disqualify centres from quality ratings "
+        "and drive regulatory exposure.",
+    "ecec_award_rates":
+        "ECEC Award minimum rates set the wage floor across CIII / "
+        "Diploma / ECT classifications; rate increases compress "
+        "operator margins where fees can't move freely.",
+    "three_day_guarantee":
+        "Three-Day Guarantee (Jan 2026) entitles every child to three "
+        "subsidised days — shifts demand floor upward across all "
+        "catchments and rewires the family-payment model.",
 }
 
 # ─────────────────────────────────────────────────────────────────────
@@ -783,13 +979,17 @@ def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str]) -> dict:
     """
     out: dict = {"population": {}, "labour_market": {}}
 
-    # Helper to seed a metric slot with status (deferred / unavailable)
-    def _stub(meta: dict, confidence: str) -> dict:
+    # Helper to seed a metric slot with status (deferred / unavailable).
+    # Takes metric_name so we can look up intent_copy from the
+    # LAYER3_METRIC_INTENT_COPY constant.
+    def _stub(metric_name: str, meta: dict, confidence: str) -> dict:
         return {
             "display": meta["display"],
             "card": meta["card"],
             "value_format": meta.get("value_format"),
             "direction": meta.get("direction"),
+            "row_weight": meta.get("row_weight", "full"),
+            "intent_copy": LAYER3_METRIC_INTENT_COPY.get(metric_name),
             "confidence": confidence,
             "source": meta.get("source"),
             "band_copy": meta.get("band_copy", {}),
@@ -799,7 +999,7 @@ def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str]) -> dict:
     if not sa2_code:
         for metric_name, meta in LAYER3_METRIC_META.items():
             confidence = "deferred" if meta.get("status") == "deferred" else "unavailable"
-            out[meta["card"]][metric_name] = _stub(meta, confidence)
+            out[meta["card"]][metric_name] = _stub(metric_name, meta, confidence)
         return out
 
     # Sibling read: sa2_cohort for cohort labelling (state, ra_band)
@@ -830,12 +1030,12 @@ def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str]) -> dict:
     for metric_name, meta in LAYER3_METRIC_META.items():
         card = meta["card"]
         if meta.get("status") == "deferred":
-            out[card][metric_name] = _stub(meta, "deferred")
+            out[card][metric_name] = _stub(metric_name, meta, "deferred")
             continue
 
         row = by_metric.get(metric_name)
         if not row:
-            out[card][metric_name] = _stub(meta, "unavailable")
+            out[card][metric_name] = _stub(metric_name, meta, "unavailable")
             continue
 
         confidence = _confidence_for_cohort_n(row.get("cohort_n"))
@@ -846,6 +1046,8 @@ def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str]) -> dict:
             "card": card,
             "value_format": meta.get("value_format"),
             "direction": meta.get("direction"),
+            "row_weight": meta.get("row_weight", "full"),
+            "intent_copy": LAYER3_METRIC_INTENT_COPY.get(metric_name),
             "raw_value": row.get("raw_value"),
             "year": row.get("year"),
             "period_label": row.get("period_label"),
