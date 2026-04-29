@@ -68,6 +68,25 @@ The banner is the only ground truth that the running process matches the expecte
 
 No Notepad-based verification gates in workflow. Use programmatic verification (Python prints, console output). If a config file needs editing, regenerate it as a download. Notepad introduces silent encoding drift and operator-eye errors.
 
+### STD-35 — Cross-session continuity via end-of-session monolith
+*Origin: 2026-04-29*
+
+Project knowledge in claude.ai and the git repo are independent stores. Files committed to git do not appear in project knowledge; files uploaded to project knowledge do not appear in git. Without explicit synchronisation, every session starts blind to prior session work — the doc library on disk does not, by itself, ground a fresh chat.
+
+The synchronisation discipline is three-tiered:
+
+- **Tier 1 — permanent project knowledge.** Slow-changing canonical docs (`ARCHITECTURE.md`, `PRINCIPLES.md`, `GLOSSARY.md`, `README.md`, `DATA_INVENTORY.md`, `CONSOLIDATION_LOG.md`) plus external reference material (PC reports, credit policy, strategic insights). Uploaded once, replaced only when content materially changes.
+
+- **Tier 2 — end-of-session monolith.** A single text file regenerated at the close of every session. Inlines the current state of every changed Tier-2 structured doc (`PROJECT_STATUS.md`, `ROADMAP.md`, `STANDARDS.md`, `DECISIONS.md`, `OPEN_ITEMS.md`); compresses unchanged content to ID ranges; cites canonical library file paths. Includes a "consolidation log" section naming any retired recon artefacts and where their decisions landed (so a future session reading the monolith does not ask for files that have been absorbed). The operator deletes the prior monolith from project knowledge and uploads the new one before closing the session — one in, one out.
+
+- **Tier 3 — in-chat drop-in.** Files actively under edit during the session — code files (`centre.html`, `centre_page.py`, etc.) and the active recon design doc if there is one. Dropped into the chat at session start or at the moment of edit. Not added to project knowledge.
+
+Mid-session regens of Tier-2 docs (per the regenerate-as-we-go discipline) require the operator to attach the current version of the relevant doc at the moment of regen — Claude does a faithful full-file regen per STD-02, which requires the source.
+
+The end-of-session monolith is the cross-session ground-truth. The structured doc library on disk is the canonical source of truth; the monolith is a serialisation of its current state into a form project knowledge can index.
+
+This standard supersedes the implicit "produce a monolith only when restructuring" assumption from the 2026-04-28 doc restructure. Monoliths now ship every session that materially changes Tier-2 state.
+
 ---
 
 ## Coding
@@ -299,4 +318,4 @@ The line-ending detection content originally under STD-10 has been moved to STD-
 
 The original chain ran 1–34 with overlaps and category-less ordering. This document preserves the global numbering for historical traceability while organising by category. Where the same standard was expressed twice in the chain (e.g. browser duplicate downloads + Move-from-Downloads), the entries are consolidated under one canonical ID with the merge recorded in `CONSOLIDATION_LOG.md`.
 
-The skipped IDs in the displayed sequence (no STD-32 visible immediately under Coding, etc.) reflect cross-category placement rather than missing content. To check coverage, the full ID range is 1–34. Every ID resolves either to a live entry or to a `Consolidated → STD-X` pointer.
+The skipped IDs in the displayed sequence (no STD-32 visible immediately under Coding, etc.) reflect cross-category placement rather than missing content. To check coverage, the full ID range is 1–35. Every ID resolves either to a live entry or to a `Consolidated → STD-X` pointer.

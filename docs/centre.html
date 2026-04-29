@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- centre.html v3.2 (2026-04-28) — Layer 4.2-B-fix2: global trajectory range buttons (3Y/5Y/10Y/All) -->
+<!-- centre.html v3.3 (2026-04-29) — Layer 4.3 sub-pass 4.3.1 (Thread A): per-chart range buttons (1Y/2Y) on unemployment + improved SALM-missing empty-state -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -866,6 +866,29 @@ function _buildCohortShortLabel(p) {
 let _TRAJECTORY_RANGE_YEARS = 0;
 let _LAST_CENTRE = null; // captured by render() so setRange can re-render
 
+// ── Layer 4.3 Thread A: Per-chart range overrides ───────────────────
+//
+// Per-metric override map alongside the global. Keyed by metric name;
+// values are override years (e.g. 1, 2). A missing key (or null) means
+// "use the global window". The metric-keyed shape is forward-compatible
+// with future short-data series picking up sub-global windows (Thread B
+// SALM-LFP, etc.) — adding an entry to _PER_CHART_RANGE_OPTIONS is
+// sufficient; nothing else changes.
+//
+// Click-to-toggle: clicking the active per-chart button clears the
+// override and falls back to the global window. Single global "Trend
+// window" bar (DEC-73) remains the page-wide control.
+let _TRAJECTORY_OVERRIDE_YEARS = {};
+
+// Metrics eligible for sub-global windows. Only metrics with sufficient
+// time-series cadence to make 1Y / 2Y meaningful belong here. SALM
+// unemployment is quarterly (61 points 2010Q4–2025Q4) — 1Y = 4 quarters,
+// 2Y = 8 quarters. Census-only metrics (LFP triplet, income trio) have
+// too few points for sub-global windows; they stay on the global.
+const _PER_CHART_RANGE_OPTIONS = {
+  "sa2_unemployment_rate": [1, 2],
+};
+
 function _setTrajectoryRange(years, btnEl) {
   _TRAJECTORY_RANGE_YEARS = years;
   // Update active state on the button row
@@ -875,6 +898,49 @@ function _setTrajectoryRange(years, btnEl) {
   if (btnEl) btnEl.classList.add("active");
   // Re-render the page so charts pick up the new window
   if (_LAST_CENTRE) render(_LAST_CENTRE);
+}
+
+// Returns the effective range years for a given metric — per-chart
+// override if set, otherwise the global trend-window value.
+function _getEffectiveRangeYears(metric) {
+  const override = _TRAJECTORY_OVERRIDE_YEARS[metric];
+  return (override !== undefined && override !== null) ? override : _TRAJECTORY_RANGE_YEARS;
+}
+
+// Click-to-toggle handler. Clicking the active button clears the
+// override (falls back to global); clicking any other button sets it.
+function _setPerChartRange(metric, years, btnEl) {
+  const current = _TRAJECTORY_OVERRIDE_YEARS[metric];
+  if (current === years) {
+    delete _TRAJECTORY_OVERRIDE_YEARS[metric];
+  } else {
+    _TRAJECTORY_OVERRIDE_YEARS[metric] = years;
+  }
+  // Re-render so the chart picks up the new window
+  if (_LAST_CENTRE) render(_LAST_CENTRE);
+}
+
+// Emits a small right-aligned button strip ABOVE the trajectory canvas
+// for metrics in _PER_CHART_RANGE_OPTIONS. Returns "" for any metric
+// not eligible for sub-global windows.
+function _renderPerChartRangeBar(metric) {
+  const opts = _PER_CHART_RANGE_OPTIONS[metric];
+  if (!opts) return "";
+  const override = _TRAJECTORY_OVERRIDE_YEARS[metric];
+  const btns = opts.map(years => {
+    const isActive = (override === years);
+    const titleAttr = isActive
+      ? "Click to clear and use the global trend window"
+      : `Override to last ${years} year${years > 1 ? "s" : ""}`;
+    return `<button class="range-btn${isActive ? " active" : ""}" `
+         + `onclick="_setPerChartRange('${metric}', ${years}, this)" `
+         + `title="${titleAttr}">${years}Y</button>`;
+  }).join("");
+  return `
+    <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;">
+      ${btns}
+    </div>
+  `;
 }
 
 function _renderTrajectoryRangeBar() {
@@ -1054,13 +1120,22 @@ function _renderTrajectory(metric, p) {
   const allPoints = (p && p.trajectory) || [];
   if (!allPoints.length) return "";
 
-  // Apply global trend-window filter (3Y/5Y/10Y/All). Per metric,
-  // window is relative to that series' most recent point.
-  const points = _filterTrajectoryByRange(allPoints, _TRAJECTORY_RANGE_YEARS);
+  // Apply effective trend window — per-chart override falls back to
+  // global (DEC-73 + Layer 4.3 Thread A). Per metric, window is relative
+  // to that series' most recent point.
+  const effectiveYears = _getEffectiveRangeYears(metric);
+  const points = _filterTrajectoryByRange(allPoints, effectiveYears);
+
+  // Per-chart range bar (only for metrics in _PER_CHART_RANGE_OPTIONS).
+  // Renders both for the normal chart AND for the empty-state, so the
+  // user can clear an override that yielded no points.
+  const perChartBar = _renderPerChartRangeBar(metric);
+
   if (!points.length) {
     // Selected window contains no points for this metric — render an
     // honest empty-state rather than a misleading flat-line chart.
     return `
+      ${perChartBar}
       <div style="margin-top:6px;padding:8px;background:var(--panel-2);
                   border:1px dashed var(--border);border-radius:4px;
                   color:var(--text-mute);font-size:11px;font-style:italic;
@@ -1119,6 +1194,7 @@ function _renderTrajectory(metric, p) {
   });
 
   return `
+    ${perChartBar}
     <div style="margin-top:6px;height:${canvasHeight}px;position:relative;">
       <canvas id="${canvasId}"></canvas>
     </div>
@@ -1250,12 +1326,23 @@ function renderPositionRow(metric, p) {
 
   // No Layer 3 row for this SA2 / metric
   if (conf === "unavailable") {
+    // Layer 4.3 Thread A: improved empty-state for SALM-missing SA2s.
+    // SALM (ABS Small Area Labour Markets) does not publish unemployment
+    // for every SA2 — small-population areas are suppressed. Replace the
+    // silent em-dash with a named reason for the unemployment row only.
+    // Other metrics retain the em-dash; their missing-data causes differ
+    // (Census-only series, deferred metrics) and warrant per-metric copy
+    // when those rows are revisited.
+    const isUnemployment = (metric === "sa2_unemployment_rate");
+    const fallback = isUnemployment
+      ? `<span style="color:var(--text-mute);font-style:italic;font-size:11.5px;">
+           SALM does not publish at this SA2 (small-population suppression)
+         </span>`
+      : `<span style="color:var(--text-mute);font-style:italic;font-size:12px;">—</span>`;
     return `
       <div class="fact">
         <span class="k">${display}</span>
-        <span class="v">
-          <span style="color:var(--text-mute);font-style:italic;font-size:12px;">—</span>
-        </span>
+        <span class="v">${fallback}</span>
       </div>
     `;
   }

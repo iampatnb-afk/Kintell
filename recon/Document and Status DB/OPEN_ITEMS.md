@@ -4,7 +4,7 @@ Known bugs, open data quality issues, deferred fixes, and tracked residuals. Thi
 
 Items are organised by severity, then by date opened. Closed items are moved to the bottom of their section with a resolution note. Items are removed from this file only when their fix is committed AND verified — partial fixes stay visible.
 
-Last updated: 2026-04-29.
+Last updated: 2026-04-29 (Layer 4.3 Thread A apply: OI-23 added).
 
 ---
 
@@ -182,6 +182,15 @@ NQS quality detail and regulatory history currently render inline in the centre 
 Ownership and corporate detail (cross-references into the operator graph, brand cluster context, group-level financial framing) currently surface via the operator-page link in the centre header. The user has flagged eventual move to a dedicated tab once the centre-page tabbing model is reviewed.
 
 **Fix path:** Not V1 or V1.5 — out of scope until the centre-page tabbing model is reviewed. See OI-21 for the prerequisite work.
+
+### OI-23 — Global trend-window bar disappears when Population card has no live data
+**Severity:** Low · **Opened:** 2026-04-29 · **Decision:** DEC-73 (extends)
+
+The global trend-window bar (DEC-73) renders only inside `renderPopulationCard`, gated by `hasAny === false` for that card's metrics. Post–Layer 4.3 sub-pass 4.3.1 (Thread A), an SA2 with unemployment data but no live Population metrics presents the unemployment row with only its per-chart 1Y/2Y override buttons — the global window control is unreachable. Clearing a per-chart override falls back to a control the user can no longer see.
+
+In practice this is rare. Population covers under-5 / total / births, which have effectively universal SA2 coverage via ABS ERP and Births. The brittleness is real but mild for V1 surface coverage.
+
+**Fix path:** when next opening `centre.html` for Population/Labour-Market layout work (e.g., Layer 4.3 sub-pass 4.3.6 row-weight reclassification per DEC-75), promote `_renderTrajectoryRangeBar()` to render at the page level (above both cards) rather than inside `renderPopulationCard`. ~10 lines; trivial in-file.
 
 ---
 

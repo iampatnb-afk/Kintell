@@ -86,3 +86,49 @@ The corrective work in this session: regenerated `recon/layer4_3_design.md` as v
 
 ---
 
+
+## 2026-04-29 (continued) — Layer 4.3 sub-pass 4.3.1 (Thread A) + STD-35
+
+**Context:** Resumed from the 2026-04-29 design-closure session. Implemented the first sub-pass of Layer 4.3 implementation. Surfaced and resolved a structural memory gap: project knowledge in claude.ai and the git repo are independent stores; without explicit synchronisation, every session starts blind. Codified the fix as STD-35.
+
+**Shipped:**
+- `docs/centre.html` v3.2 → v3.3 — Layer 4.3 sub-pass 4.3.1 (Thread A): per-chart range buttons (1Y/2Y) on the unemployment metric (`sa2_unemployment_rate`), and improved empty-state copy for SALM-missing SA2s.
+- `recon/layer4_3_thread_a_probe.md` — probe + apply artefact, decisions A1–A6 closed in-line.
+
+**Code mechanics:**
+- New globals on `centre.html`: `_TRAJECTORY_OVERRIDE_YEARS` (per-metric override map), `_PER_CHART_RANGE_OPTIONS` (lookup, currently `{sa2_unemployment_rate: [1, 2]}`).
+- New helpers: `_getEffectiveRangeYears(metric)`, `_setPerChartRange(metric, years, btnEl)`, `_renderPerChartRangeBar(metric)`.
+- `_renderTrajectory(metric, p)` rewired to read effective range via `_getEffectiveRangeYears()`; per-chart bar emitted on both normal and empty-state returns.
+- `renderPositionRow` `unavailable` branch extended: unemployment row gets a named SALM-suppression note instead of the silent em-dash; other metrics retain the em-dash.
+- Net delta: +87 lines, all additive. No deletions, no payload-schema bump, no `centre_page.py` change.
+
+**Decisions:**
+- A1–A6 closed (per-chart state model, button placement, click-to-toggle semantics, metric-keyed lookup, SALM-missing copy, override scope). Recorded in `recon/layer4_3_thread_a_probe.md` §3 — implementation choices within DEC-73's scope, not new architectural decisions; no entries added to `DECISIONS.md`.
+
+**Standards:**
+- STD-35 (Process category) — Cross-session continuity via end-of-session monolith. Codifies the three-tiered project-knowledge / git-repo synchronisation discipline. Range bumped 1–34 → 1–35 in `STANDARDS.md`.
+
+**Open items:**
+- OI-23 raised (Low) — global trend-window bar disappears when Population card has no live data; Thread A makes the brittleness more material. Fix slotted for sub-pass 4.3.6 layout work. Recorded in `OPEN_ITEMS.md`.
+
+**Doc updates this turn:**
+- `STANDARDS.md` — STD-35 added; footer numbering note updated.
+- `OPEN_ITEMS.md` — OI-23 added.
+- `PROJECT_STATUS.md` — `centre.html` v3.3 stamped; sub-pass 4.3.1 marked SHIPPED; remaining sub-pass count updated; OI-23 added to summary; doc-set table STANDARDS row bumped (1–35, STD-35 added); V1 path remaining 6.2 → 5.9 sessions.
+- `recon/PHASE_LOG.md` — this entry.
+
+**Not yet done (carry forward):**
+- Re-upload of the structured doc set to project knowledge — this session's regenerated docs (`STANDARDS.md`, `OPEN_ITEMS.md`, `PROJECT_STATUS.md`) need to land in claude.ai project knowledge before next session starts, otherwise the next chat opens with the same gap STD-35 was created to close.
+- End-of-session Tier-2 monolith per STD-35 — should be produced now (or at next session close).
+
+**Files committed this session (cumulative across both halves of 2026-04-29):**
+- `recon/Document and Status DB/DECISIONS.md` (DEC-74, 75, 76)
+- `recon/Document and Status DB/STANDARDS.md` (STD-34 locked; STD-35 added)
+- `recon/Document and Status DB/OPEN_ITEMS.md` (OI-19, 20, 21, 22, 23 added; OI-18 closed)
+- `recon/Document and Status DB/ROADMAP.md`
+- `recon/Document and Status DB/PROJECT_STATUS.md`
+- `recon/Document and Status DB/PHASE_LOG.md` (this entry + design-closure entry)
+- `recon/layer4_3_design.md` v1.1 (closure session, retired post-consolidation)
+- `recon/layer4_3_thread_a_probe.md` (apply session)
+- `docs/centre.html` v3.3
+
