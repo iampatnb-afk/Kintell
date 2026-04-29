@@ -59,11 +59,15 @@ LFP (labour force participation) is currently derived from Census 2021 TSP only 
 Bundled with OI-19 in V1.5 — both pure-deepening ingests with similar cost/benefit profile.
 
 ### OI-07 — `participation_rate` not measured at SA2
-**Severity:** Tracking · **Opened:** 2026-04-28b
+**Severity:** Tracking · **Opened:** 2026-04-28b · **Updated:** 2026-04-29 (sub-pass 4.3.4 shipped)
 
 The four catchment ratios (adjusted_demand, capture_rate, demand_supply, child_to_place) all depend on `participation_rate`, which is not directly measured at SA2 by ABS. Calibration is required. STD-34 locked 2026-04-29.
 
-**Fix path:** Layer 4.3 sub-pass 4.3.4 (per ROADMAP.md). Calibration function (`catchment_calibration.py`) takes `(income_decile, female_lfp_pct, nes_share_pct, aria_band)` and returns `(rate, rule_text)`. Default 0.50, range [0.43, 0.55], nudges ±0.02 per documented input. Note: `nes_share_pct` is a documented input gap per OI-19 (NES ingest deferred to Layer 4.4).
+**Status:** Calibration function shipped 2026-04-29 — `catchment_calibration.py` v1. Standalone module exposing `calibrate_participation_rate(income_decile, female_lfp_pct, nes_share_pct, aria_band) → (rate, rule_text)`. Default 0.50, range [0.43, 0.55], nudges ±0.02 per documented input. NES nudge is dormant in V1 (input always None per OI-19). 13 hermetic unit tests pass.
+
+**Fix path remaining:** This OI-07 effectively closes when Layer 4.2-A.3 consumes the function — i.e. when the four catchment ratios actually render on the centre page using the calibrated rate, with the rule_text surfaced in the DER tooltip. The function exists; the consumption hasn't shipped yet. Tracking-only until then.
+
+See `recon/layer4_3_sub_pass_4_3_4_probe.md` for D1–D4 implementation choices.
 
 ### OI-08 — 19 synthetic SA2s in `sa2_cohort` have NULL ra_band
 **Severity:** None (acceptable) · **Opened:** 2026-04-28

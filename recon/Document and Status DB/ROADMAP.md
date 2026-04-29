@@ -4,7 +4,7 @@ The forward-looking view of work scope and sequencing. `PROJECT_STATUS.md` is pr
 
 This document changes when scope changes or a phase moves. It does not log session work — that's in `recon/PHASE_LOG.md`.
 
-Last updated: 2026-04-29 (bundled round shipped + JSA IVI wire-up + 4.3.2/4.3.3 probe dispositions resolved).
+Last updated: 2026-04-29 (sub-pass 4.3.4 calibration function shipped).
 
 ---
 
@@ -48,7 +48,7 @@ The closures from the 2026-04-29 design session (DEC-74, DEC-75, DEC-76) reshape
 | 5 | 4.3.7 — DEC-74 perspective toggle | `reversible` + `pair_with` + `default_perspective` + `perspective_labels` fields. Render-time swap. Locked band-copy templates. | ~0.3 session | **SHIPPED 2026-04-29 — `centre_page.py` v7 + `centre.html` v3.6 (dormant; activates with 4.2-A.3).** |
 | 6 | 4.3.2 — Thread B | SALM probe for LFP. Probe ~0.2 session; if positive, ingest ~0.5 session | ~0.7 session | **PROBE COMPLETE 2026-04-29 — conditional positive. SALM source publishes participation_rate alongside existing series; ingest scope can be extended (~0.5 session). LFP not blocking V1; SALM-extension deferred to V1.5 bundled with OI-19.** |
 | 7 | 4.3.3 — Thread D probe | Confirm NCVER VET enrolments DB state (whether already ingested from earlier panel3 work) | ~0.1 session | **PROBE COMPLETE 2026-04-29 — data exists in `training_completions` (768 rows, state × remoteness × qualification × year, 2019–2024). Editorial disposition: DEC-36 stands; data kept at Industry view (state-level lacks current-tightness immediacy that DEC-76 admission requires). OI-20 NCVER bullet closed.** |
-| 8 | 4.3.4 — Calibration function | `catchment_calibration.py` with `calibrate_participation_rate()`. STD-34 already locked. | ~0.3 session | Data plumbing for Layer 4.2-A. Cannot ship before this lands. |
+| 8 | 4.3.4 — Calibration function | `catchment_calibration.py` with `calibrate_participation_rate()`. STD-34 already locked. | ~0.3 session | **SHIPPED 2026-04-29 — `catchment_calibration.py` v1. STD-34 implementation; 13 hermetic unit tests pass. Sits ready for Layer 4.2-A.3 to consume.** |
 | 9 | 4.3.5 — Schema migration | 7 new columns on `service_catchment_cache` (ratio metrics + calibration metadata) | ~0.1 session | Data plumbing. Trivial migration. |
 
 ### Layer 4.2-A sub-passes (unchanged)
