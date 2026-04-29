@@ -4,7 +4,7 @@ The current state of the Kintell project. What has shipped, what is in flight, w
 
 This document is present-tense. For forward-looking scope, see `ROADMAP.md`. For session history, see `recon/PHASE_LOG.md`. For known issues, see `OPEN_ITEMS.md`.
 
-**Last updated:** 2026-04-29 (bundled round shipped + kinder always-render hotfix v3.6 → v3.7)
+**Last updated:** 2026-04-29 (bundled round shipped + kinder always-render hotfix + visual integration v3.6 → v3.8)
 **Current phase:** Phase 2.5 (Centre page buyer's-lens enhancement)
 **Active layer:** Layer 4.3 (sub-passes 4.3.1 + 4.3.6 + 4.3.8 + 4.3.9 + 4.3.7 shipped; 4.3.2 + 4.3.3 PROBE SHIPPED; 2 sub-passes remaining)
 
@@ -12,7 +12,7 @@ This document is present-tense. For forward-looking scope, see `ROADMAP.md`. For
 
 ## Centre page — current state
 
-`centre_page.py` v7 (Python backend) + `centre.html` v3.7 (renderer) + payload schema `centre_payload_v4`.
+`centre_page.py` v7 (Python backend) + `centre.html` v3.8 (renderer) + payload schema `centre_payload_v4`.
 
 The centre page renders the three-temporal-mood pattern (DEC-32) at the leaf level:
 
@@ -51,8 +51,8 @@ What is **not** yet on the centre page: catchment-level supply ratio, competitor
 | **Layer 4.3 sub-pass 4.3.1 — Thread A (per-chart range buttons + SALM-missing empty-state)** | **SHIPPED 2026-04-29 — `centre.html` v3.3** |
 | **Layer 4.3 sub-pass 4.3.6 — DEC-75 row-weight reclassification (LFP triplet to Lite, jsa_vacancy_rate to Context-only) + OI-23 fix** | **SHIPPED 2026-04-29 — `centre_page.py` v5 + `centre.html` v3.4** |
 | **Layer 4.3 sub-pass 4.3.8 — Inline intent copy + trend-window % change display (bundled)** | **SHIPPED 2026-04-29 — `centre_page.py` v6 + `centre.html` v3.5** |
-| **Layer 4.3 sub-pass 4.3.9 — Workforce supply context block (DEC-76)** | **SHIPPED 2026-04-29 — `centre_page.py` v7 + `centre.html` v3.7** |
-| **Layer 4.3 sub-pass 4.3.7 — Perspective toggle infrastructure (DEC-74)** | **SHIPPED 2026-04-29 — `centre_page.py` v7 + `centre.html` v3.7 (dormant — activates with 4.2-A.3)** |
+| **Layer 4.3 sub-pass 4.3.9 — Workforce supply context block (DEC-76)** | **SHIPPED 2026-04-29 — `centre_page.py` v7 + `centre.html` v3.8** |
+| **Layer 4.3 sub-pass 4.3.7 — Perspective toggle infrastructure (DEC-74)** | **SHIPPED 2026-04-29 — `centre_page.py` v7 + `centre.html` v3.8 (dormant — activates with 4.2-A.3)** |
 | **Layer 4.3 sub-pass 4.3.2 — SALM LFP probe (Thread B)** | **PROBE SHIPPED 2026-04-29 — disposition pending operator script run** |
 | **Layer 4.3 sub-pass 4.3.3 — NCVER VET enrolments probe (Thread D)** | **PROBE SHIPPED 2026-04-29 — disposition pending operator script run** |
 | Layer 4.3 — Implementation (sub-passes 4.3.4 + 4.3.5) | IN PROGRESS — 2 sub-passes remaining, ~0.4 sessions (see ROADMAP.md §1) |

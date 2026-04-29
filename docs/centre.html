@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- centre.html v3.7 (2026-04-29) — Hotfix on bundled round: kinder block always renders (D2 revision per operator browser review of v3.6 — LDCs with null ACECQA flag and no name match were hiding the block entirely; the not-flagged result is information worth showing). Block now hides only if the entire kinder payload subtree is missing (defensive against pre-v7 payloads). -->
+<!-- centre.html v3.8 (2026-04-29) — Kinder visual integration: 3-row composite re-rendered as flat .fact rows matching the rest of the Places & Service Type card. Drops the panel-2 background box. Same font, same k/v structure, same badge alignment as Approved places / Subtype / Management type / Long day care flag. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -773,26 +773,33 @@ function _renderKinderBlock(p) {
 
   // v3.7 — always render. Kinder is a permanent fixture of the Places
   // card so the reader sees we checked, even when the result is
-  // "Not flagged". (Original v3.6 D2 hid the block when ACECQA was
-  // null AND name didn't match, which was the dominant case for LDCs
-  // — practically invisible.) Defensive: still hide if the entire
-  // payload subtree is missing (pre-v7 payload).
+  // "Not flagged". Defensive: still hide if the entire payload subtree
+  // is missing (pre-v7 payload).
+  // v3.8 — visual integration: three flat .fact rows matching the rest
+  // of the Places card. Same k/v structure as Approved places / Subtype
+  // / Management type / Long day care flag. Bold main value + muted
+  // qualifier in parentheses + badge — same pattern as Subtype's
+  // "<b>Long Day Care</b> (LDC) [OBS]".
   if (!summary || !nameMatch) return "";
 
   const acecqaUnknown = (acecqa?.value === null || acecqa?.value === undefined);
   const acecqaPositive = !!acecqa?.value;
   const namePositive = !!nameMatch?.value;
 
-  // Headline — green-ish accent if confirmed by any signal, muted otherwise
-  const stateClass =
-    (summary?.state === "confirmed_both" || summary?.state === "confirmed_acecqa") ? "confirmed"
-    : (summary?.state === "likely_name_only") ? "likely"
-    : "not_flagged";
-  const headlineColor =
-    stateClass === "confirmed" ? "var(--text)"
-    : stateClass === "likely"  ? "var(--text-dim)"
-    : "var(--text-mute)";
-  const headlineText = htmlEscape(summary?.headline || "Not flagged");
+  // Headline: split into bold "main" (Confirmed / Likely / Not flagged)
+  // and muted "qualifier" in parentheses, matching Subtype's pattern.
+  let summaryMain, summaryQualifier;
+  switch (summary?.state) {
+    case "confirmed_both":
+      summaryMain = "Confirmed"; summaryQualifier = "ACECQA + name match"; break;
+    case "confirmed_acecqa":
+      summaryMain = "Confirmed"; summaryQualifier = "ACECQA"; break;
+    case "likely_name_only":
+      summaryMain = "Likely"; summaryQualifier = "name match only — not in ACECQA"; break;
+    default:
+      summaryMain = "Not flagged"; summaryQualifier = null; break;
+  }
+
   const summaryDerBadge = renderBadge("DER", {
     rule: "Composite of ACECQA flag + service-name regex match. State is one of: confirmed_both, confirmed_acecqa, likely_name_only, not_flagged.",
     inputs: `<code>kinder_approved=${acecqaUnknown ? "null" : (acecqaPositive ? "true" : "false")}</code>, <code>name_match=${namePositive ? "true" : "false"}</code>`,
@@ -807,9 +814,6 @@ function _renderKinderBlock(p) {
 
   // Name-match evidence row
   const matchedText = nameMatch?.matched_text;
-  const nameValueHtml = namePositive
-    ? `Yes <span style="color:var(--text-mute);font-size:11.5px;">— matched "${htmlEscape(matchedText || "")}"</span>`
-    : `No`;
   const nameDerBadge = renderBadge("DER", {
     rule: htmlEscape(nameMatch?.rule || "regex on services.service_name"),
     formula: `<code>${htmlEscape(nameMatch?.pattern || "")}</code> case-insensitive, word-boundary`,
@@ -818,29 +822,29 @@ function _renderKinderBlock(p) {
   }, true);
 
   return `
-    <div style="margin-top:8px;padding:8px 10px;background:var(--panel-2);border:1px solid var(--border);border-radius:4px;">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">
-        <span style="color:var(--text-mute);font-size:11px;letter-spacing:0.06em;text-transform:uppercase;font-weight:600;">Kinder</span>
-        <span style="display:inline-flex;gap:8px;align-items:center;">
-          <b style="color:${headlineColor};font-weight:600;font-size:13px;">${headlineText}</b>
-          ${summaryDerBadge}
-        </span>
-      </div>
-      <div style="margin-top:6px;display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:12px;">
-        <span style="color:var(--text-dim);">ACECQA flag</span>
-        <span style="display:inline-flex;gap:8px;align-items:center;">
-          <span style="color:var(--text);">${acecqaValueText}</span>
-          <span style="color:var(--text-mute);font-size:11px;">(${htmlEscape(acecqaSource)})</span>
-          ${acecqaObsBadge}
-        </span>
-      </div>
-      <div style="margin-top:4px;display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:12px;">
-        <span style="color:var(--text-dim);">Name match</span>
-        <span style="display:inline-flex;gap:8px;align-items:center;">
-          <span style="color:var(--text);">${nameValueHtml}</span>
-          ${nameDerBadge}
-        </span>
-      </div>
+    <div class="fact">
+      <span class="k">Kinder</span>
+      <span class="v">
+        <b>${htmlEscape(summaryMain)}</b>
+        ${summaryQualifier ? `<span style="color:var(--text-mute);font-size:11px;">(${htmlEscape(summaryQualifier)})</span>` : ""}
+        ${summaryDerBadge}
+      </span>
+    </div>
+    <div class="fact">
+      <span class="k">Kinder — ACECQA flag</span>
+      <span class="v">
+        <b>${acecqaValueText}</b>
+        ${acecqaSource ? `<span style="color:var(--text-mute);font-size:11px;">(${htmlEscape(acecqaSource)})</span>` : ""}
+        ${acecqaObsBadge}
+      </span>
+    </div>
+    <div class="fact">
+      <span class="k">Kinder — name match</span>
+      <span class="v">
+        <b>${namePositive ? "Yes" : "No"}</b>
+        ${(namePositive && matchedText) ? `<span style="color:var(--text-mute);font-size:11px;">(matched "${htmlEscape(matchedText)}")</span>` : ""}
+        ${nameDerBadge}
+      </span>
     </div>
   `;
 }
