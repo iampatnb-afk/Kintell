@@ -4,7 +4,7 @@ The forward-looking view of work scope and sequencing. `PROJECT_STATUS.md` is pr
 
 This document changes when scope changes or a phase moves. It does not log session work — that's in `recon/PHASE_LOG.md`.
 
-Last updated: 2026-04-29.
+Last updated: 2026-04-29 (sub-pass re-sequence per DEC-65 amendment; 4.3.1 Thread A shipped).
 
 ---
 
@@ -37,17 +37,19 @@ Total: ~6.2 sessions of work. L4.4 is pure deepening; V1 ships without it if nee
 
 The closures from the 2026-04-29 design session (DEC-74, DEC-75, DEC-76) reshape the Layer 4.3 implementation sequence. Total effort grew from ~1.7 to ~2.5 sessions.
 
-| Sub-pass | Description | Effort |
-|---|---|---|
-| 4.3.1 — Thread A | Per-chart range buttons on unemployment + improved empty-state | ~0.3 session |
-| 4.3.2 — Thread B | SALM probe for LFP. Probe ~0.2 session; if positive, ingest ~0.5 session | ~0.7 session |
-| 4.3.3 — Thread D probe | Confirm NCVER VET enrolments DB state (whether already ingested from earlier panel3 work) | ~0.1 session |
-| 4.3.4 — Calibration function | `catchment_calibration.py` with `calibrate_participation_rate()`. STD-34 locked. | ~0.3 session |
-| 4.3.5 — Schema migration | 7 new columns on `service_catchment_cache` (ratio metrics + calibration metadata) | ~0.1 session |
-| 4.3.6 — DEC-75 row-weight | `row_weight` field on metric registry. Reclassify LFP triplet to Lite. Render switch in `centre.html`. | ~0.2 session |
-| 4.3.7 — DEC-74 perspective toggle | `reversible` + `pair_with` + `default_perspective` + `perspective_labels` fields. Render-time swap. Locked band-copy templates. | ~0.3 session |
-| 4.3.8 — Intent copy | `LAYER3_METRIC_INTENT_COPY` constant — inline prose for all 10 existing + 4 catchment metrics + 2–4 Workforce supply context rows | ~0.3 session |
-| 4.3.9 — DEC-76 Workforce supply context block | Render JSA IVI 4211 + 2411 + (NCVER if probe positive) + ECEC Award rates + Three-Day Guarantee. Default open. | ~0.3 session |
+**Re-sequenced 2026-04-29 (continued)** to put renderer best-practice before data plumbing. Renderer sub-passes (row-weight, intent copy, workforce supply block, perspective toggle) depend only on the metric-registry shape, not on the calibration function or schema migration. Re-sequencing brings visible "best-practice" centre page forward by ~2.3 sessions and means catchment ratios in Layer 4.2-A drop into a render slot that is already wired with the perspective toggle, eliminating retrofit. Original ordering preserved in git history. See OI-24 — the missed dependency check is the protocol-level gap; DEC-65 amended to include a sequencing pass at design closure.
+
+| Order | Sub-pass | Description | Effort | Rationale for position |
+|---|---|---|---|---|
+| 1 | 4.3.1 — Thread A | Per-chart range buttons on unemployment + improved empty-state | ~0.3 session | **SHIPPED 2026-04-29** |
+| 2 | 4.3.6 — DEC-75 row-weight | `row_weight` field on metric registry. Reclassify LFP triplet to Lite. Render switch in `centre.html`. | ~0.2 session | Renderer-only. Honest depiction of LFP (3 Census points) before further work. |
+| 3 | 4.3.8 — Intent copy | `LAYER3_METRIC_INTENT_COPY` constant — inline prose for all 10 existing + 4 catchment metrics + 2–4 Workforce supply context rows | ~0.3 session | Renderer-only. Touches every row regardless; cheaper to do once than twice. |
+| 4 | 4.3.9 — DEC-76 Workforce supply context block | Render JSA IVI 4211 + 2411 + (NCVER if probe positive) + ECEC Award rates + Three-Day Guarantee. Default open. | ~0.3 session | Renderer-only. Surfaces a top-tier credit signal currently invisible. |
+| 5 | 4.3.7 — DEC-74 perspective toggle | `reversible` + `pair_with` + `default_perspective` + `perspective_labels` fields. Render-time swap. Locked band-copy templates. | ~0.3 session | Renderer-only. Toggle infrastructure sits dormant on existing rows; ready for catchment ratios in Layer 4.2-A without retrofit. |
+| 6 | 4.3.2 — Thread B | SALM probe for LFP. Probe ~0.2 session; if positive, ingest ~0.5 session | ~0.7 session | Read-only probe, then conditional ingest. May promote LFP back from Lite to Full once data lands. |
+| 7 | 4.3.3 — Thread D probe | Confirm NCVER VET enrolments DB state (whether already ingested from earlier panel3 work) | ~0.1 session | Read-only probe. May promote NCVER from V1.5 (OI-20) to V1 row in the workforce block. |
+| 8 | 4.3.4 — Calibration function | `catchment_calibration.py` with `calibrate_participation_rate()`. STD-34 already locked. | ~0.3 session | Data plumbing for Layer 4.2-A. Cannot ship before this lands. |
+| 9 | 4.3.5 — Schema migration | 7 new columns on `service_catchment_cache` (ratio metrics + calibration metadata) | ~0.1 session | Data plumbing. Trivial migration. |
 
 ### Layer 4.2-A sub-passes (unchanged)
 
@@ -115,12 +117,13 @@ The Layer 4.3 design extension surfaced four decisions plus §9.4. As of 2026-04
 ## 4. Parallel work streams
 
 ### Daily-rate data acquisition (separate chat)
-A parallel work stream is finalising daily-rate data acquisition. Expected outputs:
+A parallel work stream is finalising daily-rate data acquisition (vacancy availability, daily-rate pricing, and adjacent feeds). Expected outputs:
 - A new working standard around scrape cadence / vendor selection formalisation
 - A new decision tree on the daily-rate ingest pipeline
 - New Layer 2 step entries
+- **A centre-page integration point** — daily-rate data renders somewhere on the centre page (likely a new metric registry entry plus a Position-row slot, or a dedicated block similar in pattern to the Workforce supply context block per DEC-76). Specific render shape to be designed when the data lands; the renderer-best-practice infrastructure shipped by Layer 4.3 sub-passes 2–5 (re-sequenced) sets up the slot without retrofit.
 
-When that work merges back, its standards and decisions enter `STANDARDS.md` and `DECISIONS.md` with the next sequential IDs (STD-35+, DEC-77+). A consolidation pass will reconcile any overlap with existing entries.
+When that work merges back, its standards and decisions enter `STANDARDS.md` and `DECISIONS.md` with the next sequential IDs (STD-36+, DEC-77+ — STD-35 already taken by the cross-session continuity standard added 2026-04-29 continued). A consolidation pass will reconcile any overlap with existing entries and decide where the centre-page integration sits in the sub-pass / phase ordering (probably a new Layer 4.5 or a Phase 5 promotion from V1.5).
 
 ### Starting Blocks integration
 The Starting Blocks pilot (separate `MODULE_SUMMARY_*.md`) is production-ready in isolation. Integration into `kintell.db` requires four steps in order:

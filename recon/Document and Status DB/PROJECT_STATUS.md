@@ -52,16 +52,16 @@ What is **not** yet on the centre page: catchment-level supply ratio, competitor
 
 In recommended order:
 
-1. **Layer 4.3 implementation** — 8 sub-passes remaining per the revised ROADMAP §1. Total ~2.2 sessions remaining. Sub-pass ordering:
+1. **Layer 4.3 implementation** — 8 sub-passes remaining per the revised ROADMAP §1 (re-sequenced 2026-04-29 continued: renderer best-practice before data plumbing). Total ~2.2 sessions remaining. Sub-pass ordering:
    - 4.3.1 Thread A (per-chart range buttons on unemployment) — **SHIPPED 2026-04-29**
-   - 4.3.2 Thread B (SALM probe for LFP) — **next**
-   - 4.3.3 Thread D probe (NCVER VET enrolments DB state — could promote OI-20's NCVER row to V1)
-   - 4.3.4 Calibration function (`catchment_calibration.py`)
-   - 4.3.5 Schema migration (7 new columns on `service_catchment_cache`)
-   - 4.3.6 DEC-75 row-weight reclassification (LFP triplet to Lite)
-   - 4.3.7 DEC-74 perspective toggle on reversible ratios
+   - 4.3.6 DEC-75 row-weight reclassification (LFP triplet to Lite) — **next**
    - 4.3.8 `LAYER3_METRIC_INTENT_COPY` constant + render slot
    - 4.3.9 DEC-76 Workforce supply context block (default open)
+   - 4.3.7 DEC-74 perspective toggle on reversible ratios (infrastructure ready for Layer 4.2-A catchment ratios + parallel-stream daily-rate render)
+   - 4.3.2 Thread B (SALM probe for LFP)
+   - 4.3.3 Thread D probe (NCVER VET enrolments DB state)
+   - 4.3.4 Calibration function (`catchment_calibration.py`)
+   - 4.3.5 Schema migration (7 new columns on `service_catchment_cache`)
 2. **Layer 4.2-A implementation** (~2.2 sessions). Gated on 4.3 calibration function landing + Layer 2.5 cache build.
 3. **Layer 4.4** (~1.5 sessions, V1.5 — OI-19) — NES + parent-cohort + schools ingests. Closes the calibration function's documented `nes_share_pct` gap.
 
@@ -90,6 +90,7 @@ Branch: `master`. Working tree expected clean after this session's commit lands.
 - 2026-04-28 doc restructure (12-doc set)
 - 2026-04-29 Layer 4.3 design closure: `recon/layer4_3_design.md` v1.1 + DEC-74 + DEC-75 + DEC-76 + STD-34 locked + OI-19 through OI-22 + ROADMAP/PROJECT_STATUS/PHASE_LOG updated
 - 2026-04-29 Layer 4.3 sub-pass 4.3.1 (Thread A) apply: `centre.html` v3.3 + `recon/layer4_3_thread_a_probe.md` + OPEN_ITEMS.md (OI-23) + PROJECT_STATUS.md update
+- 2026-04-29 Layer 4.3 sub-pass re-sequence: ROADMAP.md (re-ordered §1.3; daily-rate centre-page integration flagged in §4) + DECISIONS.md (DEC-65 amended) + OPEN_ITEMS.md (OI-24) + PROJECT_STATUS.md update
 
 All pushed to origin (assumed once this session's commit lands).
 
@@ -97,7 +98,7 @@ All pushed to origin (assumed once this session's commit lands).
 
 ## Parallel work streams
 
-A separate chat is finalising daily-rate data acquisition. When merged, it will likely add: a working standard around scrape cadence / vendor selection (STD-35), a decision tree on the daily-rate ingest pipeline (DEC-77+), new Layer 2 step entries.
+A separate chat is finalising daily-rate data acquisition (vacancy availability + daily-rate pricing + adjacent feeds). When merged, it will likely add: a working standard around scrape cadence / vendor selection (STD-36+), a decision tree on the daily-rate ingest pipeline (DEC-77+), new Layer 2 step entries, and a centre-page integration point — likely a new metric registry entry or a dedicated block following the DEC-76 Workforce-supply pattern. Render slot is set up by Layer 4.3 sub-passes 2–5 (re-sequenced) with no retrofit needed.
 
 Starting Blocks pilot is production-ready in isolation. Integration into `kintell.db` is Phase 8, sequenced as: lift folder off Google Drive → identity resolution → scale stress-test → multi-source posture decision. See `ROADMAP.md` §4.
 
@@ -110,7 +111,8 @@ See `OPEN_ITEMS.md` for the full list. Headlines:
 - **OI-12 (Medium):** backup pruning needed — cumulative ~5.0 GB approaching git-timeout threshold.
 - **OI-19 (Medium, new 2026-04-29):** Layer 4.4 ingests deferred to V1.5; NES required to close calibration function's documented gap.
 - **OI-20 (Low, new 2026-04-29):** Workforce supply context enrichments — SEEK-by-SA2, NCVER probe, advertised wages.
-- **OI-23 (Low, new 2026-04-29):** global trend-window bar disappears when Population card has no live data; Thread A makes the brittleness more material. Fix in next Population/Labour-Market layout work (likely sub-pass 4.3.6).
+- **OI-23 (Low, new 2026-04-29):** global trend-window bar disappears when Population card has no live data; Thread A makes the brittleness more material. Fix in next Population/Labour-Market layout work (sub-pass 4.3.6 — now the next sub-pass after the re-sequence).
+- **OI-24 (Tracking, new 2026-04-29):** sub-pass dependency-ordering pass missing from design-closure protocol. Closed structurally by the DEC-65 amendment. Marker for traceability; close at next consolidation.
 - **OI-04 (Medium):** ~20 services with bad lat/lng (0,0) need geocoding fix; deferred per DEC-63.
 - **OI-18 closed 2026-04-29:** Layer 4.3 design decisions G1–G4 + §9.4 resolved.
 
@@ -126,11 +128,11 @@ The 12-document set produced by the 2026-04-28 restructure. The 2026-04-29 Layer
 | `PROJECT_STATUS.md` | This file | 2026-04-29 |
 | `PRINCIPLES.md` | Stable design principles | 2026-04-28 |
 | `STANDARDS.md` | Categorised working standards 1–35 | 2026-04-29 (STD-34 locked, STD-35 added) |
-| `DECISIONS.md` | ADR-style decisions 1–76 | 2026-04-29 (DEC-74/75/76 added) |
+| `DECISIONS.md` | ADR-style decisions 1–76 | 2026-04-29 (DEC-65 amended; DEC-74/75/76 added) |
 | `ARCHITECTURE.md` | Visual systems, palette, page topology, layer architecture | 2026-04-28 |
 | `DATA_INVENTORY.md` | Source files, DB tables, refresh policy | 2026-04-28 |
-| `ROADMAP.md` | V1 scope, deferred work, sequencing | 2026-04-29 |
-| `OPEN_ITEMS.md` | Known bugs, deferred fixes, residuals | 2026-04-29 (OI-19/20/21/22 added; OI-18 closed) |
+| `ROADMAP.md` | V1 scope, deferred work, sequencing | 2026-04-29 (sub-pass re-sequence; daily-rate centre-page integration flagged) |
+| `OPEN_ITEMS.md` | Known bugs, deferred fixes, residuals | 2026-04-29 (OI-19/20/21/22/23/24 added; OI-18 closed) |
 | `GLOSSARY.md` | Terms and acronyms | 2026-04-28 |
 | `recon/PHASE_LOG.md` | Append-only session history | 2026-04-29 (entry appended) |
 | `CONSOLIDATION_LOG.md` | One-time record of merges in the 2026-04-28 restructure | 2026-04-28 |

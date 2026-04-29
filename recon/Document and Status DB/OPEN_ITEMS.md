@@ -4,7 +4,7 @@ Known bugs, open data quality issues, deferred fixes, and tracked residuals. Thi
 
 Items are organised by severity, then by date opened. Closed items are moved to the bottom of their section with a resolution note. Items are removed from this file only when their fix is committed AND verified — partial fixes stay visible.
 
-Last updated: 2026-04-29 (Layer 4.3 Thread A apply: OI-23 added).
+Last updated: 2026-04-29 (Layer 4.3 sub-pass re-sequence: OI-24 added).
 
 ---
 
@@ -191,6 +191,17 @@ The global trend-window bar (DEC-73) renders only inside `renderPopulationCard`,
 In practice this is rare. Population covers under-5 / total / births, which have effectively universal SA2 coverage via ABS ERP and Births. The brittleness is real but mild for V1 surface coverage.
 
 **Fix path:** when next opening `centre.html` for Population/Labour-Market layout work (e.g., Layer 4.3 sub-pass 4.3.6 row-weight reclassification per DEC-75), promote `_renderTrajectoryRangeBar()` to render at the page level (above both cards) rather than inside `renderPopulationCard`. ~10 lines; trivial in-file.
+
+### OI-24 — Sub-pass dependency-ordering pass missing from design-closure protocol
+**Severity:** Tracking · **Opened:** 2026-04-29 (continued) · **Decision:** DEC-65 (amended)
+
+The Layer 4.3 design-closure session (2026-04-29) closed nine sub-passes but did not check whether their default ordering was dependency-optimised. The 2026-04-29 (continued) session caught the gap on Patrick's prompting — a renderer-only run could have shipped before data-plumbing sub-passes, surfacing best-practice rendering ~2.3 sessions earlier and eliminating retrofit risk on Layer 4.2-A catchment ratios and the parallel daily-rate integration. See `recon/PHASE_LOG.md` 2026-04-29 (continued) for the diagnosis.
+
+DEC-65 (the Decision-65 pattern: probe → design doc → decisions closed → code) has been amended to include a dependency-ordered sequencing pass at design closure. The amendment is retroactive: any open multi-sub-pass plan that has not had a sequencing pass should have one run before the next sub-pass starts.
+
+**Status:** structural gap closed by the DEC-65 amendment. This OI exists for traceability of the missed-then-caught protocol gap. No further action; close at next consolidation.
+
+**Fix path:** none required — the protocol-level fix is the DEC-65 amendment. OI-24 is a marker, not active work.
 
 ---
 

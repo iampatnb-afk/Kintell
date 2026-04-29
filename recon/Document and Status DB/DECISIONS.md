@@ -834,6 +834,7 @@ Consequences: Codified in STD-26. Per-state national-sum sanity check is incorre
 ## DEC-65 — Layer 3 schema and RWCI weighting: precedent survey first
 Status: Active
 Date: 2026-04-27c
+Amended: 2026-04-29 (continued) — added the dependency-ordered sequencing pass to the closure protocol; see "Amendment 2026-04-29" below.
 
 Context: Layer 3 schema and RWCI weighting decisions risked redesigning conventions already shipped on the Industry, Catchment, Operator, and Centre v1 tabs.
 
@@ -846,6 +847,20 @@ Decision: Layer 3 schema and RWCI weighting decisions deferred pending precedent
 This is non-negotiable for Layer 3 even though it adds 0.5 sessions of pre-work; without it, banding choices made in isolation will likely conflict with conventions on shipped pages, forcing rework.
 
 Consequences: Established the **Decision-65 pattern** — probe → design doc → decisions closed → code — as the project's standard approach for non-trivial work. Promoted to a principle in `PRINCIPLES.md`. RWCI composite deferred to P2 (Layer 3b); banding choices in Layer 3 follow shipped UI conventions (DEC-67 confirms).
+
+### Amendment 2026-04-29 — sequencing pass at design closure
+
+The Layer 4.3 design-closure session (2026-04-29) closed nine sub-passes but did not check whether their default ordering (roughly chronological with the design conversation) was dependency-optimised. The 2026-04-29 (continued) implementation session caught the gap when Patrick asked what came next — a renderer-only run could have shipped before any data-plumbing sub-pass, surfacing best-practice rendering ~2.3 sessions earlier and eliminating retrofit risk on downstream layers (Layer 4.2-A catchment ratios + the parallel daily-rate integration). See OI-24.
+
+Closure protocol amended: a sub-pass dependency-ordering pass is now part of design closure, alongside the per-decision closures. The pass asks, for each sub-pass:
+
+1. What does this depend on (data, schema, decisions, prior renderer state)?
+2. Does anything downstream depend on this happening *before* something else, or only on it happening eventually?
+3. If multiple sub-passes have no mutual dependency, which delivers visible value soonest? Which sets up the most downstream work without retrofit?
+
+Output of the sequencing pass: an explicit ordering in `ROADMAP.md` with a one-line rationale per sub-pass position. Default-chronological-from-design-conversation is rejected as a sequencing strategy because it has no dependency basis.
+
+Applies retroactively to any open multi-sub-pass plan: if sub-passes have not had a sequencing pass, run one before starting the next sub-pass. Layer 4.3 itself has been re-sequenced (ROADMAP §1.3) under this amendment.
 
 ---
 
