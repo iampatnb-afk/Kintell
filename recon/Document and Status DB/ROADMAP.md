@@ -4,7 +4,7 @@ The forward-looking view of work scope and sequencing. `PROJECT_STATUS.md` is pr
 
 This document changes when scope changes or a phase moves. It does not log session work — that's in `recon/PHASE_LOG.md`.
 
-Last updated: 2026-04-29 (sub-pass re-sequence per DEC-65 amendment; 4.3.1 Thread A shipped).
+Last updated: 2026-04-29 (sub-pass 4.3.6 shipped — DEC-75 row-weight + OI-23 close; sub-pass 4.3.8 scope expanded to bundle trend-window % change feature with intent copy).
 
 ---
 
@@ -42,8 +42,8 @@ The closures from the 2026-04-29 design session (DEC-74, DEC-75, DEC-76) reshape
 | Order | Sub-pass | Description | Effort | Rationale for position |
 |---|---|---|---|---|
 | 1 | 4.3.1 — Thread A | Per-chart range buttons on unemployment + improved empty-state | ~0.3 session | **SHIPPED 2026-04-29** |
-| 2 | 4.3.6 — DEC-75 row-weight | `row_weight` field on metric registry. Reclassify LFP triplet to Lite. Render switch in `centre.html`. | ~0.2 session | Renderer-only. Honest depiction of LFP (3 Census points) before further work. |
-| 3 | 4.3.8 — Intent copy | `LAYER3_METRIC_INTENT_COPY` constant — inline prose for all 10 existing + 4 catchment metrics + 2–4 Workforce supply context rows | ~0.3 session | Renderer-only. Touches every row regardless; cheaper to do once than twice. |
+| 2 | 4.3.6 — DEC-75 row-weight | `row_weight` field on metric registry. Reclassify LFP triplet to Lite, `jsa_vacancy_rate` to Context-only. Render switch in `centre.html`. Closes OI-23 in the same edit (trend-window bar promoted to page level). | ~0.2 session | **SHIPPED 2026-04-29 — `centre_page.py` v5 + `centre.html` v3.4** |
+| 3 | 4.3.8 — Intent copy + trend-% display | (a) `LAYER3_METRIC_INTENT_COPY` constant — inline prose for all 10 existing + 4 catchment metrics + 2–4 Workforce supply context rows. (b) Trend-window % change on each Full-weight chart — signed `+X.X% since YYYY` label top-right of the chart, plus running % from window-start in the Chart.js hover tooltip. Both update live when any range button changes (global or per-chart). Renderer-implementation choice within DEC-73 scope, same pattern as Thread A's per-chart overrides. Lite rows do NOT get the label (P-2: keep with the no-trajectory framing). Neutral colour, no green/red valence. | ~0.4–0.5 session | Renderer-only. Touches every Full row's chart area + every row's intent-copy slot; cheaper to ship in one round. |
 | 4 | 4.3.9 — DEC-76 Workforce supply context block | Render JSA IVI 4211 + 2411 + (NCVER if probe positive) + ECEC Award rates + Three-Day Guarantee. Default open. | ~0.3 session | Renderer-only. Surfaces a top-tier credit signal currently invisible. |
 | 5 | 4.3.7 — DEC-74 perspective toggle | `reversible` + `pair_with` + `default_perspective` + `perspective_labels` fields. Render-time swap. Locked band-copy templates. | ~0.3 session | Renderer-only. Toggle infrastructure sits dormant on existing rows; ready for catchment ratios in Layer 4.2-A without retrofit. |
 | 6 | 4.3.2 — Thread B | SALM probe for LFP. Probe ~0.2 session; if positive, ingest ~0.5 session | ~0.7 session | Read-only probe, then conditional ingest. May promote LFP back from Lite to Full once data lands. |

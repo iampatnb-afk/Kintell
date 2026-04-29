@@ -4,24 +4,27 @@ The current state of the Kintell project. What has shipped, what is in flight, w
 
 This document is present-tense. For forward-looking scope, see `ROADMAP.md`. For session history, see `recon/PHASE_LOG.md`. For known issues, see `OPEN_ITEMS.md`.
 
-**Last updated:** 2026-04-29
+**Last updated:** 2026-04-29 (sub-pass 4.3.6 shipped; 4.3.8 scope expanded to bundle trend-window % change with intent copy)
 **Current phase:** Phase 2.5 (Centre page buyer's-lens enhancement)
-**Active layer:** Layer 4.3 (sub-pass 4.3.1 Thread A shipped; 8 sub-passes remaining)
+**Active layer:** Layer 4.3 (sub-passes 4.3.1 + 4.3.6 shipped; 7 sub-passes remaining)
 
 ---
 
 ## Centre page — current state
 
-`centre_page.py` v4 (Python backend) + `centre.html` v3.3 (renderer) + payload schema `centre_payload_v4`.
+`centre_page.py` v5 (Python backend) + `centre.html` v3.4 (renderer) + payload schema `centre_payload_v4`.
 
 The centre page renders the three-temporal-mood pattern (DEC-32) at the leaf level:
 
 - **NOW block:** NQS rating + cadence (five-state classification per DEC-34); places + service sub-type + management type; catchment context (SEIFA + ARIA + SA2); tenure (greenfield/brownfield + transfer history).
-- **POSITION block:** 10 Layer 3-backed metrics across two cards (Population, Labour Market). Each row currently shows trajectory chart (Chart.js), cohort distribution histogram (bespoke SVG), gradient decile strip, low/mid/high band chips, and DER+COM badges.
-- **Trend window:** global 3Y/5Y/10Y/All button strip applied per-metric relative to each series' most recent point (DEC-73). The unemployment row carries per-chart 1Y/2Y override buttons (Layer 4.3 sub-pass 4.3.1 Thread A) — click-to-toggle; falls back to the global window when cleared.
-- **Empty-state copy:** unemployment rows for SA2s where SALM does not publish render a named small-population-suppression note rather than a silent em-dash (Layer 4.3 sub-pass 4.3.1 Thread A).
+- **POSITION block:** 10 Layer 3-backed metrics across two cards (Population, Labour Market). Visual treatment is per-metric per DEC-75 — `row_weight: "full" | "lite" | "context"` on the metric registry switches the renderer:
+  - **Full** (7 metrics — under-5 count, total population, births, unemployment, income trio): trajectory chart (Chart.js) + cohort distribution histogram (bespoke SVG) + gradient decile strip + low/mid/high band chips + DER+COM badges.
+  - **Lite** (3 metrics — LFP triplet): decile strip + chips + "as at YYYY" stamp + DER+COM badges. No trajectory chart, no cohort histogram. Honest absence (P-2) — 3 Census points is not a trajectory.
+  - **Context-only** (1 metric — `jsa_vacancy_rate`): single-fact line. Branch wired but currently dormant — the metric is `status='deferred'` and relocates to the Workforce supply context block in sub-pass 4.3.9 (DEC-76).
+- **Trend window:** global 3Y/5Y/10Y/All button strip applied per-metric relative to each series' most recent point (DEC-73). The bar renders at page level above both Position cards (sub-pass 4.3.6 fix for OI-23). The unemployment row carries per-chart 1Y/2Y override buttons (sub-pass 4.3.1) — click-to-toggle; falls back to the global window when cleared.
+- **Empty-state copy:** unemployment rows for SA2s where SALM does not publish render a named small-population-suppression note rather than a silent em-dash (sub-pass 4.3.1).
 
-What is **not** yet on the centre page: catchment-level supply ratio, competitor density, the four catchment ratios from the Layer 4.2-A scope, the Workforce supply context block (DEC-76), the perspective toggle on reversible ratios (DEC-74), the row-weight reclassification of the LFP triplet to Lite (DEC-75), and the inline `LAYER3_METRIC_INTENT_COPY` constant. All of these are the Layer 4.3 sub-passes 4.3.2–4.3.9 + Layer 4.2-A implementation queue.
+What is **not** yet on the centre page: catchment-level supply ratio, competitor density, the four catchment ratios from the Layer 4.2-A scope, the Workforce supply context block (DEC-76), the perspective toggle on reversible ratios (DEC-74), and the inline `LAYER3_METRIC_INTENT_COPY` constant. All of these are the Layer 4.3 sub-passes 4.3.7–4.3.9 + Layer 4.2-A implementation queue.
 
 ---
 
@@ -42,7 +45,8 @@ What is **not** yet on the centre page: catchment-level supply ratio, competitor
 | Layer 4.2-A — Catchment data on centre page | DESIGNED, awaiting Layer 4.3 + Layer 2.5 |
 | **Layer 4.3 — Design v1.1** | **CLOSED 2026-04-29 — all decisions resolved (DEC-74, DEC-75, DEC-76; STD-34 locked; OI-19/20/21/22 logged)** |
 | **Layer 4.3 sub-pass 4.3.1 — Thread A (per-chart range buttons + SALM-missing empty-state)** | **SHIPPED 2026-04-29 — `centre.html` v3.3** |
-| Layer 4.3 — Implementation (sub-passes 4.3.2–4.3.9) | IN PROGRESS — 8 sub-passes remaining, ~2.2 sessions (see ROADMAP.md §1) |
+| **Layer 4.3 sub-pass 4.3.6 — DEC-75 row-weight reclassification (LFP triplet to Lite, jsa_vacancy_rate to Context-only) + OI-23 fix** | **SHIPPED 2026-04-29 — `centre_page.py` v5 + `centre.html` v3.4** |
+| Layer 4.3 — Implementation (sub-passes 4.3.2–4.3.5, 4.3.7–4.3.9) | IN PROGRESS — 7 sub-passes remaining, ~2.0 sessions (see ROADMAP.md §1) |
 | Layer 4.4 — New ingests (NES, parent-cohort, schools) | DEFERRED to V1.5 (OI-19) |
 | Layer 5 — Doc restructuring | COMPLETE 2026-04-28 |
 
@@ -52,10 +56,10 @@ What is **not** yet on the centre page: catchment-level supply ratio, competitor
 
 In recommended order:
 
-1. **Layer 4.3 implementation** — 8 sub-passes remaining per the revised ROADMAP §1 (re-sequenced 2026-04-29 continued: renderer best-practice before data plumbing). Total ~2.2 sessions remaining. Sub-pass ordering:
+1. **Layer 4.3 implementation** — 7 sub-passes remaining per the revised ROADMAP §1 (re-sequenced 2026-04-29 continued: renderer best-practice before data plumbing). Total ~2.0 sessions remaining. Sub-pass ordering:
    - 4.3.1 Thread A (per-chart range buttons on unemployment) — **SHIPPED 2026-04-29**
-   - 4.3.6 DEC-75 row-weight reclassification (LFP triplet to Lite) — **next**
-   - 4.3.8 `LAYER3_METRIC_INTENT_COPY` constant + render slot
+   - 4.3.6 DEC-75 row-weight reclassification (LFP triplet to Lite) + OI-23 fix — **SHIPPED 2026-04-29**
+   - 4.3.8 `LAYER3_METRIC_INTENT_COPY` constant + render slot + trend-window % change feature (signed % since start year on each Full-weight chart, in label and tooltip; renderer-implementation choice within DEC-73 scope) — **next**
    - 4.3.9 DEC-76 Workforce supply context block (default open)
    - 4.3.7 DEC-74 perspective toggle on reversible ratios (infrastructure ready for Layer 4.2-A catchment ratios + parallel-stream daily-rate render)
    - 4.3.2 Thread B (SALM probe for LFP)
@@ -65,7 +69,7 @@ In recommended order:
 2. **Layer 4.2-A implementation** (~2.2 sessions). Gated on 4.3 calibration function landing + Layer 2.5 cache build.
 3. **Layer 4.4** (~1.5 sessions, V1.5 — OI-19) — NES + parent-cohort + schools ingests. Closes the calibration function's documented `nes_share_pct` gap.
 
-V1 path remaining: ~5.9 sessions if all of Layer 4.3 (remainder) + 4.2-A + 4.4 land. L4.4 is pure deepening; V1 ships without it if needed.
+V1 path remaining: ~5.7 sessions if all of Layer 4.3 (remainder) + 4.2-A + 4.4 land. L4.4 is pure deepening; V1 ships without it if needed.
 
 ---
 
@@ -91,6 +95,7 @@ Branch: `master`. Working tree expected clean after this session's commit lands.
 - 2026-04-29 Layer 4.3 design closure: `recon/layer4_3_design.md` v1.1 + DEC-74 + DEC-75 + DEC-76 + STD-34 locked + OI-19 through OI-22 + ROADMAP/PROJECT_STATUS/PHASE_LOG updated
 - 2026-04-29 Layer 4.3 sub-pass 4.3.1 (Thread A) apply: `centre.html` v3.3 + `recon/layer4_3_thread_a_probe.md` + OPEN_ITEMS.md (OI-23) + PROJECT_STATUS.md update
 - 2026-04-29 Layer 4.3 sub-pass re-sequence: ROADMAP.md (re-ordered §1.3; daily-rate centre-page integration flagged in §4) + DECISIONS.md (DEC-65 amended) + OPEN_ITEMS.md (OI-24) + PROJECT_STATUS.md update
+- 2026-04-29 Layer 4.3 sub-pass 4.3.6 (DEC-75 row-weight) apply: `centre_page.py` v5 + `centre.html` v3.4 + `recon/layer4_3_sub_pass_4_3_6_probe.md` + OPEN_ITEMS.md (OI-23 closed) + ROADMAP.md (4.3.6 SHIPPED) + PROJECT_STATUS.md update
 
 All pushed to origin (assumed once this session's commit lands).
 
@@ -111,7 +116,7 @@ See `OPEN_ITEMS.md` for the full list. Headlines:
 - **OI-12 (Medium):** backup pruning needed — cumulative ~5.0 GB approaching git-timeout threshold.
 - **OI-19 (Medium, new 2026-04-29):** Layer 4.4 ingests deferred to V1.5; NES required to close calibration function's documented gap.
 - **OI-20 (Low, new 2026-04-29):** Workforce supply context enrichments — SEEK-by-SA2, NCVER probe, advertised wages.
-- **OI-23 (Low, new 2026-04-29):** global trend-window bar disappears when Population card has no live data; Thread A makes the brittleness more material. Fix in next Population/Labour-Market layout work (sub-pass 4.3.6 — now the next sub-pass after the re-sequence).
+- **OI-23 CLOSED 2026-04-29:** trend-window bar promoted to page level above both Position cards in sub-pass 4.3.6.
 - **OI-24 (Tracking, new 2026-04-29):** sub-pass dependency-ordering pass missing from design-closure protocol. Closed structurally by the DEC-65 amendment. Marker for traceability; close at next consolidation.
 - **OI-04 (Medium):** ~20 services with bad lat/lng (0,0) need geocoding fix; deferred per DEC-63.
 - **OI-18 closed 2026-04-29:** Layer 4.3 design decisions G1–G4 + §9.4 resolved.
