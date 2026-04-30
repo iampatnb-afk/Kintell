@@ -1,5 +1,5 @@
 """
-populate_service_catchment_cache.py v4
+populate_service_catchment_cache.py v5
 =======================================
 Layer 2.5 sub-pass 2.5.1 — populator for service_catchment_cache.
 
@@ -525,41 +525,33 @@ def stage3_dry_run(conn, d, smoke):
     # median_income from socioec long-format (latest year for metric)
     income_map = {}
     if d.get("soc_income_metric"):
+        # Schema has all years 2011-2025 but data only for
+        # Census years; pick the latest year with non-null
+        # values rather than MAX(year).
         cur.execute(
             "SELECT MAX(year) FROM abs_sa2_socioeconomic_annual "
-            "WHERE metric_name = ?",
+            "WHERE metric_name = ? AND value IS NOT NULL",
             (d["soc_income_metric"],),
         )
         yr = cur.fetchone()[0]
-        cur.execute(
-            "SELECT sa2_code, value FROM "
-            "abs_sa2_socioeconomic_annual "
-            "WHERE metric_name = ? AND year = ?",
-            (d["soc_income_metric"], yr),
-        )
-        income_map = {sa2: v for sa2, v in cur.fetchall()
-                      if v is not None}
-        log(f"  median_income ({yr}): {len(income_map):,}")
+        if yr is not None:
+            cur.execute(
+                "SELECT sa2_code, value FROM "
+                "abs_sa2_socioeconomic_annual "
+                "WHERE metric_name = ? AND year = ? "
+                "AND value IS NOT NULL",
+                (d["soc_income_metric"], yr),
+            )
+            income_map = {sa2: v for sa2, v in cur.fetchall()}
+            log(f"  median_income ({yr}): {len(income_map):,}")
+        else:
+            log("  median_income: no non-null years")
 
     # seifa_irsd from socioec long-format (latest year)
-    seifa_map = {}
-    if d.get("soc_irsd_metric"):
-        cur.execute(
-            "SELECT MAX(year) FROM abs_sa2_socioeconomic_annual "
-            "WHERE metric_name = ?",
-            (d["soc_irsd_metric"],),
-        )
-        yr = cur.fetchone()[0]
-        cur.execute(
-            "SELECT sa2_code, value FROM "
-            "abs_sa2_socioeconomic_annual "
-            "WHERE metric_name = ? AND year = ?",
-            (d["soc_irsd_metric"], yr),
-        )
-        seifa_map = {sa2: int(v) if v is not None else None
-                     for sa2, v in cur.fetchall()
-                     if v is not None}
-        log(f"  seifa_irsd ({yr}): {len(seifa_map):,}")
+    # seifa_irsd: read directly from services.seifa_decile
+    # (per-service column, ~95% non-null, range 1-10) in
+    # the per-service SELECT in stage 3.4.
+    seifa_map = None  # not used; per-service lookup
 
     # unemployment_pct latest year_qtr
     unemp_map = {}
@@ -601,10 +593,17 @@ def stage3_dry_run(conn, d, smoke):
     if d.get("services_open_col"):
         oc = d["services_open_col"]
         try:
+            # services.approval_granted_date is DD/MM/YYYY;
+            # rearrange to YYYY-MM-DD for julianday().
+            iso_expr = (
+                f"substr({oc},7,4) || '-' || "
+                f"substr({oc},4,2) || '-' || "
+                f"substr({oc},1,2)"
+            )
             cur.execute(
                 f"SELECT sa2_code, COUNT(*) FROM services "
                 f"WHERE {af} AND {oc} IS NOT NULL "
-                f"AND julianday({oc}) >= "
+                f"AND julianday({iso_expr}) >= "
                 f"julianday('now', '-365 days') "
                 f"GROUP BY sa2_code"
             )
@@ -692,7 +691,7 @@ def stage3_dry_run(conn, d, smoke):
     # --- 3.4 per-service rows --------------------------------------------
     log("3.4 building per-service rows")
     nc = d["services_name_col"]
-    select_cols = ["service_id", "sa2_code"]
+    select_cols = ["service_id", "sa2_code", "seifa_decile"]
     if nc:
         select_cols.append(nc)
     cur.execute(
@@ -706,8 +705,8 @@ def stage3_dry_run(conn, d, smoke):
     null_counts = Counter()
 
     for r in raw:
-        service_id, sa2 = r[0], r[1]
-        sname = r[2] if nc and len(r) > 2 else None
+        service_id, sa2, seifa_dec = r[0], r[1], r[2]
+        sname = r[3] if nc and len(r) > 3 else None
         rec = sa2_records.get(sa2, {})
 
         cc = centres_count_map.get(sa2, 0)
@@ -723,7 +722,7 @@ def stage3_dry_run(conn, d, smoke):
             "sa2_name": name_map.get(sa2) or sname,
             "u5_pop": rec.get("u5_pop"),
             "median_income": income_map.get(sa2),
-            "seifa_irsd": seifa_map.get(sa2),
+            "seifa_irsd": seifa_dec,
             "unemployment_pct": unemp_map.get(sa2),
             "supply_ratio": rec.get("supply_ratio"),
             "supply_band": None,
