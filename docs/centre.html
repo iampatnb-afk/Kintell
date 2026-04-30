@@ -1,4 +1,7 @@
 <!DOCTYPE html>
+<!-- centre.html v3.13 (2026-04-30) — Layer 4.2-A.3a-fix iter 2: external HTML readout above each trajectory chart, replacing Chart.js native tooltip. Chart.js tooltip disabled (enabled:false); external callback updates a fixed-position <div> above the canvas. Line + crosshair + active dot fully visible underneath; readout never overlaps. -->
+<!-- centre.html v3.12 (2026-04-30) — Layer 4.2-A.3a-fix: three trajectory polish items — (A) tooltip clipping resolved properly via wrapper padding-top headroom; (B) sparkline now shows individual dot points (pointRadius 2, hover 6) so periods are visible; (C) new crosshair plugin draws a vertical dashed line at the snapped data index, turning hover into a measurement experience. -->
+<!-- centre.html v3.11 (2026-04-30) — Layer 4.2-A.3a: two visual fixes — (1) Chart.js tooltip clipping resolved via yAlign=bottom + position=nearest; (2) sparkline X-axis labels re-enabled (maxTicksLimit=5, autoSkip), canvas height bumped 48->64 to accommodate. Tooltip no longer overlaps into the histogram below; charts now show year ticks on sparkline mode. -->
 <!-- centre.html v3.10 (2026-04-30) — Layer 4.2-A.3: catchment ratios wired in as new "Catchment position" card (5 rows: supply_ratio, demand_supply, child_to_place, adjusted_demand, demand_share_state). Page reorder per option α: credit block (Catchment / Population / Labour / Workforce) at top, operational block (NQS / Places / Catchment-meta / Tenure / QA) below. Companion to centre_page.py v9. -->
 <html lang="en">
 <head>
@@ -1199,6 +1202,98 @@ const _CHART_FILL_BY_METRIC = {
   sa2_lfp_males:               "rgba(155,89,182,0.08)",
 };
 
+// v3.13: external tooltip readout. Updates a fixed-position
+// <div> above the chart (slot id derived from canvas id) when
+// the user hovers the chart. Replaces native Chart.js tooltip
+// rendering for trajectory charts so the readout never
+// overlaps the data line.
+// v3.13a readout: defensive parser. Collects every text
+// fragment Chart.js v4 may have placed in the tooltip
+// internal state — body[].before / .lines / .after, plus
+// tt.beforeBody and tt.afterBody arrays. Whatever the
+// callbacks (label, afterLabel, beforeBody, afterBody)
+// produced, we capture and render it.
+function _kintellExternalReadout(context) {
+  const chart = context.chart;
+  const tt = context.tooltip;
+  const canvasId = chart.canvas && chart.canvas.id;
+  if (!canvasId) return;
+  const slot = document.getElementById("readout-" + canvasId);
+  if (!slot) return;
+  if (!tt || tt.opacity === 0) {
+    slot.innerHTML = '<span style="color:var(--text-mute);font-style:italic;">hover the line to read values</span>';
+    return;
+  }
+  const titleLines = tt.title || [];
+  const beforeBody = tt.beforeBody || [];
+  const bodyItems = tt.body || [];
+  const afterBody = tt.afterBody || [];
+  const lines = [];
+  beforeBody.forEach(l => { if (l) lines.push(l); });
+  bodyItems.forEach(b => {
+    (b.before || []).forEach(l => { if (l) lines.push(l); });
+    (b.lines  || []).forEach(l => { if (l) lines.push(l); });
+    (b.after  || []).forEach(l => { if (l) lines.push(l); });
+  });
+  afterBody.forEach(l => { if (l) lines.push(l); });
+  const titleHtml = titleLines.length
+    ? `<span style="color:var(--text-mute);font-size:11.5px;margin-right:10px;">${titleLines[0]}</span>`
+    : "";
+  const linesHtml = lines.map((l, i) =>
+    i === 0
+      ? `<b style="color:var(--text);">${l}</b>`
+      : `<span style="color:var(--text-mute);font-size:11.5px;margin-left:10px;">${l}</span>`
+  ).join("");
+  slot.innerHTML = titleHtml + linesHtml;
+}
+
+// v3.12b: custom tooltip positioner. Pins horizontally to
+// the active data point but vertically to the top of the
+// chart area. Combined with yAlign="bottom" the tooltip box
+// extends UP from this pinned y, sitting just above the
+// chart edge — leaving the data line + crosshair + active
+// dot clearly visible underneath.
+if (window.Chart && Chart.Tooltip && Chart.Tooltip.positioners) {
+  Chart.Tooltip.positioners.topPin = function(items, eventPos) {
+    if (!items || !items.length) return false;
+    const item = items[0];
+    const chart = item.element && item.element.$context && item.element.$context.chart;
+    const ca = chart && chart.chartArea;
+    return {
+      x: item.element.x,
+      y: ca ? (ca.top - 4) : item.element.y,
+    };
+  };
+}
+
+// v3.12: crosshair plugin for trajectory charts.
+// Draws a vertical dashed line at the active tooltip x-position
+// (which Chart.js snaps to nearest data index because
+// interaction.mode is "index"). Effect: hovering feels like
+// scrubbing a ruler — pause anywhere on the line, read the
+// value cleanly, see exactly which period the cursor is on.
+const _kintellCrosshair = {
+  id: "kintellCrosshair",
+  afterDraw(chart) {
+    const tt = chart.tooltip;
+    if (!tt || !tt.opacity) return;
+    const active = tt.dataPoints && tt.dataPoints[0];
+    if (!active) return;
+    const ctx = chart.ctx;
+    const ca  = chart.chartArea;
+    const x   = active.element.x;
+    ctx.save();
+    ctx.strokeStyle = "rgba(180,200,230,0.40)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(x, ca.top);
+    ctx.lineTo(x, ca.bottom);
+    ctx.stroke();
+    ctx.restore();
+  }
+};
+
 // Chart.js helpers — verbatim from index.html so behaviour matches.
 function _kintell_makeOpts(yLabel, extra) {
   return {
@@ -1208,14 +1303,15 @@ function _kintell_makeOpts(yLabel, extra) {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: "rgba(15,17,23,0.95)",
-        titleColor: "#e8eaf0",
-        bodyColor: "#e8eaf0",
-        borderColor: "#2a2f3f",
-        borderWidth: 1,
-        padding: 8,
-        titleFont: { size: 12 },
-        bodyFont: { size: 12.5, family: "inherit" },
+        // v3.13: native Chart.js tooltip disabled. The
+        // tooltip MACHINERY (active-point detection, label
+        // callbacks) still runs — we hook into it via the
+        // external callback below to update a fixed DOM
+        // element above the canvas.
+        enabled: false,
+        external: _kintellExternalReadout,
+        // Keep these so the callbacks (label, afterLabel)
+        // continue to be invoked and produce body lines.
         displayColors: false,
       },
     },
@@ -1371,9 +1467,10 @@ function _renderTrajectory(metric, p) {
 
   // Unique id per row (metric + service-id keeps it stable on re-renders)
   const canvasId = `traj-${metric}-${Math.random().toString(36).slice(2, 8)}`;
-  // Sparkline taller — has no x-axis labels; dot trajectory shorter to
-  // make room for x-axis ticks.
-  const canvasHeight = isSparkline ? 48 : 56;
+  // v3.11: both modes now show x-axis labels (sparkline gets
+  // sparse ticks via maxTicksLimit=5). Canvas height bumped to
+  // 64 so tooltip has headroom and ticks fit cleanly.
+  const canvasHeight = isSparkline ? 64 : 64;
 
   // Queue the chart init to run after the canvas is in the DOM.
   _CHART_PENDING.push(() => {
@@ -1381,21 +1478,27 @@ function _renderTrajectory(metric, p) {
     if (!el) return;
 
     const dataset = _kintell_makeLine(p.display || metric, data, stroke, fill);
-    // For dot-trajectory mode, show point markers
+    // v3.12: BOTH modes show dot points. Sparkline gets
+    // smaller dots (radius 2), dot-trajectory gets larger
+    // (radius 3). Hover bumps to a clearly-visible 5/6.
+    dataset.pointBackgroundColor = stroke;
+    dataset.pointBorderColor = stroke;
     if (!isSparkline) {
       dataset.pointRadius = 3;
       dataset.pointHoverRadius = 5;
-      dataset.pointBackgroundColor = stroke;
-      dataset.pointBorderColor = stroke;
     } else {
-      // Sparkline: hide ticks/labels on x-axis to save space
-      dataset.pointHoverRadius = 4;
+      dataset.pointRadius = 2;
+      dataset.pointHoverRadius = 6;
     }
 
     const opts = _kintell_makeOpts(null, null);
     if (isSparkline) {
-      opts.scales.x.ticks.display = false;
-      opts.scales.x.ticks.maxTicksLimit = 0;
+      // v3.11: show sparse year labels on sparkline mode.
+      // 5-tick limit keeps the axis legible without crowding.
+      opts.scales.x.ticks.display = true;
+      opts.scales.x.ticks.maxTicksLimit = 5;
+      opts.scales.x.ticks.autoSkip = true;
+      opts.scales.x.ticks.font = { size: 9 };
     } else {
       // Show all dot labels for short series
       opts.scales.x.ticks.maxTicksLimit = points.length;
@@ -1417,8 +1520,10 @@ function _renderTrajectory(metric, p) {
         return `${ctx.dataset.label}: ${formatted}`;
       },
       afterLabel: function (ctx) {
+        // v3.13a: populate trend line for EVERY point
+        // including window-start (operator wants the
+        // readout consistent across all cursor positions).
         if (windowStartValue == null || windowStartValue === 0) return null;
-        if (ctx.dataIndex === 0) return null; // window-start point itself
         const here = Number(ctx.parsed.y);
         if (!isFinite(here)) return null;
         const pct = ((here - windowStartValue) / windowStartValue) * 100;
@@ -1431,12 +1536,16 @@ function _renderTrajectory(metric, p) {
       type: "line",
       data: { labels, datasets: [dataset] },
       options: opts,
+      plugins: [_kintellCrosshair],
     });
   });
 
   return `
     ${topStrip}
-    <div style="margin-top:6px;height:${canvasHeight}px;position:relative;">
+    <div id="readout-${canvasId}" style="height:18px;font-size:12.5px;line-height:18px;color:var(--text);margin-top:10px;margin-bottom:4px;padding:0 4px;">
+      <span style="color:var(--text-mute);font-style:italic;">hover the line to read values</span>
+    </div>
+    <div style="height:${canvasHeight}px;position:relative;">
       <canvas id="${canvasId}"></canvas>
     </div>
   `;
@@ -2171,8 +2280,11 @@ function _renderWorkforceSupplySparkline(r) {
     const dataset = _kintell_makeLine(r.display, data, stroke, fill);
     dataset.pointHoverRadius = 4;
     const opts = _kintell_makeOpts(null, null);
-    opts.scales.x.ticks.display = false;
-    opts.scales.x.ticks.maxTicksLimit = 0;
+    // v3.11: workforce sparkline gets sparse year labels too.
+    opts.scales.x.ticks.display = true;
+    opts.scales.x.ticks.maxTicksLimit = 5;
+    opts.scales.x.ticks.autoSkip = true;
+    opts.scales.x.ticks.font = { size: 9 };
     _CHART_INSTANCES[canvasId] = new Chart(el, {
       type: "line",
       data: { labels, datasets: [dataset] },
