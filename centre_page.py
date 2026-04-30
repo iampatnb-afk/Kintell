@@ -1,6 +1,29 @@
 """
 centre_page.py — Phase 2 backend helper for centre.html
-Version: v8 (2026-04-29) — JSA IVI wire-up: vacancy_count added to value column candidates
+Version: v9 (2026-04-30) — Layer 4.2-A.3: catchment ratios wired into Position block as new 'catchment_position' card.
+
+v9 changes (2026-04-30, Layer 4.2-A.3):
+  - LAYER3_METRIC_META: 5 catchment entries added —
+    sa2_supply_ratio + sa2_child_to_place (reversible
+    pair, DEC-74), sa2_adjusted_demand (absolute),
+    sa2_demand_supply (reversible <-> demand_supply_inv
+    rendered at HTML level), sa2_demand_share_state
+    (context-only weight, unbanded — rank-by-construction
+    per Layer 2.5 sub-pass 2.5.2). Card key:
+    "catchment_position". Band copy per layer4_3_design
+    §4.6. Reversibility infrastructure (v7) is now
+    activated for the two pairs.
+  - LAYER3_METRIC_INTENT_COPY: capture_rate -> 
+    demand_share_state key rename (4.3.5b cleanup).
+    sa2_-prefixed copies added so the registry's
+    canonical metric names resolve.
+  - _layer3_position: third card key catchment_position
+    in returned dict. Special-case branch for
+    sa2_demand_share_state — reads raw from
+    service_catchment_cache (no Layer 3 banding row
+    exists; rank-by-construction).
+  - POSITION_CARD_ORDER: catchment_position list added.
+  - schema_version: centre_payload_v4 -> v5.
 
 Provides get_centre_payload(service_id) -> dict
 Returns full single-centre detail: service + entity + group + brand,
@@ -396,10 +419,112 @@ LAYER3_METRIC_META = {
         "source": "JSA IVI (state-level, computed at read time — pending)",
         "band_copy": {"low": "—", "mid": "—", "high": "—"},
     },
+
+    # ── Catchment position card (Layer 4.2-A.3) ─────────────────
+    # 5 metrics surfaced from service_catchment_cache + layer3
+    # banding (sub-pass 2.5.2). Two reversible pairs activate
+    # the DEC-74 perspective toggle (renderer-side, v7 fields).
+    # demand_supply_inv is NOT in this registry — it is rendered
+    # at HTML level by inverting demand_supply's raw_value when
+    # the perspective toggle is in inverse state. Templates for
+    # the inverse direction live in centre.html v3.6+.
+    "sa2_supply_ratio": {
+        "display": "Supply ratio",
+        "card": "catchment_position",
+        "value_format": "ratio_x",
+        "direction": "high_is_concerning",
+        "row_weight": "lite",  # point-in-time data; no trajectory
+        "source": "service_catchment_cache (places / under-5 pop)",
+        "reversible": True,
+        "pair_with": "sa2_child_to_place",
+        "default_perspective": "forward",
+        "perspective_labels": {
+            "forward": "competition",
+            "inverse": "demand",
+        },
+        "band_copy": {
+            "low":  "undersupplied — opportunity",
+            "mid":  "balanced supply",
+            "high": "saturated — competition risk",
+        },
+    },
+    "sa2_child_to_place": {
+        "display": "Children per place",
+        "card": "catchment_position",
+        "value_format": "ratio_x",
+        "direction": "high_is_positive",
+        "row_weight": "lite",
+        "source": "service_catchment_cache (under-5 pop / places)",
+        "reversible": True,
+        "pair_with": "sa2_supply_ratio",
+        "default_perspective": "forward",
+        "perspective_labels": {
+            "forward": "demand-per-place",
+            "inverse": "competition",
+        },
+        "band_copy": {
+            "low":  "thin demand per place",
+            "mid":  "balanced demand per place",
+            "high": "strong demand per place",
+        },
+    },
+    "sa2_adjusted_demand": {
+        "display": "Adjusted demand",
+        "card": "catchment_position",
+        "value_format": "int",
+        "direction": "high_is_positive",
+        "row_weight": "lite",
+        "source": "service_catchment_cache (u5 × calibrated_rate × 0.6)",
+        "band_copy": {
+            "low":  "thin calibrated demand",
+            "mid":  "average calibrated demand",
+            "high": "deep calibrated demand",
+        },
+    },
+    "sa2_demand_supply": {
+        "display": "Demand vs supply",
+        "card": "catchment_position",
+        "value_format": "ratio_x",
+        "direction": "high_is_positive",
+        "row_weight": "lite",
+        "source": "service_catchment_cache (adjusted_demand / places)",
+        "reversible": True,
+        "pair_with": "sa2_demand_supply",  # inverse rendered at HTML level
+        "default_perspective": "forward",
+        "perspective_labels": {
+            "forward": "fill",
+            "inverse": "spare capacity",
+        },
+        "band_copy": {
+            "low":  "soft catchment — fill risk",
+            "mid":  "in balance",
+            "high": "demand pull — strong fill expected",
+        },
+    },
+    "sa2_demand_share_state": {
+        "display": "Share of state demand",
+        "card": "catchment_position",
+        "value_format": "percent_share",
+        "direction": "high_is_positive",
+        "row_weight": "context",  # rank-by-construction; no banding
+        "source": "service_catchment_cache (this SA2's adjusted_demand / state total)",
+        "band_copy": {
+            "low": "—", "mid": "—", "high": "—",
+        },
+    },
 }
 
 # Display order within each card (drives section order in the UI).
 POSITION_CARD_ORDER = {
+    # Catchment position is the headline credit signal —
+    # rendered first in centre.html render() per Layer 4.2-A.3.
+    "catchment_position": [
+        "sa2_supply_ratio",
+        "sa2_demand_supply",
+        "sa2_child_to_place",
+        "sa2_adjusted_demand",
+        "sa2_demand_share_state",
+    ],
     "population": [
         "sa2_under5_count",
         "sa2_total_population",
@@ -521,10 +646,11 @@ LAYER3_METRIC_INTENT_COPY = {
         "Adjusted demand is the calibrated demand estimate after "
         "participation rate and attendance factor — the realistic "
         "demand the catchment can actually fill.",
-    "capture_rate":
-        "Capture rate is this centre's share of catchment demand; "
-        "high capture in a competitive market is a moat signal, low "
-        "capture in a thin market is a fill-risk signal.",
+    "demand_share_state":
+        "Share of state demand puts this catchment's demand pool "
+        "in state-wide context — high values flag concentration of "
+        "demand in this SA2, low values flag a long-tail catchment "
+        "in a state-wide distribution.",
     "demand_supply":
         "Demand-supply ratio (adjusted demand / places) is the fill "
         "expectation — high values flag demand pull and strong "
@@ -533,6 +659,34 @@ LAYER3_METRIC_INTENT_COPY = {
         "Demand-supply ratio inverted frames the same data as "
         "spare-capacity headroom; high values flag abundant capacity, "
         "low values flag tight capacity vs demand.",
+
+    # ── Catchment intent copy keyed by registry name (Layer 4.2-A.3) ──
+    # The unprefixed keys above (supply_ratio, child_to_place, etc.) are
+    # the original Layer 4.3 sub-pass 4.3.8 entries, kept for
+    # backward reference. The sa2_-prefixed copies below are
+    # what _layer3_position actually reads (registry-canonical
+    # metric_name).
+    "sa2_supply_ratio":
+        "Supply ratio (places per child) measures local competition "
+        "intensity; high values flag saturation risk and pressure on "
+        "fill rates, low values flag undersupplied catchments with "
+        "opportunity.",
+    "sa2_child_to_place":
+        "Children per place inverts supply ratio — frames the same "
+        "data as demand-headroom; high values flag strong demand per "
+        "place, low values flag thin demand per place.",
+    "sa2_adjusted_demand":
+        "Adjusted demand is the calibrated demand estimate after "
+        "participation rate and attendance factor — the realistic "
+        "demand the catchment can actually fill.",
+    "sa2_demand_supply":
+        "Demand-supply ratio (adjusted demand / places) is the fill "
+        "expectation — high values flag demand pull and strong "
+        "expected fill, low values flag soft catchments.",
+    "sa2_demand_share_state":
+        "Share of state demand puts this catchment in state-wide "
+        "context — high values flag concentrated demand here, low "
+        "values flag a long-tail position in the state distribution.",
 
     # ── Workforce supply context (DEC-76; sub-pass 4.3.9) — dormant
     # in V1 until the workforce block renderer ships.
@@ -1025,6 +1179,30 @@ def _cohort_distribution(con: sqlite3.Connection,
     }
 
 
+def _read_demand_share_state(con: sqlite3.Connection,
+                              sa2_code: Optional[str]
+                              ) -> Optional[float]:
+    """DER. Read demand_share_state for any service in this SA2.
+
+    The cache broadcasts the SA2-level value to every active
+    service in that SA2, so any row's value is canonical for
+    the SA2. Returns None if the SA2 has no active services or
+    if the cache has no row for it.
+    """
+    if not sa2_code:
+        return None
+    try:
+        row = con.execute(
+            "SELECT demand_share_state FROM service_catchment_cache"
+            " WHERE sa2_code = ? AND demand_share_state IS NOT NULL"
+            " LIMIT 1",
+            (sa2_code,),
+        ).fetchone()
+    except sqlite3.OperationalError:
+        return None
+    return row[0] if row else None
+
+
 def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str]) -> dict:
     """
     DER. Read Layer 3 banding rows for this SA2 + sa2_cohort row for cohort
@@ -1045,7 +1223,11 @@ def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str]) -> dict:
     cohort_key, cohort_n, cohort_label, band_copy (full triple), confidence,
     source.
     """
-    out: dict = {"population": {}, "labour_market": {}}
+    out: dict = {
+        "catchment_position": {},
+        "population":         {},
+        "labour_market":      {},
+    }
 
     # Helper to seed a metric slot with status (deferred / unavailable).
     # Takes metric_name so we can look up intent_copy from the
@@ -1102,10 +1284,25 @@ def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str]) -> dict:
 
     by_metric = {r["metric"]: _row_to_dict(r) for r in rows}
 
+    # Layer 4.2-A.3: sa2_demand_share_state is unbanded
+    # (rank-by-construction); read raw from cache.
+    cache_share = _read_demand_share_state(con, sa2_code)
+
     for metric_name, meta in LAYER3_METRIC_META.items():
         card = meta["card"]
         if meta.get("status") == "deferred":
             out[card][metric_name] = _stub(metric_name, meta, "deferred")
+            continue
+
+        # Special-case: demand_share_state has no Layer 3 row.
+        if metric_name == "sa2_demand_share_state":
+            if cache_share is None:
+                out[card][metric_name] = _stub(metric_name, meta, "unavailable")
+            else:
+                stub = _stub(metric_name, meta, "normal")
+                stub["raw_value"] = cache_share
+                stub["period_label"] = "as at 2026-04-30"
+                out[card][metric_name] = stub
             continue
 
         row = by_metric.get(metric_name)
@@ -1400,7 +1597,7 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
 
         # --- ASSEMBLE ---
         payload = {
-            "schema_version": "centre_payload_v4",
+            "schema_version": "centre_payload_v5",
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "header": header,
             "nqs": nqs,

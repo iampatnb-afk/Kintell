@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- centre.html v3.9 (2026-04-29) — JSA IVI wire-up: workforce supply row value-formatter is now integer-aware. Raw counts (vacancy_count) render with thousands separator (6,543) rather than .toFixed(1) (6543.0). Decimals still render with one decimal place. Companion to centre_page.py v8. -->
+<!-- centre.html v3.10 (2026-04-30) — Layer 4.2-A.3: catchment ratios wired in as new "Catchment position" card (5 rows: supply_ratio, demand_supply, child_to_place, adjusted_demand, demand_share_state). Page reorder per option α: credit block (Catchment / Population / Labour / Workforce) at top, operational block (NQS / Places / Catchment-meta / Tenure / QA) below. Companion to centre_page.py v9. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -878,9 +878,9 @@ function renderCatchmentCard(centre) {
           </span>
         </div>
       ` : ""}
-      <div class="placeholder" style="margin-top:8px;">
-        Service-level catchment metrics (under-5 population, supply ratio, competitor density)
-        <span class="will-show">awaiting Tier 3 service_catchment_cache build.</span>
+      <div class="placeholder" style="margin-top:8px;font-size:11.5px;">
+        Catchment ratios (supply, demand, child-per-place, share of state demand)
+        <span class="will-show">render in the Catchment position card above.</span>
       </div>
     </section>
   `;
@@ -904,6 +904,9 @@ function _formatPositionValue(p) {
   if (fmt === "percent")          return `${Number(raw).toFixed(1)}%`;
   if (fmt === "currency_annual")  return `$${fmtN(Math.round(raw))} p.a.`;
   if (fmt === "currency_weekly")  return `$${fmtN(Math.round(raw))}/week`;
+  // Layer 4.2-A.3 catchment formats:
+  if (fmt === "ratio_x")          return `${Number(raw).toFixed(2)}×`;
+  if (fmt === "percent_share")    return `${(Number(raw) * 100).toFixed(2)}%`;
   return fmtN(raw);
 }
 
@@ -1954,6 +1957,39 @@ function _pageHasFullTrajectory(centre) {
   return false;
 }
 
+// ── Layer 4.2-A.3: Catchment position card (headline credit signal) ──
+//
+// Renders 5 catchment metrics with peer banding. supply_ratio
+// and demand_supply carry the DEC-74 perspective toggle.
+// demand_share_state is row_weight=context (rank-by-construction;
+// no peer cohort).
+function renderCatchmentPositionCard(centre) {
+  const pos = (centre.position && centre.position.catchment_position) || {};
+  const order = [
+    "sa2_supply_ratio",
+    "sa2_demand_supply",
+    "sa2_child_to_place",
+    "sa2_adjusted_demand",
+    "sa2_demand_share_state",
+  ];
+  const hasAny = order.some(k => {
+    const e = pos[k];
+    return e && !["unavailable", "deferred"].includes(e.confidence);
+  });
+
+  return `
+    <section class="op-section">
+      <h3>Catchment position <span class="note">SA2 peer position — credit signal</span></h3>
+      ${hasAny
+        ? order.map(k => renderPositionRow(k, pos[k])).join("")
+        : `<div class="placeholder">Catchment-position metrics
+            <span class="will-show">Will show: supply ratio, demand vs supply, children per place, adjusted demand, share of state demand — banded against same-state and same-remoteness peer cohorts.</span>
+          </div>`
+      }
+    </section>
+  `;
+}
+
 function renderPopulationCard(centre) {
   const pos = (centre.position && centre.position.population) || {};
   const order = [
@@ -2250,8 +2286,25 @@ function render(centre) {
   }
 
   const main = document.getElementById("main");
+  // Layer 4.2-A.3 page reorder (option α): credit block first
+  // (Catchment position / Population / Labour / Workforce),
+  // operational block second (NQS / Places / Catchment-meta /
+  // Tenure / QA). Trend-window bar sits above the credit block
+  // since all trajectory charts live in those four cards.
   main.innerHTML = `
     ${renderHeader(centre)}
+
+    ${_pageHasFullTrajectory(centre) ? _renderTrajectoryRangeBar() : ""}
+
+    <!-- ── credit block ── -->
+    ${renderCatchmentPositionCard(centre)}
+    ${renderPopulationCard(centre)}
+    ${renderLabourMarketCard(centre)}
+    ${renderWorkforceSupplyCard(centre)}
+
+    <hr style="border:0;border-top:1px solid var(--border);margin:28px 0 12px;">
+
+    <!-- ── operational block ── -->
     <div class="section-row">
       ${renderNqsCard(centre)}
       ${renderPlacesCard(centre)}
@@ -2260,10 +2313,6 @@ function render(centre) {
       ${renderCatchmentCard(centre)}
       ${renderTenureCard(centre)}
     </div>
-    ${_pageHasFullTrajectory(centre) ? _renderTrajectoryRangeBar() : ""}
-    ${renderPopulationCard(centre)}
-    ${renderLabourMarketCard(centre)}
-    ${renderWorkforceSupplyCard(centre)}
     ${renderQaCard(centre)}
     ${renderCommentary(centre)}
   `;
