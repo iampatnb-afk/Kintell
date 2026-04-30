@@ -1,6 +1,29 @@
 """
 centre_page.py — Phase 2 backend helper for centre.html
-Version: v9 (2026-04-30) — Layer 4.2-A.3: catchment ratios wired into Position block as new 'catchment_position' card.
+Version: v10 (2026-04-30) — Layer 4.2-A.3b: industry-absolute thresholds added on supply_ratio, child_to_place, demand_supply (PC universal-access + Remara Strategic Insights v4.2 + Credit Committee Brief grounded). Renders alongside local-relative decile band — both lenses kept.
+
+v10 changes (2026-04-30, Layer 4.2-A.3b):
+  - INDUSTRY_BAND_THRESHOLDS — declarative table of
+    absolute industry thresholds for the 3 catchment
+    ratios with meaningful industry bands. Sources: PC
+    universal-access target (1.0 places/child = all
+    children, 3 days/week); Remara Strategic Insights
+    v4.2 real distribution by SES + remoteness; Credit
+    Committee Brief break-even (70%) + target (85%)
+    occupancy. Bands are ordered low->high; each entry
+    is (max_exclusive, key, label, note).
+  - _industry_band_for(metric, raw_value) helper resolves
+    a raw value to the matching band entry, or None if
+    the metric isn't in the thresholds table.
+  - LAYER3_METRIC_META: industry_thresholds=True added
+    on sa2_supply_ratio / sa2_child_to_place /
+    sa2_demand_supply. Renderer reads this flag to
+    decide whether to surface the industry band line.
+  - _layer3_position emits industry_band /
+    industry_band_label / industry_band_note on every
+    populated entry; None on stubs (deferred /
+    unavailable).
+  - schema_version: centre_payload_v5 -> v6.
 
 v9 changes (2026-04-30, Layer 4.2-A.3):
   - LAYER3_METRIC_META: 5 catchment entries added —
@@ -266,6 +289,95 @@ COHORT_LABEL_TEMPLATES = {
 # catchment ratios (which will) ship with sub-pass 4.2-A.3. The toggle
 # infrastructure in centre.html sits inert until those rows arrive —
 # zero retrofit cost on the renderer side at that point.
+# ─────────────────────────────────────────────────────────────
+# Layer 4.2-A.3b — industry-absolute threshold table.
+# ─────────────────────────────────────────────────────────────
+# For the 3 catchment ratios with meaningful absolute bounds,
+# this table maps raw values to industry bands. Renders BELOW
+# the existing decile band chips on the centre page so credit
+# readers see both lenses: "where this SA2 sits vs same-state
+# same-remoteness peers" (decile) AND "where this SA2 sits in
+# absolute industry terms" (industry_band).
+#
+# Source synthesis:
+#   - PC universal-access target = 1.0 places/child = "all
+#     children, 3 days/week" (Productivity Commission report
+#     v1, fig 11). Australian markets capped at 1.0 in PC
+#     analysis; majority well below.
+#   - Real Australian distribution (Remara Strategic Insights
+#     v4.2 p.5): high-SES 33.5/100, mid-SES 24/100, low-SES
+#     19.7/100; major cities 34.2/100, regional 22.9/100,
+#     remote 24.9/100. So real values cluster 0.20-0.35 with
+#     metro outliers reaching 1.0+ in dense employment hubs.
+#   - Break-even occupancy = 70% (Credit Committee Brief p.14
+#     "Localised Oversupply"). Target occupancy = 85%
+#     (Established loan key consideration, p.1).
+#
+# Each band entry is (max_exclusive, key, label, note). The
+# band a value falls into is the FIRST entry whose
+# max_exclusive > value. Last entry uses float("inf").
+INDUSTRY_BAND_THRESHOLDS = {
+    "sa2_supply_ratio": [
+        (0.10, "desert",        "childcare desert",
+         "PC: well below universal access; access constrained"),
+        (0.20, "undersupplied", "undersupplied",
+         "below low-SES Australian average (~0.20)"),
+        (0.30, "below_bench",   "below benchmark",
+         "approaching mid-SES Australian average (~0.24)"),
+        (0.40, "at_bench",      "at benchmark",
+         "near high-SES major-cities average (~0.34)"),
+        (1.00, "well_served",   "well served",
+         "above benchmark; approaching universal access"),
+        (1.50, "at_target",     "at universal-access target",
+         "PC target: 1.0 places per child = 3 days/week for all"),
+        (float("inf"), "saturated", "saturated",
+         ">1.0 places per child; possible oversupply"),
+    ],
+    "sa2_child_to_place": [
+        (1.00, "excess_capacity", "excess capacity",
+         "supply matches universal-access target"),
+        (2.50, "balanced",        "balanced",
+         "near at-benchmark for Australia"),
+        (5.00, "tight",           "tight",
+         "demand pressure; saturation pressure (inverted)"),
+        (10.00, "constrained",    "constrained",
+         "significant access limitation"),
+        (float("inf"), "severe",  "severe constraint",
+         "effectively zero choice"),
+    ],
+    "sa2_demand_supply": [
+        (0.40, "soft",     "soft fill risk",
+         "below 70% break-even at typical 85% occupancy"),
+        (0.55, "near_be",  "near break-even",
+         "approaching 70% break-even occupancy threshold"),
+        (0.85, "viable",   "viable",
+         "comfortable fill expectation"),
+        (float("inf"), "strong", "strong fill",
+         "demand pull; growth-supportive"),
+    ],
+}
+
+def _industry_band_for(metric_name, raw_value):
+    """DER. Resolve a raw value to the matching industry band
+    entry per INDUSTRY_BAND_THRESHOLDS. Returns dict with key
+    / label / note, or None if metric has no thresholds or
+    raw_value is None.
+    """
+    if raw_value is None:
+        return None
+    bands = INDUSTRY_BAND_THRESHOLDS.get(metric_name)
+    if not bands:
+        return None
+    try:
+        v = float(raw_value)
+    except (TypeError, ValueError):
+        return None
+    for max_excl, key, label, note in bands:
+        if v < max_excl:
+            return {"key": key, "label": label, "note": note}
+    return None
+
+
 LAYER3_METRIC_META = {
     # ── Population card ─────────────────────────────────────────────
     "sa2_under5_count": {
@@ -434,6 +546,7 @@ LAYER3_METRIC_META = {
         "value_format": "ratio_x",
         "direction": "high_is_concerning",
         "row_weight": "lite",  # point-in-time data; no trajectory
+        "industry_thresholds": True,  # v10
         "source": "service_catchment_cache (places / under-5 pop)",
         "reversible": True,
         "pair_with": "sa2_child_to_place",
@@ -454,6 +567,7 @@ LAYER3_METRIC_META = {
         "value_format": "ratio_x",
         "direction": "high_is_positive",
         "row_weight": "lite",
+        "industry_thresholds": True,  # v10
         "source": "service_catchment_cache (under-5 pop / places)",
         "reversible": True,
         "pair_with": "sa2_supply_ratio",
@@ -487,6 +601,7 @@ LAYER3_METRIC_META = {
         "value_format": "ratio_x",
         "direction": "high_is_positive",
         "row_weight": "lite",
+        "industry_thresholds": True,  # v10
         "source": "service_catchment_cache (adjusted_demand / places)",
         "reversible": True,
         "pair_with": "sa2_demand_supply",  # inverse rendered at HTML level
@@ -1250,6 +1365,11 @@ def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str]) -> dict:
             "confidence": confidence,
             "source": meta.get("source"),
             "band_copy": meta.get("band_copy", {}),
+            # v10: industry-absolute band fields. Always None
+            # on stubs (no raw value to evaluate).
+            "industry_band":       None,
+            "industry_band_label": None,
+            "industry_band_note":  None,
         }
 
     # If no SA2, every metric is 'unavailable' or 'deferred'
@@ -1339,6 +1459,18 @@ def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str]) -> dict:
             "confidence": confidence,
             "source": meta["source"],
         }
+
+        # v10: industry-absolute band lookup for opted-in
+        # metrics (industry_thresholds=True).
+        if meta.get("industry_thresholds"):
+            ib = _industry_band_for(metric_name, entry["raw_value"])
+            entry["industry_band"]       = ib["key"]   if ib else None
+            entry["industry_band_label"] = ib["label"] if ib else None
+            entry["industry_band_note"]  = ib["note"]  if ib else None
+        else:
+            entry["industry_band"]       = None
+            entry["industry_band_label"] = None
+            entry["industry_band_note"]  = None
 
         # Layer 4.2-B: trajectory + cohort distribution.
         # Only populate for normal/low confidence — for insufficient,
@@ -1597,7 +1729,7 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
 
         # --- ASSEMBLE ---
         payload = {
-            "schema_version": "centre_payload_v5",
+            "schema_version": "centre_payload_v6",
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "header": header,
             "nqs": nqs,

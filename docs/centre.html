@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- centre.html v3.14 (2026-04-30) — Layer 4.2-A.3b (renderer): industry-absolute band line wired beneath the band chips for catchment metrics. Reads payload fields industry_band / industry_band_label / industry_band_note (centre_page.py v10). Renders only when populated; silent absence otherwise. -->
 <!-- centre.html v3.13 (2026-04-30) — Layer 4.2-A.3a-fix iter 2: external HTML readout above each trajectory chart, replacing Chart.js native tooltip. Chart.js tooltip disabled (enabled:false); external callback updates a fixed-position <div> above the canvas. Line + crosshair + active dot fully visible underneath; readout never overlaps. -->
 <!-- centre.html v3.12 (2026-04-30) — Layer 4.2-A.3a-fix: three trajectory polish items — (A) tooltip clipping resolved properly via wrapper padding-top headroom; (B) sparkline now shows individual dot points (pointRadius 2, hover 6) so periods are visible; (C) new crosshair plugin draws a vertical dashed line at the snapped data index, turning hover into a measurement experience. -->
 <!-- centre.html v3.11 (2026-04-30) — Layer 4.2-A.3a: two visual fixes — (1) Chart.js tooltip clipping resolved via yAlign=bottom + position=nearest; (2) sparkline X-axis labels re-enabled (maxTicksLimit=5, autoSkip), canvas height bumped 48->64 to accommodate. Tooltip no longer overlaps into the histogram below; charts now show year ticks on sparkline mode. -->
@@ -1925,11 +1926,54 @@ function _renderFullRow(p, ctx) {
       ${_renderCohortHistogram(p)}
       ${_renderDecileStrip(decile)}
       ${_renderBandChips(ctx.metric, p)}
+      ${_renderIndustryBand(p)}
       ${_renderIntentCopy(p)}
       <div style="margin-top:8px;display:flex;justify-content:flex-end;gap:6px;">
         ${derBadge}
         ${comBadge}
       </div>
+    </div>
+  `;
+}
+
+// ── Layer 4.2-A.3b: industry-absolute band line ──────────────
+//
+// Renders BELOW the local-relative band chips. Two lenses on
+// the same data: chips show "where this SA2 sits vs same-state
+// same-remoteness peers" (decile 1-10); industry band shows
+// "where this SA2 sits in absolute industry terms" (PC + RSI
+// + Credit Committee Brief grounded thresholds).
+//
+// Silent absence: if p.industry_band is null (metric not opted
+// in to industry thresholds, or raw_value is null), renders
+// nothing. Honest absence per P-2.
+function _renderIndustryBand(p) {
+  if (!p || !p.industry_band) return "";
+  const label = htmlEscape(p.industry_band_label || p.industry_band);
+  const note  = htmlEscape(p.industry_band_note || "");
+  // Match band key to a subtle accent. Direction-aware where
+  // possible: "saturated"/"soft"/"desert" lean cautionary;
+  // "well_served"/"strong"/"viable" lean positive; midbands
+  // stay neutral. Palette stays muted per design §11.2.
+  const cautionKeys  = ["saturated", "soft", "desert",
+                         "undersupplied", "severe", "constrained"];
+  const positiveKeys = ["well_served", "strong", "viable",
+                         "at_target", "excess_capacity"];
+  let pill;
+  if (cautionKeys.includes(p.industry_band)) {
+    pill = `<span style="background:rgba(224,92,58,0.10);color:var(--amber,#d8b050);border:1px solid rgba(224,92,58,0.25);padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;">${label}</span>`;
+  } else if (positiveKeys.includes(p.industry_band)) {
+    pill = `<span style="background:rgba(122,197,122,0.10);color:var(--ok,#7ac57a);border:1px solid rgba(122,197,122,0.25);padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;">${label}</span>`;
+  } else {
+    pill = `<span style="background:rgba(180,200,230,0.06);color:var(--text-dim);border:1px solid rgba(180,200,230,0.15);padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;">${label}</span>`;
+  }
+  return `
+    <div style="margin-top:8px;padding:6px 8px;background:rgba(255,255,255,0.02);border-radius:4px;border-left:2px solid var(--border);">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--text-mute);">
+        <span style="font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:10px;">Industry</span>
+        ${pill}
+      </div>
+      ${note ? `<div style="margin-top:3px;font-size:11px;color:var(--text-mute);font-style:italic;">${note}</div>` : ""}
     </div>
   `;
 }
@@ -1997,6 +2041,7 @@ function _renderLiteRow(p, ctx) {
       <div style="margin-top:6px;font-size:12px;">${headlineHtml}</div>
       ${_renderDecileStrip(decile)}
       ${_renderBandChips(ctx.metric, p)}
+      ${_renderIndustryBand(p)}
       ${asAtStamp}
       ${_renderIntentCopy(p)}
       <div style="margin-top:8px;display:flex;justify-content:flex-end;gap:6px;">
