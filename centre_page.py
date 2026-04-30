@@ -1,6 +1,6 @@
 """
 centre_page.py — Phase 2 backend helper for centre.html
-Version: v10 (2026-04-30) — Layer 4.2-A.3b: industry-absolute thresholds added on supply_ratio, child_to_place, demand_supply (PC universal-access + Remara Strategic Insights v4.2 + Credit Committee Brief grounded). Renders alongside local-relative decile band — both lenses kept.
+Version: v12 (2026-04-30) — Layer 4.2-A.3a-fix iter 4 (F1-β): JSA IVI methodology lifted out of hover-gated OBS tooltip into a new about_data field on IVI rows. Renderer surfaces it as a permanent visible block under the chart so credit readers don't need to discover the OBS hover affordance. OBS source string now carries full methodology one-liner (what the IVI is, where it comes from); intent_copy tightened to credit-relevant framing only. Reader hovers OBS for data provenance, reads inline copy for credit signal.
 
 v10 changes (2026-04-30, Layer 4.2-A.3b):
   - INDUSTRY_BAND_THRESHOLDS — declarative table of
@@ -807,13 +807,16 @@ LAYER3_METRIC_INTENT_COPY = {
     # in V1 until the workforce block renderer ships.
     # ──────────────────────────────────────────────────────────────
     "jsa_ivi_4211_child_carer":
-        "Child carer (ANZSCO 4211) vacancy intensity at state level — "
-        "leading indicator of educator-supply pressure regardless of "
-        "local demand.",
+        "Child carer (ANZSCO 4211) vacancy intensity — leading "
+        "indicator of educator-supply pressure regardless of local "
+        "demand. Rising counts flag wage-cost risk and "
+        "staffing-driven occupancy risk.",
     "jsa_ivi_2411_ect":
         "Early childhood teacher (ANZSCO 2411) vacancy intensity — "
         "ECT shortfalls can disqualify centres from quality ratings "
-        "and drive regulatory exposure.",
+        "and drive regulatory exposure. Sustained elevated counts "
+        "here are a leading indicator of compliance-cost and "
+        "refinanceability risk.",
     "ecec_award_rates":
         "ECEC Award minimum rates set the wage floor across CIII / "
         "Diploma / ECT classifications; rate increases compress "
@@ -1875,7 +1878,21 @@ def _ivi_row(conn, metric_key: str, anzsco_code: str, display_label: str, state_
         "anzsco_code": anzsco_code,
         "intent_copy": intent_copy,
         "row_weight": "context",
-        "source": "JSA Internet Vacancy Index (Step 5c)",
+        # Compact label for the OBS pill tooltip.
+        "source": "Jobs and Skills Australia IVI",
+        # Full methodology rendered as a permanent
+        # visible block below the chart (centre.html
+        # v3.17 _renderWorkforceSupplyRow). v12 split:
+        # OBS pill carries just the source name; the
+        # about_data field is the new explainer home.
+        "about_data": (
+            "Jobs and Skills Australia's Internet Vacancy "
+            "Index (IVI) — monthly count of online job "
+            "advertisements for this ANZSCO occupation, "
+            "compiled from postings on SEEK, CareerOne "
+            "and Australian JobSearch at month-end. "
+            "State-level series; no SA2 disaggregation."
+        ),
         "scope_stamp": f"state-level ({state_value or 'unknown'}) — no SA2 peer cohort",
     }
     data = _try_query_ivi(conn, anzsco_code, state_value)

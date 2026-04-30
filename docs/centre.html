@@ -1,4 +1,7 @@
 <!DOCTYPE html>
+<!-- centre.html v3.17 (2026-04-30) — Layer 4.2-A.3a-fix iter 4 (F1-β): r.about_data rendered as a permanent visible "About this measure" block below the chart on workforce IVI rows. Silent absence when not populated. Pairs with centre_page.py v12. -->
+<!-- centre.html v3.16 (2026-04-30) — Layer 4.2-A.3a-fix iter 3: workforce-section local trend window. New 6M / 1Y / 2Y / 5Y / All selector at top of Workforce Supply Context, default 2Y. Sparklines filter to selected window; Y-axis now uses beginAtZero=false so monthly variance is visible. Re-render is workforce-scoped (other charts untouched). Global trajectory range bar caption corrected. -->
+<!-- centre.html v3.15 (2026-04-30) — Layer 4.2-A.3a-fix extension: workforce supply sparklines now have the same trajectory-polish treatment as Population / Labour Market / Catchment — dot points, vertical crosshair, external HTML readout slot above each chart, all in place. Reuses previously-defined _kintellExternalReadout (v3.13) and _kintellCrosshair (v3.12). -->
 <!-- centre.html v3.14 (2026-04-30) — Layer 4.2-A.3b (renderer): industry-absolute band line wired beneath the band chips for catchment metrics. Reads payload fields industry_band / industry_band_label / industry_band_note (centre_page.py v10). Renders only when populated; silent absence otherwise. -->
 <!-- centre.html v3.13 (2026-04-30) — Layer 4.2-A.3a-fix iter 2: external HTML readout above each trajectory chart, replacing Chart.js native tooltip. Chart.js tooltip disabled (enabled:false); external callback updates a fixed-position <div> above the canvas. Line + crosshair + active dot fully visible underneath; readout never overlaps. -->
 <!-- centre.html v3.12 (2026-04-30) — Layer 4.2-A.3a-fix: three trajectory polish items — (A) tooltip clipping resolved properly via wrapper padding-top headroom; (B) sparkline now shows individual dot points (pointRadius 2, hover 6) so periods are visible; (C) new crosshair plugin draws a vertical dashed line at the snapped data index, turning hover into a measurement experience. -->
@@ -1139,7 +1142,7 @@ function _renderTrajectoryRangeBar() {
       <span class="label">Trend window</span>
       <div class="btns">${btns}</div>
       <span style="margin-left:auto;font-size:10.5px;color:var(--text-mute);">
-        applies to all trajectory charts below
+        applies to Population, Labour, Catchment trajectories
       </span>
     </div>
   `;
@@ -2229,6 +2232,102 @@ function renderLabourMarketCard(centre) {
 // JSA IVI rows render a state-level sparkline when data is live; render
 // as deferred otherwise (the IVI table-name wire-up is the bundle's
 // follow-up task — see workforce_supply probe artefact).
+// ── Layer 4.2-A.3a-fix iter 3: workforce window state ────────
+// Workforce Supply Context has its own trend-window selector.
+// The page-top bar applies only to annual/quarterly trajectory
+// charts; workforce data is monthly with much shorter useful
+// horizons. State is just a number-of-months value; 0 = "All".
+let _WFS_WINDOW_MONTHS = 24;  // default 2Y
+
+// Period strings expected: "YYYY-MM" (JSA IVI monthly).
+// Tolerates "YYYY-Qn" and "YYYY". Returns {y, m} or null.
+function _wfsParsePeriod(p) {
+  const s = String(p);
+  const mm = /^(\d{4})-(\d{2})$/.exec(s);
+  if (mm) return { y: parseInt(mm[1], 10),
+                   m: parseInt(mm[2], 10) };
+  const qq = /^(\d{4})-Q([1-4])$/.exec(s);
+  if (qq) return { y: parseInt(qq[1], 10),
+                   m: parseInt(qq[2], 10) * 3 };
+  const yy = /^(\d{4})$/.exec(s);
+  if (yy) return { y: parseInt(yy[1], 10), m: 12 };
+  return null;
+}
+
+function _wfsFilterByWindow(points, months) {
+  if (!months || months <= 0 || !points || !points.length) {
+    return points;
+  }
+  const last = _wfsParsePeriod(
+    points[points.length - 1].period);
+  if (!last) return points;
+  let cy = last.y;
+  let cm = last.m - months;
+  while (cm <= 0) { cy -= 1; cm += 12; }
+  return points.filter(pt => {
+    const p = _wfsParsePeriod(pt.period);
+    if (!p) return true;
+    if (p.y > cy) return true;
+    if (p.y < cy) return false;
+    return p.m >= cm;
+  });
+}
+
+// Workforce-scoped chart re-instantiation: destroys only
+// chart instances whose canvas id starts with "wfs-",
+// then runs queued instantiations. Other charts (catchment,
+// population, labour) are left alone.
+function _flushPendingChartsWorkforceScoped() {
+  Object.keys(_CHART_INSTANCES).forEach(id => {
+    if (!id.startsWith("wfs-")) return;
+    try { _CHART_INSTANCES[id].destroy(); } catch (e) {}
+    delete _CHART_INSTANCES[id];
+  });
+  while (_CHART_PENDING.length) {
+    const fn = _CHART_PENDING.shift();
+    try { fn(); } catch (e) {
+      console.warn("chart init failed:", e);
+    }
+  }
+}
+
+function _setWfsWindow(months, btn) {
+  _WFS_WINDOW_MONTHS = months;
+  if (!window._kintellLastCentre) return;
+  const old = document.getElementById("kintell-wfs-card");
+  if (!old) return;
+  // Replace the card HTML in-place. The replacement is the
+  // full <section> string; outerHTML re-parses + injects.
+  old.outerHTML = renderWorkforceSupplyCard(
+    window._kintellLastCentre);
+  // Now drain pending chart instantiations, scoped to wfs.
+  _flushPendingChartsWorkforceScoped();
+}
+
+function _renderWfsRangeBar() {
+  const opts = [
+    { months: 6,  label: "6M" },
+    { months: 12, label: "1Y" },
+    { months: 24, label: "2Y" },
+    { months: 60, label: "5Y" },
+    { months: 0,  label: "All" },
+  ];
+  const btns = opts.map(o => {
+    const isActive = (o.months === _WFS_WINDOW_MONTHS);
+    return `<button class="range-btn${isActive ? " active" : ""}" `
+         + `onclick="_setWfsWindow(${o.months}, this)">${o.label}</button>`;
+  }).join("");
+  return `
+    <div class="traj-range-bar" style="margin-top:8px;margin-bottom:12px;">
+      <span class="label">Window</span>
+      <div class="btns">${btns}</div>
+      <span style="margin-left:auto;font-size:10.5px;color:var(--text-mute);">
+        applies to workforce sparklines
+      </span>
+    </div>
+  `;
+}
+
 function renderWorkforceSupplyCard(centre) {
   const ws = centre && centre.workforce_supply;
   if (!ws || !Array.isArray(ws.rows) || !ws.rows.length) return "";
@@ -2236,10 +2335,11 @@ function renderWorkforceSupplyCard(centre) {
   const rows = ws.rows.map(r => _renderWorkforceSupplyRow(r)).join("");
 
   return `
-    <section class="op-section">
+    <section class="op-section" id="kintell-wfs-card">
       <h3>Workforce supply context
         <span class="note">state &amp; national signals · default open</span>
       </h3>
+      ${_renderWfsRangeBar()}
       ${rows}
     </section>
   `;
@@ -2249,6 +2349,17 @@ function _renderWorkforceSupplyRow(r) {
   const intentCopyHtml = r.intent_copy
     ? `<div style="margin-top:6px;font-size:11.5px;font-style:italic;color:var(--text-mute);line-height:1.5;">
          ${htmlEscape(String(r.intent_copy))}
+       </div>`
+    : "";
+
+  // v3.17: about_data — permanent visible methodology block.
+  // Rendered as a subtle "About this measure" panel beneath
+  // the intent copy. Silent absence when payload doesn't
+  // populate it (e.g. ECEC Award, 3-Day Guarantee rows).
+  const aboutDataHtml = r.about_data
+    ? `<div style="margin-top:8px;padding:6px 10px;background:rgba(255,255,255,0.02);border-radius:4px;border-left:2px solid var(--border);font-size:11px;color:var(--text-mute);line-height:1.5;">
+         <span style="font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:10px;color:var(--text-dim);">About this measure</span>
+         <span style="margin-left:6px;">${htmlEscape(String(r.about_data))}</span>
        </div>`
     : "";
 
@@ -2305,13 +2416,17 @@ function _renderWorkforceSupplyRow(r) {
       <div style="margin-top:4px;">${scopeStampHtml}</div>
       ${trajectoryHtml}
       ${intentCopyHtml}
+      ${aboutDataHtml}
       ${statusNoteHtml}
     </div>
   `;
 }
 
 function _renderWorkforceSupplySparkline(r) {
-  const traj = (r && r.trajectory) || [];
+  const fullTraj = (r && r.trajectory) || [];
+  if (fullTraj.length < 2) return "";
+  // v3.16: filter to active window before plotting.
+  const traj = _wfsFilterByWindow(fullTraj, _WFS_WINDOW_MONTHS);
   if (traj.length < 2) return "";
   const stroke = "#3d7eff";
   const fill = "rgba(61,126,255,0.08)";
@@ -2323,22 +2438,51 @@ function _renderWorkforceSupplySparkline(r) {
     const el = document.getElementById(canvasId);
     if (!el) return;
     const dataset = _kintell_makeLine(r.display, data, stroke, fill);
-    dataset.pointHoverRadius = 4;
+    // v3.15: dot points visible at every period (matches
+    // trajectory polish on Population / Labour / Catchment).
+    dataset.pointRadius      = 2;
+    dataset.pointHoverRadius = 6;
+    dataset.pointBackgroundColor = stroke;
+    dataset.pointBorderColor     = stroke;
     const opts = _kintell_makeOpts(null, null);
-    // v3.11: workforce sparkline gets sparse year labels too.
+    // v3.16: optimise Y-axis to show variance. Compute
+    // padded min/max from filtered data; beginAtZero=false.
+    if (data.length) {
+      const dmin = Math.min.apply(null, data);
+      const dmax = Math.max.apply(null, data);
+      const range = Math.max(dmax - dmin, 1);
+      const pad = range * 0.08;
+      opts.scales.y.beginAtZero = false;
+      opts.scales.y.min = Math.max(0, dmin - pad);
+      opts.scales.y.max = dmax + pad;
+    }
+    // v3.11: workforce sparkline gets sparse year labels.
     opts.scales.x.ticks.display = true;
     opts.scales.x.ticks.maxTicksLimit = 5;
     opts.scales.x.ticks.autoSkip = true;
     opts.scales.x.ticks.font = { size: 9 };
+    // v3.15: switch native tooltip OFF, route to external
+    // HTML readout (defined globally in v3.13). Same
+    // pattern as trajectory charts.
+    if (!opts.plugins) opts.plugins = {};
+    opts.plugins.tooltip = {
+      enabled: false,
+      external: _kintellExternalReadout,
+      displayColors: false,
+    };
     _CHART_INSTANCES[canvasId] = new Chart(el, {
       type: "line",
       data: { labels, datasets: [dataset] },
       options: opts,
+      plugins: [_kintellCrosshair],
     });
   });
 
   return `
-    <div style="margin-top:6px;height:42px;position:relative;">
+    <div id="readout-${canvasId}" style="height:18px;font-size:12.5px;line-height:18px;color:var(--text);margin-top:6px;margin-bottom:2px;padding:0 4px;">
+      <span style="color:var(--text-mute);font-style:italic;">hover the line to read values</span>
+    </div>
+    <div style="height:42px;position:relative;">
       <canvas id="${canvasId}"></canvas>
     </div>
   `;
@@ -2430,6 +2574,9 @@ function renderCommentary(centre) {
 
 // ── Main render ─────────────────────────────────────────────────────
 function render(centre) {
+  // v3.16: stash so the workforce window selector can
+  // re-render its card in-place without a full reload.
+  window._kintellLastCentre = centre;
   // Capture for trajectory-range button re-render (Layer 4.2-B-fix2)
   _LAST_CENTRE = centre;
 
