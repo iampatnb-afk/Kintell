@@ -132,3 +132,32 @@ The corrective work in this session: regenerated `recon/layer4_3_design.md` as v
 - `recon/layer4_3_thread_a_probe.md` (apply session)
 - `docs/centre.html` v3.3
 
+
+## 2026-04-30 — Layer 4.3 closeout + Layer 2.5 ship + Layer 4.2-A.3 catchment ratios + 4.2-A.3a-fix polish + 4.2-A.3b industry thresholds
+
+**Shipped:** 7 commits + 5 patches uncommitted-pending-composite-commit.
+
+**Layer 4.3 closeout:**
+- `8e944d9` Sub-pass 4.3.5: schema migration on `service_catchment_cache` (7 cols added; audit_id 138)
+- `5eec075` Sub-pass 4.3.5b: rename capture_rate → demand_share_state (audit_id 139)
+
+**Layer 2.5 ship:**
+- `a65ee57` Sub-pass 2.5.1: populate `service_catchment_cache` (18,203 rows; audit_id 140)
+- `4d49516` Sub-pass 2.5.1 v5: three null-coverage fixes (median_income year selection, seifa_irsd from services.seifa_decile, new_competitor_12m DD/MM/YYYY date parsing; audit_id 141)
+- `b924524` Sub-pass 2.5.2: Layer 3.x catchment metric banding (9,035 rows for 4 metrics; audit_id 142)
+
+**Layer 4.2-A.3:**
+- `d12da0b` Catchment ratios wired into centre page + credit-block reorder (centre_page.py v8→v9, centre.html v3.9→v3.10, schema_version v4→v5; option α reorder)
+
+**Layer 4.2-A.3a-fix (trajectory chart polish):**
+- `beb7bbe` 4 chained centre.html iterations (v3.10→v3.13a): tooltip flip via external HTML readout, sparkline dot points, vertical crosshair plugin, X-axis label restoration, defensive readout parser
+
+**Uncommitted (composite commit pending):**
+- centre_page.py v9→v12: 4.2-A.3b industry thresholds (INDUSTRY_BAND_THRESHOLDS table) + F1/F1-β JSA IVI explainer (about_data field)
+- docs/centre.html v3.13a→v3.17: industry band line render, workforce sparkline polish (v3.15), workforce-section local trend-window selector (v3.16), about_data render (v3.17)
+
+**Open items new:** OI-25 (Census income trajectory single-point bug), OI-26 (demand_supply industry threshold post-launch calibration), OI-27 (sa2_history.json subtype rebuild for 4.2-A.3c), OI-28 (populator banner cosmetic).
+
+**Open items closed:** OI-05 (service_catchment_cache populated), OI-23 (trend-window bar caption corrected — original framing was a misread).
+
+**Standards / decisions:** No new STDs or DECs. DEC-77 candidate (industry threshold framework) flagged for next-session lock pending operator-use validation.
