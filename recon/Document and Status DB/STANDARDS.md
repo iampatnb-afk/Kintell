@@ -51,6 +51,24 @@ Get-NetTCPConnection -LocalPort 8001 -State Listen -ErrorAction SilentlyContinue
 
 Cost a full diagnostic round in the 2026-04-26 session: 6 orphan python processes accumulated across multi-day work; the v5 server from 25/04 was answering `/api/centre/<sid>` with "Not found" while the v6 server's banner suggested it was the live process.
 
+#### Mutation-script variant — `proc_helpers.py`
+*Added: 2026-05-03*
+
+Mutation scripts (Layer 2.5 cache builders, schema migrations) need a different check than the prophylactic-kill pattern above: they must DETECT orphan python.exe processes — those potentially holding stale module imports against files about to be mutated — and FAIL FAST if any are alive, rather than blindly killing them.
+
+The canonical helper for this is `proc_helpers.py` (added 2026-05-03; commit `1f72226`). New mutation scripts must use it:
+
+```python
+from proc_helpers import std13_self_check
+std13_self_check(log, fail)  # log/fail are your script's logger funcs
+```
+
+Helper internals: `Get-CimInstance Win32_Process` via PowerShell shell-out (Win11-safe; canonical replacement for the deprecated WMIC command). Returns identical `(pid, ppid)` shape to the historical `_wmic_python_procs()` functions in the scripts named below — drop-in compatible. Returns `None` on any failure (PowerShell unavailable, query timeout, non-Windows host); `std13_self_check()` treats `None` as "could not check; skip with warning", matching historical fail-soft semantics.
+
+Historical scripts are NOT retrofitted: `populate_service_catchment_cache.py`, `layer3_x_catchment_metric_banding.py`, `migrate_4_3_5_service_catchment_cache.py`, `migrate_4_3_5b_rename_capture_rate.py`. Each already shipped, is idempotency-guarded against re-runs, and emits a harmless `STD-13: WMIC unavailable; SKIPPING with warning` line. The orphan-detection check is silently disabled for them, but they have already done their work and won't run again — no practical impact. The retrofit was deliberately scoped out (Option A on 2026-05-03) to avoid churning shipped mutation code.
+
+Self-test the helper on any new machine via `python proc_helpers.py` — prints all running python.exe processes with PID/PPID and confirms Get-CimInstance is wired correctly.
+
 ### STD-14 — Verify server banner version matches file on disk
 *Origin: 2026-04-26*
 
