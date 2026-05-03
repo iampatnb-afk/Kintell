@@ -101,7 +101,11 @@ Banner says "v2" in the `print()` output even though the file has been patched t
 
 
 ### OI-29 — `sa2_median_household_income` should be Lite weight per DEC-75
-*Origin: 2026-05-03. Status: open; ~0.1 session.*
+*Origin: 2026-05-03. **Closed: 2026-05-03** — landed in centre_page.py v14 same session.*
+
+**Resolution.** `row_weight: "lite"` set on `sa2_median_household_income` in `LAYER3_METRIC_META`. `_renderLiteRow` (centre.html v3.18) handles the visual change: trajectory chart dropped; decile strip + band chips + intent copy + as-at stamp ("as at 2021 · static snapshot, no trajectory") retained. Trajectory data still attached to the payload by `_metric_trajectory` (the 3 non-null Census points 2011/2016/2021); the renderer just no longer plots it as a chart, eliminating the smooth-interpolation-over-a-decade visual lie and the Trend-Window-clipping fragility that was the original OI-25 symptom. Asymmetry preserved: `sa2_median_employee_income` and `sa2_median_total_income` stay Full (annual cadence, 5 dense points 2018-2022).
+
+**Original framing (kept for traceability):**
 
 Three Census points (2011/2016/2021) is not a trajectory. DEC-75 reclassified the LFP triplet on this exact logic (OI-06); the same logic applies here. Currently rendered as Full weight, which means (a) three dots spanning a decade visually implies more granularity than exists, and (b) the global Trend Window default clips it to a single point on shorter windows — the visible failure mode that triggered OI-25.
 

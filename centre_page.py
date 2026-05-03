@@ -1,6 +1,8 @@
 """
 centre_page.py — Phase 2 backend helper for centre.html
-Version: v13 (2026-05-03) — Layer 4.2-A.4: STD-34 calibration metadata surfaced on the 3 catchment_position metrics that derive from the participation_rate calibration (sa2_adjusted_demand, sa2_demand_supply, sa2_demand_share_state). New _read_calibration_meta helper reads calibrated_rate + rule_text from service_catchment_cache once per SA2; attached per-entry where meta.uses_calibration=True. Renderer half ships separately (centre.html v3.17 -> v3.18) per DEC-22 two-commit pattern. Other catchment metrics (sa2_supply_ratio, sa2_child_to_place) are pure ratios and correctly do NOT receive this metadata.
+Version: v14 (2026-05-03) — OI-29 close: sa2_median_household_income reclassified to Lite weight per DEC-75. Three Census points (2011/2016/2021) is not a trajectory; same logic the LFP triplet got in DEC-75. Renderer-only behavioural change at runtime: _renderLiteRow drops the trajectory chart, keeps decile strip + band chips + intent copy + as-at stamp (reads "2021" from the most recent non-null point). sa2_median_employee_income and sa2_median_total_income stay Full (annual cadence, 5 dense points 2018-2022).
+
+v13 changes (2026-05-03, Layer 4.2-A.4): STD-34 calibration metadata surfaced on the 3 catchment_position metrics that derive from the participation_rate calibration (sa2_adjusted_demand, sa2_demand_supply, sa2_demand_share_state). New _read_calibration_meta helper reads calibrated_rate + rule_text from service_catchment_cache once per SA2; attached per-entry where meta.uses_calibration=True. Renderer half ships separately (centre.html v3.17 -> v3.18) per DEC-22 two-commit pattern. Other catchment metrics (sa2_supply_ratio, sa2_child_to_place) are pure ratios and correctly do NOT receive this metadata.
 
 v12 changes (2026-04-30, Layer 4.2-A.3a-fix iter 4 (F1-β)): JSA IVI methodology lifted out of hover-gated OBS tooltip into a new about_data field on IVI rows. Renderer surfaces it as a permanent visible block under the chart so credit readers don't need to discover the OBS hover affordance. OBS source string now carries full methodology one-liner (what the IVI is, where it comes from); intent_copy tightened to credit-relevant framing only. Reader hovers OBS for data provenance, reads inline copy for credit signal.
 
@@ -463,7 +465,7 @@ LAYER3_METRIC_META = {
         "card": "labour_market",
         "value_format": "currency_weekly",
         "direction": "high_is_positive",
-        "row_weight": "full",
+        "row_weight": "lite",  # v14 (OI-29): 3 Census points is not a trajectory; per DEC-75
         "source": "ABS Census 2021 (median_equiv_household_income_weekly)",
         "band_copy": {
             "low":  "price-sensitive",
