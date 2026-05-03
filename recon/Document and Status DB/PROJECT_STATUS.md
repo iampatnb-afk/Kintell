@@ -1,90 +1,38 @@
 # Project Status
 
-*Last updated: 2026-05-03. The on-disk version supersedes the project-knowledge monolith if they disagree.*
+*Last updated: 2026-05-03 (end of afternoon session). The on-disk version supersedes the project-knowledge monolith if they disagree.*
+
+## Headline
+
+**V1 is at HEAD.** All blocking V1 work shipped. The remaining items in the V1 queue (4.2-A.3c, OI-29, OI-12, STD-13) all landed this session. What remains is V1.5 polish + the deferred Bug 4 (helper text length / explainer copy) which Patrick will handle when he sees a third screenshot.
 
 ## Centre page — current state
 
-`centre_page.py` v13 (Python backend) + `centre.html` v3.18 (renderer) + payload schema `centre_payload_v6` (unchanged this session — v13 added fields, no schema rev).
+`centre_page.py` v16 (Python backend) + `centre.html` v3.21 (renderer) + payload schema `centre_payload_v6` (unchanged this session — v15/v16 added fields, no schema rev).
 
-The centre page renders the three-temporal-mood pattern (DEC-32) at the leaf level, with the **2026-04-30 page-level reorder** putting credit-lens content first:
+Major Layer 4.2-A.3c shipment lands the catchment-trajectory feature end-to-end:
+- All 4 banded catchment metrics (sa2_supply_ratio, sa2_child_to_place, sa2_demand_supply, sa2_adjusted_demand) promoted Lite→Full
+- Quarterly trajectories rendered with same chart treatment as Population/Labour Market (dot points, crosshair, external readout)
+- Per-subtype centre_events overlay (vertical dashed coloured lines): green for additions, red for removals, grey for net-zero churn
+- Centre page now drives all subtype-specific data from `docs/sa2_history.json` (v2, multi-subtype build, 13.2 MB)
 
-**Page order (top to bottom):**
-1. Header (centre name + key facts)
-2. Trend window bar (3Y / 5Y / 10Y / All; applies to Population / Labour / Catchment trajectories only)
-3. **Credit block** (signals first):
-   - Catchment position card (5 rows; HEADLINE CREDIT SIGNAL)
-   - Population card (4 rows; 1 deferred)
-   - Labour Market card (7 rows; 1 deferred)
-   - Workforce Supply Context (4 rows; own window selector)
-4. Visible horizontal divider
-5. **Operational block** (facts second):
-   - NQS rating + Places (side-by-side)
-   - Catchment-meta + Tenure (side-by-side)
-   - Quality Assessment Areas
-   - Commentary
+**POSITION block — Catchment position card (after Layer 4.2-A.3c):**
 
-**NOW block** (operational, now in lower half of page):
-- NQS rating + cadence (DEC-34 five-state classification)
-- Places + service sub-type + management type
-- Kinder recognition (3-row composite: ACECQA flag + name match + four-state derived headline; mirrors operator-page treatment; always renders)
-- Catchment context (SEIFA + ARIA + SA2)
-- Tenure (greenfield / brownfield + transfer history)
+| Metric | Weight | Trajectory | Events overlay | Industry band | Calibration in DER |
+|---|---|---|---|---|---|
+| `sa2_supply_ratio` | FULL | quarterly per subtype | YES (subtype-matched) | 7 levels | — |
+| `sa2_demand_supply` | FULL | quarterly (cal_rate held constant) | YES | 4 levels | YES (4.2-A.4) |
+| `sa2_child_to_place` | FULL | quarterly (1/supply_ratio) | YES | 5 levels | — |
+| `sa2_adjusted_demand` | FULL | quarterly (cal_rate held constant) | YES | NO (decile only) | YES (4.2-A.4) |
+| `sa2_demand_share_state` | CONTEXT | n/a | n/a | n/a | YES (4.2-A.4) |
 
-**POSITION block — Catchment position card (sub-pass 4.2-A.3, 4.2-A.3b, 4.2-A.4):**
+**DEC-74 amendment:** perspective toggle removed from the 3 reversible catchment metrics. Once both inverse views (supply_ratio ↔ child_to_place) render as separate Full rows in the same card, the toggle just swapped to data already visible.
 
-| Metric | Weight | Reversibility | Industry band | Calibration in DER |
-|---|---|---|---|---|
-| `sa2_supply_ratio` | LITE | reversible ↔ `sa2_child_to_place` | 7 levels (desert / undersupplied / below_bench / at_bench / well_served / at_target / saturated) | — (pure ratio) |
-| `sa2_demand_supply` | LITE | reversible ↔ `demand_supply_inv` (HTML-level) | 4 levels (soft / near_be / viable / strong) | YES (4.2-A.4) |
-| `sa2_child_to_place` | LITE | reversible ↔ `sa2_supply_ratio` | 5 levels (excess_capacity / balanced / tight / constrained / severe) | — (pure ratio) |
-| `sa2_adjusted_demand` | LITE | not reversible | NO industry band (decile only) | YES (4.2-A.4) |
-| `sa2_demand_share_state` | CONTEXT | n/a | n/a (rank-by-construction; reads cache directly) | YES (4.2-A.4) |
+**Subtype handling.** The centre's `service_sub_type` (LDC / OSHC / PSK / FDC) drives which `by_subtype.<>` block in sa2_history.json gets read. Null/Other subtypes fall back to LDC view. LDC is the V1 focus (53% of platform); OSHC/PSK/FDC trajectories use the same `pop_0_4` denominator across all subtypes (documented known simplification — subtype-correct denominators are V1.5+).
 
-Two reversible pairs activate the DEC-74 perspective toggle (live in V1).
+**Calibration semantics.** `adjusted_demand` and `demand_supply` use the centre's CURRENT `calibrated_rate` held constant across all historical quarters. Honest framing: "supply trajectory adjusted for current demand structure." Will surface explicitly in helper text once Bug 4 explainer copy lands.
 
-**STD-34 calibration metadata now surfaces in the DER tooltip** on the three calibration-using rows (4.2-A.4 ship 2026-05-03). Tooltip carries `calibrated_rate=X.XX — <rule_text>` where `rule_text` traces every nudge applied (e.g. `default 0.50; +0.02 income decile 10 (high); +0.02 female LFP top quartile (67.7% ≥ 67.2%); NES share not yet ingested (OI-19; nudge dormant); ARIA band 1 unrecognised (no nudge)`). `_renderContextRow` now ships a conditional DER badge (didn't exist before 4.2-A.4) so `sa2_demand_share_state` carries the surface.
-
-Each Lite catchment row renders: title + value + decile strip + low/mid/high band chips + INDUSTRY band line (when populated) + intent copy + DER+COM badges.
-
-**POSITION block — Population (4 metrics, 1 deferred):**
-- `sa2_under5_count` FULL — band against same-state cohort
-- `sa2_total_population` FULL — band against state-x-remoteness
-- `sa2_births_count` FULL — band against state-x-remoteness
-- `sa2_under5_growth_5y` DEFERRED (placeholder; OI-09)
-
-**POSITION block — Labour Market (7 metrics, 1 deferred):**
-- `sa2_unemployment_rate` FULL — band against same-state cohort
-- `sa2_median_employee_income` FULL — band against same-remoteness (5 dense annual points 2018-2022)
-- `sa2_median_household_income` FULL — band against same-remoteness (3 sparse Census points; **OI-29 queued: should be Lite per DEC-75**)
-- `sa2_median_total_income` FULL — band against same-remoteness (5 dense annual points 2018-2022)
-- `sa2_lfp_persons` LITE — 3 Census points (SALM-extension V1.5)
-- `sa2_lfp_females` LITE — 3 Census points (permanent)
-- `sa2_lfp_males` LITE — 3 Census points (permanent)
-- `jsa_vacancy_rate` CONTEXT — moved to Workforce supply block (DEC-76)
-
-**Workforce Supply Context block** (sub-pass 4.3.9 + 4.2-A.3a-fix iter 3-4):
-- Own local window selector: **6M / 1Y / 2Y / 5Y / All** (default 2Y)
-- Y-axis: `beginAtZero=false`, padded min/max so monthly variance is readable
-- Trajectory polish: dot points, vertical crosshair on hover, external HTML readout above each chart (matches Catchment / Population / Labour treatment)
-- 4 rows:
-  - Child carer vacancy index (ANZSCO 4211) — JSA IVI live + permanent **About this measure** explainer
-  - ECT vacancy index (ANZSCO 2411) — JSA IVI live + permanent About this measure explainer
-  - ECEC Award rates — pending (Fair Work ingest)
-  - 3-Day Guarantee policy — live (national policy fact)
-
-**Trajectory chart polish** (4.2-A.3a-fix):
-- Sparkline trajectories show visible dot points at every period
-- Vertical dashed crosshair tracks cursor and snaps to nearest data index
-- Chart.js native tooltip replaced with external HTML readout in a fixed slot above each canvas — period + value + since-window-start trend %
-- Sparkline X-axis labels show with `maxTicksLimit=5`, `autoSkip=true`
-
-**Empty-state copy** — unemployment row in SALM-suppressed SA2s renders a named small-population-suppression note (Thread A 4.3.1).
-
-**Standalone module ready for Layer 4.2-A consumption:**
-- `catchment_calibration.py` v1 (sub-pass 4.3.4) — STD-34 calibration function. Now actively consumed: per-SA2 calibrated_rate + rule_text in `service_catchment_cache`, propagated into payload via centre_page.py v13 `_read_calibration_meta`, surfaced in DER tooltip via centre.html v3.18 `_buildCalibrationRow`.
-
-**What is NOT yet on the centre page:**
-- Subtype-aware new-centre overlay on `sa2_supply_ratio` trajectory (sub-pass 4.2-A.3c, queued; ~1.0 session; locked design D6=c — only supply_ratio gets a trajectory chart, the other 3 banded ratios stay histogram-only by intent per data-honesty principle P-2)
+**Workforce Supply Context block, Population, Labour Market** — unchanged this session.
 
 ---
 
@@ -92,27 +40,27 @@ Each Lite catchment row renders: title + value + decile strip + low/mid/high ban
 
 | Layer | Description | Status |
 |---|---|---|
-| 0 | Operator + corporate identity | COMPLETE |
-| 1 | Service NOW slice | COMPLETE |
-| 2 | SA2 cohort + remoteness | COMPLETE |
-| 2.5 | Catchment cache populator | COMPLETE 2026-04-30 (sub-passes 2.5.1 + 2.5.2 shipped; 18,203 cache rows, 9,035 layer3 banding rows) |
-| 3 | Layer 3 banding (existing 14 metrics) | COMPLETE |
-| 4.1 | Layer 3 banding render-side | COMPLETE |
-| **4.2** | **Centre page renderer** | **In flight** — 4.2-A.3 + 4.2-A.3a-fix + 4.2-A.3b + 4.2-A.4 SHIPPED; **only 4.2-A.3c remains** (subtype-aware overlay, ~1.0 session) |
-| 4.3 | Centre page polish + workforce | COMPLETE — all 9 sub-passes shipped |
+| 0 / 1 / 2 | Foundations | COMPLETE |
+| 2.5 | Catchment cache populator | COMPLETE 2026-04-30 |
+| 3 / 4.1 | Layer 3 banding existing 14 metrics + render-side | COMPLETE |
+| **4.2** | **Centre page renderer** | **COMPLETE** — all sub-passes shipped (4.2-A.3, 4.2-A.3a-fix, 4.2-A.3b, 4.2-A.4, 4.2-A.3c) |
+| 4.3 | Centre page polish + workforce | COMPLETE — all 9 sub-passes |
 | 4.4 | V1.5 ingests (NES + parent-cohort + schools + SALM-ext) | DEFERRED to V1.5 |
 
 ---
 
 ## What's next
 
-V1 path remaining: **~1.3 sessions** if Layer 4.2-A.3c lands. V1.5 path adds ~2.0 sessions (Layer 4.4 ingests bundle).
+V1 path remaining: **~0 sessions.** Optional polish below.
 
-**Recommended next-session order** (per ROADMAP § 8):
-1. **OI-29** (~0.1 session) — reclassify `sa2_median_household_income` to Lite weight per DEC-75. Trivial. Can interleave anywhere.
-2. **4.2-A.3c** (~1.0 session) — subtype-aware new-centre overlay on supply_ratio trajectory. Largest visible UX upgrade remaining. Requires `build_sa2_history.py` rebuild for subtype tagging.
-3. **OI-12** (~0.1 session) — backup pruning. `data/` >5.8 GB and growing.
-4. **STD-13** (~0.1 session) — WMIC → Get-CimInstance Win32_Process rewrite. Falls through with warning every invocation.
+**Priority polish (when Patrick is ready):**
+1. **Bug 4 (explainer text)** — currently deferred per "Patrick will recall later". Larger explainer per metric, especially adjusted_demand. Renderer-only, ~10-30 min depending on copy provided.
+2. **OI-30 (Bayswater data sparsity)** — investigate ABS pop_0_4 SA2 code coverage. Bayswater 211011251 only has data Q3 2019+; pre-2019 data lives under different ASGS code. Build script needs ASGS concordance step. Real V1.5 ingest fix; estimate ~0.3 session probe + ~0.5 session build script change.
+
+**V1.5 path (~3 sessions):**
+- **OI-31 (click-on-event detail)** — interactive overlay showing centre names + place changes when clicking a vertical event line. Substantial feature; ~1 session of renderer work.
+- **OI-32 (absolute change alongside %)** — show "+12 places, +1 centre" alongside trend %. ~30 min if scoped narrow.
+- **Layer 4.4 ingests** — NES + parent-cohort + schools + SALM-extension bundle. ~2 sessions.
 
 See ROADMAP.md for full dependency-ordered queue.
 
@@ -120,39 +68,49 @@ See ROADMAP.md for full dependency-ordered queue.
 
 ## Database state
 
-Path: `data\kintell.db` (~565 MB).
+Path: `data\kintell.db` (~565 MB). 36 tables. `audit_log: 142 rows` (no DB mutations this session).
 
-36 tables. No DB mutations this session — Layer 4.2-A.4 was a code-only ship (backend reads from existing cache columns; renderer reads from existing payload fields).
+`docs/sa2_history.json` rebuilt to v2 multi-subtype shape: 13.2 MB (was 5.2 MB v1), 50 quarters, 1,267 SA2s, 4 subtype buckets. Tracked in git (`docs/` is not gitignored). Future rebuilds land as deltas.
 
-`audit_log` unchanged at 142 rows (no new mutations).
-
-**OI-12 backup pruning is now status-critical.** Cumulative backups in `data/` exceed 5.8 GB. Approaching the threshold where a single git operation (which scans the working tree) can time out.
+**OI-12 status update:** backup inventory (`recon/db_backup_inventory_2026-05-03.md`) committed `bbac24f` provides queryable record of all 36 backups (audit_log + table+rowcount per backup). Deletion deferred — disk pressure is not currently biting; if it becomes an issue, deletion is now safely reversible.
 
 ---
 
 ## Git state
 
-HEAD: `528f9be` (Layer 4.2-A.4: STD-34 calibration metadata surfaced in DER tooltip).
-`origin/master`: `528f9be` (in sync after this session's pushes).
+HEAD: `bcdf84c` (Layer 4.2-A.3c Part 3). Branch in sync with origin.
 
-Today's commits (chronological):
-1. `a4104b6` — 2026-04-30 doc set landing (PROJECT_STATUS + ROADMAP + OPEN_ITEMS regen + PHASE_LOG append). Closed the doc-discipline gap from the prior session.
-2. `6d30d33` — OI-25 closed (premise dissolved by probe), OI-29 opened (Lite weight reclassification per DEC-75).
-3. `528f9be` — Layer 4.2-A.4: STD-34 calibration metadata surfaced in DER tooltip (centre_page.py v12→v13 + centre.html v3.17→v3.18, two-commit DEC-22 pattern collapsed).
+Today's commits in two phases:
 
-Plus the doc-set regen commit landing this monolith and the regenerated Tier-2 docs (separate commit; reference at end of PHASE_LOG).
+**Morning (a4104b6 → 16f7e18):**
+1. `a4104b6` — 30/04 doc set landing (closed prior-session doc-discipline gap)
+2. `6d30d33` — OI-25 closed by probe (premise dissolved); OI-29 opened (Lite weight reclassification per DEC-75)
+3. `528f9be` — Layer 4.2-A.4: STD-34 calibration metadata in DER tooltip
+4. `16f7e18` — 03/05 morning doc regen
 
-Untracked (gitignored): patch scripts, recon probe artefacts, frontend backups in `docs/`. The `*.v?_backup_*` ignore pattern uses single `?` so `v3_3` doesn't match — minor gitignore tightening worth a 30-second pass at the next consolidation.
+**Afternoon (6a7fe8a → bcdf84c):**
+5. `6a7fe8a` — OI-29 closed: sa2_median_household_income → Lite weight (centre_page.py v13→v14)
+6. `bbac24f` — OI-12 inventory: read-only audit_log + table snapshot of all 36 data/ backups
+7. `1f72226` — STD-13 helper module: `proc_helpers.py` with query_python_processes() + std13_self_check() (Win11-safe; replaces deprecated WMIC)
+8. `c70e942` — STD-13 extended in STANDARDS.md: mutation-script variant subsection documents proc_helpers.py as canonical pattern
+9. `36c2f78` — Layer 4.2-A.3c Part 2 (build): build_sa2_history.py v2 — LDC-first multi-subtype rebuild
+10. `bcdf84c` — Layer 4.2-A.3c Part 3 (renderer wiring + bug fixes): centre_page.py v14→v16 + centre.html v3.18→v3.21
+
+Plus this end-of-session doc commit landing the regenerated Tier-2 docs and the 03/05 PM monolith.
 
 ---
 
-## Parallel work streams
+## Standards / decisions
 
-**Daily-rate centre-page integration** — flagged but no progress. STD-36+ note holds.
+**No new STDs/DECs this session.** Two changes to existing:
 
-**Industry view (training_completions)** — data ready (768 rows; CHC30113/30121/50113/50121 across 2019-2024). Editorial disposition: kept at Industry view per DEC-36.
+- **STD-13 extended** (commit `c70e942`): mutation-script variant subsection added documenting `proc_helpers.py` as the canonical orphan-Python detection helper. Historical scripts (4 files: populate_service_catchment_cache.py, layer3_x_catchment_metric_banding.py, migrate_4_3_5_*.py) intentionally NOT retrofitted — already shipped, idempotency-guarded.
 
-**SALM extension** — SALM source publishes participation_rate at SA2; ingest scope can be extended (~0.5–0.6 session). Bundled with V1.5 OI-19.
+- **DEC-74 amended** (this session): perspective toggle removed for the 3 reversible catchment metrics post-Lite→Full promotion. Inverse views now visible as separate rows. Recorded as appended amendment block in DECISIONS.md.
+
+**STD-35 reinforcement candidate** (carried from morning): the 30/04→03/05 doc-discipline gap demonstrated "regenerate at session end" is necessary but not sufficient — "land on disk + upload to project knowledge" needs explicit verification. This session honoured the discipline (this very regen). Worth a 2-line addition to STD-35 at next consolidation.
+
+**STD-13 follow-on observation:** when patcher anchors include line endings, use `\n` not `\r\n` even on Windows source files. Python's text mode normalises to `\n` on read. The v15 patcher initially failed all 8 multi-line anchor checks for this reason; one-line fix worked. Worth a 1-line addition to STD-10 (Patcher pattern) at next consolidation.
 
 ---
 
@@ -160,13 +118,17 @@ Untracked (gitignored): patch scripts, recon probe artefacts, frontend backups i
 
 See OPEN_ITEMS.md for full text.
 
-**Closed this session (2026-05-03):**
-- **OI-25** — `sa2_median_household_income` trajectory shows single point. Probe (`probe_oi25_income_trajectory.py`, read-only, Patcher pattern per STD-10) confirmed backend correctness: DB has 11 rows for the metric on test SA2 118011341; backend `_metric_trajectory` returns 3 non-null points (2011, 2016, 2021); renderer draws 3 dots when Trend Window is "All". The "single point" symptom was visible only on shorter Trend Windows where Census 5-year cadence + window clipping leaves 2021 alone. No backend bug; no renderer bug. Real residual issue → tracked as OI-29.
+**Closed this session:**
+- **OI-25** (morning) — Census income trajectory single-point bug. Premise dissolved by probe; backend + renderer correct.
+- **OI-29** (afternoon) — sa2_median_household_income reclassified to Lite per DEC-75. Three Census points is not a trajectory.
+- **OI-27** (afternoon, by Layer 4.2-A.3c) — sa2_history.json subtype tagging requirement. v2 build delivers per-subtype `centre_events` arrays; renderer consumes them.
 
-**Opened this session (2026-05-03):**
-- **OI-29** — `sa2_median_household_income` should be Lite weight per DEC-75. Three Census points is not a trajectory; same logic LFP triplet got. ~0.1 session, renderer-only (set `row_weight: "lite"` on the metric in `LAYER3_METRIC_META`). Note the asymmetry inside the income triplet: `sa2_median_employee_income` and `sa2_median_total_income` have annual cadence (5 dense points 2018-2022) and stay Full.
+**Opened this session:**
+- **OI-30** — Bayswater (and likely other 2021-ASGS) SA2 codes have incomplete pre-2019 ABS coverage. Build script needs concordance step to map newer ASGS codes to older ASGS data. Affects trajectory completeness for ~unknown number of SA2s. V1.5 ingest scope.
+- **OI-31** — Catchment trajectory event lines should support click → popup showing quarter, net change, list of centre names with places. Substantial renderer feature; V1.5 polish.
+- **OI-32** — Catchment metrics need longer "what is this metric?" explainer text in the centre page UI. Especially for `adjusted_demand`. Renderer + content; Patrick to provide copy.
 
-**Carried (unchanged):** OI-01–OI-04 (data quality), OI-06–OI-22 (assorted), OI-24 (DEC-65 protocol traceability), OI-26 (demand_supply industry threshold post-launch review), OI-27 (sa2_history.json subtype rebuild for 4.2-A.3c), OI-28 (populator banner cosmetic).
+**Carried (unchanged):** OI-01–OI-04 (data quality), OI-06–OI-22 (assorted), OI-24 (DEC-65 protocol traceability), OI-26 (demand_supply industry threshold post-launch review), OI-28 (populator banner cosmetic), OI-12 (status updated: inventory landed, deletion deferred).
 
 ---
 
@@ -174,9 +136,8 @@ See OPEN_ITEMS.md for full text.
 
 The 2026-04-28 restructure produced the 12-doc set. Update history:
 - 2026-04-29c+d: Layer 4.3 design closure + 8 of 9 sub-passes shipped
-- 2026-04-30: Layer 4.3 closeout (4.3.5 + 4.3.5b) + Layer 2.5 ship + Layer 4.2-A.3 + 4.2-A.3a-fix + 4.2-A.3b. **Doc updates regenerated but not landed** until 2026-05-03 (the doc-discipline gap that triggered this session's STD-35 enforcement work).
-- **2026-05-03: doc-discipline catch-up + Layer 4.2-A.4 + OI-25 dissolution + OI-29 add.** This session regenerated PROJECT_STATUS, ROADMAP, OPEN_ITEMS (already landed via 30/04 patcher path); appended PHASE_LOG entry; produced the 2026-05-03 monolith.
+- 2026-04-30: Layer 4.3 closeout + Layer 2.5 ship + Layer 4.2-A.3 / 3a-fix / 3b. Doc artefacts produced but not landed until 03/05.
+- 2026-05-03 morning: doc-discipline catch-up (30/04 set landed) + Layer 4.2-A.4 + OI-25 dissolution + OI-29 add. Monolith `kintell_project_status_2026-05-03.txt`.
+- **2026-05-03 afternoon: OI-29 close + OI-12 inventory + STD-13 helper + Layer 4.2-A.3c (Part 1+2+3) + DEC-74 amendment.** This session regenerated PROJECT_STATUS, ROADMAP, OPEN_ITEMS, appended PHASE_LOG, amended DECISIONS, produced new monolith `kintell_project_status_2026-05-03_pm.txt`.
 
-STANDARDS and DECISIONS unchanged this session (no new STDs / DECs). DEC-77 candidate (industry threshold framework) flagged for next-session lock pending operator-use validation.
-
-**STD-35 reinforcement candidate (not yet a STD addition):** the 30/04 → 03/05 doc-discipline gap demonstrated that "regenerate the artefacts at session end" is necessary but not sufficient — the artefacts also need to make it onto disk and into project knowledge. Worth a 2-line addition to STD-35 (or a new STD) requiring an explicit "files moved to disk + monolith uploaded to project knowledge" verification step before declaring session-end. Note for the next consolidation pass.
+This doc set reflects state as of HEAD `bcdf84c` (and the doc commit immediately following).

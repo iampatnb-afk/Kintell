@@ -236,3 +236,109 @@ No new STDs or DECs. DEC-77 candidate (industry threshold framework) still flagg
 ### Mood note for future sessions
 
 This session opened with a stale framing in the kickoff message — wrong git state, wrong file versions. Probe-before-code (DEC-65) caught it: rather than executing the kickoff blindly, ran `git status` first and found the inconsistency. Same discipline saved a misdirected fix on OI-25 (probed first, dissolved the bug claim, rather than diving into `_layer3_position`). The substrate work (doc landing) ate ~1/3 of the session but was the right call — without it, every subsequent session would have re-paid the orientation tax. Patrick's pull-up midway ("have you done a full review of all the documents?") was the corrective intervention that triggered the substrate audit.
+
+---
+
+## 2026-05-03 PM — Layer 4.2-A.3c end-to-end ship + housekeeping cluster
+
+Continuation of the 2026-05-03 morning session. 6 commits this afternoon delivering the largest remaining V1 piece (Layer 4.2-A.3c catchment trajectories) plus three planned housekeeping items (OI-29, OI-12, STD-13).
+
+**Headline: V1 is at HEAD `bcdf84c`.** All blocking V1 items shipped.
+
+### Block 1 — OI-29 close (commit `6a7fe8a`)
+
+Single-line patcher flipping `row_weight: "lite"` on `sa2_median_household_income` in `LAYER3_METRIC_META`, plus version bump v13 → v14, plus closing OI-29 in OPEN_ITEMS.md atomically. Smoke test confirmed asymmetry preserved: household income (Census, 3 sparse points) now Lite/static; employee + total income (annual, 5 dense points 2018-2022) stay Full with charts.
+
+### Block 2 — OI-12 inventory (commit `bbac24f`)
+
+Patrick raised legitimate "what if we need this data later" concern when initial dry-run of `prune_db_backups.py` showed all 36 backups would be deleted. Wrote `inventory_db_backups.py` (read-only probe; opens each backup with SQLite mode=ro URI, captures audit_log + table+rowcount per backup). Output `recon/db_backup_inventory_2026-05-03.md` (2.97 MB, 6,129 lines). Result: deletion is now safely reversible — even if all binary backups go, the inventory preserves the queryable record. Disk space NOT reclaimed; deletion deferred until disk pressure becomes real.
+
+### Block 3 — STD-13 helper (commit `1f72226`)
+
+Wrote `proc_helpers.py` (Get-CimInstance Win32_Process via PowerShell shell-out) as the canonical Win11-safe replacement for the deprecated WMIC pattern in 4 historical mutation scripts. Self-test detected 3 real orphan python processes — confirmed the helper works correctly. Historical scripts intentionally NOT retrofitted (already shipped, idempotency-guarded; the harmless WMIC-skip warning doesn't block them).
+
+### Block 4 — STD-13 doc extension (commit `c70e942`)
+
+Patcher to STANDARDS.md adding "Mutation-script variant" subsection to STD-13 documenting `proc_helpers.py` as the canonical pattern for new mutation scripts. Original STD-13 (prophylactic kill before review_server) preserved; new subsection covers the orphan-detection variant.
+
+### Block 5 — Layer 4.2-A.3c Part 2 (commit `36c2f78`)
+
+Wholesale replacement of `build_sa2_history.py` (v1 → v2). Multi-subtype rebuild:
+- Filter switches from `Long Day Care = Yes` flag to `Service Sub Type IN (LDC, OSHC, PSK, FDC)` column (with legacy fallback for older quarters)
+- Per-quarter loop iterates over 4 subtypes; LDC processed first and mirrors into v1 top-level arrays for back-compat
+- New `by_subtype` block per SA2 with parallel arrays per subtype + per-subtype `centre_events`
+- `pop_0_4` / `income` stay top-level (subtype-independent); `supply_ratio` uses same `pop_0_4` denominator across subtypes (documented known simplification)
+- Auto-copy from `data/sa2_history.json` to `docs/sa2_history.json` added (review_server serves docs/)
+
+Build runtime: ~17 min on Patrick's machine (within the 15-25 min estimate). Output: 13.2 MB (was 5.2 MB v1), 50 quarters, 1,267 SA2s, all 4 subtype buckets populated. OSHC/PSK/FDC histories begin Q4 2021 (when `Service Sub Type` column first appears in NQAITS source); LDC has full 50-quarter coverage where ABS pop data exists.
+
+**Design probes inverted prior framing.** The locked D5=b decision had assumed sa2_history.json events were "all-subtype" needing subtype filtering. Probe revealed the inverse: events were already LDC-only (filtered at the top of `process_sheet_sa2`), and we needed to EXPAND to multi-subtype, not filter down. Plus the verification centre service_id=103 was OSHC, which would have rendered empty under the original LDC-only design. Patrick's clarification ("LDC at the centre of its thinking") locked the LDC-first principle.
+
+### Block 6 — Layer 4.2-A.3c Part 3 (commit `bcdf84c`)
+
+Largest patcher work of the session. Two patchers (centre_page.py + centre.html) bundled into one commit per DEC-22 collapse pattern. Plus iterative bug fixes on visual review.
+
+**Backend (centre_page.py v14 → v16, 11+4 mutations):**
+
+v14 → v15:
+- Added `import json` + `from pathlib import Path` (caught after first run)
+- New `CATCHMENT_TRAJECTORY_METRICS = frozenset({...})` set
+- New `_SA2_HISTORY_CACHE` module-level + `_load_sa2_history()` lazy-cached singleton
+- New `_catchment_trajectory(sa2_code, metric_name, subtype, calibrated_rate)` helper returning `(points, kind, events)` matching `_metric_trajectory` shape plus events
+- `_layer3_position` signature gains `service_sub_type` parameter; dispatches catchment metrics to new helper
+- Single call site in `get_centre_payload` updated
+- 4 catchment row_weights flipped Lite → Full
+
+v15 → v16:
+- DEC-74 perspective toggle removed from 3 reversible catchment metrics (post-promotion-to-Full, the toggle just swapped to data already visible as separate rows)
+
+**Renderer (centre.html v3.18 → v3.21, 3+2+2 mutations):**
+
+v3.19: New `_kintellEventAnnotation` Chart.js plugin (vertical dashed lines at centre entry/exit quarters; green=add, red=remove, grey=churn); wired into `_renderTrajectory` chart instantiation; data-driven via `opts.plugins.kintellEventAnnotation = {events}` (silently no-ops on Population/Labour charts that don't carry events).
+
+v3.20: Bug 1 fix — `_yearOfPeriod` regex un-anchored to handle quarter format ("Q3 2013") that was returning NaN.
+
+v3.21: Bug 1b fix — found a SECOND copy of the same regex inside `_filterTrajectoryByRange`. v3.20 fixed only the trend-label copy; this caused the trend window buttons (3Y/5Y/10Y/All) to have NO effect on catchment charts because the filter saw NaN and bailed out. With both fixed, trend window now works.
+
+**Verified visually on:**
+- Sparrow Early Learning Bayswater (svc 2358, LDC, VIC) — primary V1 path
+- Kool HQ Waverley (svc 103, OSHC, NSW) — secondary subtype path
+
+### DEC-74 amendment
+
+Recorded as appended block in DECISIONS.md. Original DEC-74 design (perspective toggle on reversible ratio pairs) made sense for Lite-weight rows where the toggle saved the credit reader from mental math. Post-promotion to Full, the inverse views render as separate rows in the same card — toggle becomes redundant by construction. Toggle fields removed from META; renderer gates on `p.reversible` so removal cleanly hides the toggle without renderer change.
+
+### Open items movement this session (PM)
+
+**Closed:**
+- **OI-29** (Lite reclassification of household income per DEC-75) — landed via Block 1
+- **OI-27** (sa2_history.json subtype tagging for new-centre overlay) — landed via Block 5 (build) + Block 6 (renderer wiring)
+
+**Opened:**
+- **OI-30** — Bayswater (and likely other 2021-ASGS SA2s) have incomplete pre-2019 ABS coverage. Discovered during Layer 4.2-A.3c verification: only 23/50 quarters have supply_ratio for SA2 211011251 because ABS `pop_0_4` only exists Q3 2019+. Likely an ASGS-version concordance issue. V1.5 build script work.
+- **OI-31** — Click-to-detail on event overlay lines (Bug 6 deferred from visual review). Vertical lines render correctly; clicking should show centre names + place changes. Substantial renderer feature; ~1 session.
+- **OI-32** — Catchment metric explainer text (Bug 4 deferred from visual review). Patrick will provide copy.
+
+### Patcher pattern observation worth banking
+
+The v15 patcher (11 mutations including 8 multi-line anchors) initially failed all 8 multi-line anchor checks because the `OLD` strings used `\r\n` line endings. Python's text mode normalises `\r\n` to `\n` on read, so the literal anchors didn't match the in-memory text. One-line bash sed fix on the patcher (`\r\n` → `\n` in OLD literals) made all anchors hit. Worth a 1-line addition to STD-10 (Patcher pattern): "anchors must use `\n` even on Windows source files."
+
+### Session shape
+
+Long session (started morning, continued afternoon). 10 commits total today plus end-of-session doc commit. V1 at HEAD. Patrick's pull-up at the start of the afternoon ("the buttons aren't working — re-render but data doesn't change") triggered the second regex bug discovery that v3.20 had missed. Without that visual verification, the Bug 1b would have shipped as a silent regression in the trend window machinery for catchment metrics.
+
+DEC-65 probe-before-code earned its keep this session: at start (OI-25 dissolved before any wasted backend work), at Layer 4.2-A.3c Part 1 (probes inverted the build's data shape assumption), at OI-30 discovery (Bayswater sparsity diagnosed before any "fix" attempt), and at Bug 1b (probed the regex twice, found two copies, fixed both).
+
+### What's banked for next session
+
+V1 is shippable. Optional polish queue (~ small / negotiable):
+- Bug 4 (explainer text — needs Patrick's copy)
+- OI-30 probe (ASGS coverage scope)
+- DEC-77 lock (industry threshold framework)
+- Various housekeeping (gitignore, untracked sweep, "Remara" hangover)
+
+V1.5 path queued:
+- OI-31 (click-on-event detail)
+- OI-32 (absolute change alongside %)
+- Layer 4.4 ingests bundle (NES + parent-cohort + schools + SALM-ext)
+- Subtype-correct denominators (folds into Layer 4.4)
