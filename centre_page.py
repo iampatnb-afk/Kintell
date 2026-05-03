@@ -1,6 +1,8 @@
 """
 centre_page.py — Phase 2 backend helper for centre.html
-Version: v18 (2026-05-03) — OI-32 polish round (operator review of v17). Two text edits on sa2_demand_supply: (a) LAYER3_METRIC_ABOUT_DATA copy reframed from "fill expectation / fill risk" to industry-standard "occupancy ramp-up / trade-up risk" terminology — credit readers use these terms, "fill" reads as colloquial; (b) INDUSTRY_BAND_THRESHOLDS rewritten to remove the generic "below 70% break-even at typical 85% occupancy" note (operator: too generic; said nothing band-specific) and replace "fill" in band labels/notes with occupancy-ramp / trade-up language across all 4 bands. No structural change; banding logic + thresholds + STD-34 calibration trace unchanged. Renderer half ships as centre.html v3.22 -> v3.23 in same commit (font bump on the about_data panel only).
+Version: v19 (2026-05-03) — OI-32 polish round 2 (operator screenshot review of v18 missed surfaces). Round-1 cleaned about_data + INDUSTRY_BAND_THRESHOLDS notes; this round cleans the remaining visible "fill" / "soft" terminology in (a) LAYER3_METRIC_META.sa2_demand_supply.band_copy chips ("soft catchment — fill risk" / "demand pull — strong fill expected"), (b) LAYER3_METRIC_INTENT_COPY sa2-prefixed entries for sa2_demand_supply, sa2_supply_ratio, and sa2_adjusted_demand, and (c) INDUSTRY_BAND_THRESHOLDS sa2_demand_supply soft-band LABEL ("soft ramp-up" -> "below break-even"). Band KEY stays "soft" because centre.html cautionKeys references it for the cautionary pill colour. Renderer-side: no change. Unprefixed duplicate INTENT_COPY entries left alone — kept for backward reference per existing comment, not read by _layer3_position.
+
+v18 (2026-05-03) — OI-32 polish round (operator review of v17). Two text edits on sa2_demand_supply: (a) LAYER3_METRIC_ABOUT_DATA copy reframed from "fill expectation / fill risk" to industry-standard "occupancy ramp-up / trade-up risk" terminology — credit readers use these terms, "fill" reads as colloquial; (b) INDUSTRY_BAND_THRESHOLDS rewritten to remove the generic "below 70% break-even at typical 85% occupancy" note (operator: too generic; said nothing band-specific) and replace "fill" in band labels/notes with occupancy-ramp / trade-up language across all 4 bands. No structural change; banding logic + thresholds + STD-34 calibration trace unchanged. Renderer half ships as centre.html v3.22 -> v3.23 in same commit (font bump on the about_data panel only).
 
 v17 (2026-05-03) — OI-32 close (Bug 4): catchment metric explainer text. New module-level constant LAYER3_METRIC_ABOUT_DATA carries longer plain-language "what is this metric?" copy for the 4 catchment_position Full-weight metrics (sa2_supply_ratio, sa2_child_to_place, sa2_demand_supply, sa2_adjusted_demand). Each entry is a plain string with \n\n paragraph breaks. _layer3_position propagates p.about_data onto every entry it emits (stub + populated) via LAYER3_METRIC_ABOUT_DATA.get(metric_name) — same shape as intent_copy propagation. Missing key = silent absence per P-2; non-catchment metrics see no change. Renderer half ships as centre.html v3.21 -> v3.22 in the same commit (verified together; DEC-22 collapse precedent).
 
@@ -366,7 +368,7 @@ INDUSTRY_BAND_THRESHOLDS = {
         # framing (industry-standard credit terminology). Soft-band note
         # rewritten to remove the generic "70% break-even / 85% occupancy"
         # phrase (operator: said nothing band-specific).
-        (0.40, "soft",     "soft ramp-up",
+        (0.40, "soft",     "below break-even",
          "extended trade-up exposure"),
         (0.55, "near_be",  "near break-even",
          "occupancy approaching break-even"),
@@ -634,9 +636,9 @@ LAYER3_METRIC_META = {
         # what credit readers actually use; the inverse "spare capacity"
         # framing adds little value for the credit-decision use case.
         "band_copy": {
-            "low":  "soft catchment — fill risk",
+            "low":  "supply outweighs demand — trade-up risk",
             "mid":  "in balance",
-            "high": "demand pull — strong fill expected",
+            "high": "demand outweighs supply — fast occupancy ramp",
         },
     },
     "sa2_demand_share_state": {
@@ -808,8 +810,8 @@ LAYER3_METRIC_INTENT_COPY = {
     "sa2_supply_ratio":
         "Supply ratio (places per child) measures local competition "
         "intensity; high values flag saturation risk and pressure on "
-        "fill rates, low values flag undersupplied catchments with "
-        "opportunity.",
+        "occupancy build, low values flag undersupplied catchments "
+        "with opportunity.",
     "sa2_child_to_place":
         "Children per place inverts supply ratio — frames the same "
         "data as demand-headroom; high values flag strong demand per "
@@ -817,11 +819,12 @@ LAYER3_METRIC_INTENT_COPY = {
     "sa2_adjusted_demand":
         "Adjusted demand is the calibrated demand estimate after "
         "participation rate and attendance factor — the realistic "
-        "demand the catchment can actually fill.",
+        "demand the catchment can actually absorb.",
     "sa2_demand_supply":
-        "Demand-supply ratio (adjusted demand / places) is the fill "
-        "expectation — high values flag demand pull and strong "
-        "expected fill, low values flag soft catchments.",
+        "Demand-supply ratio (adjusted demand / places) frames the "
+        "occupancy ramp-up expectation — high values flag demand "
+        "pull and fast ramp, low values flag supply-heavy catchments "
+        "and extended trade-up risk.",
     "sa2_demand_share_state":
         "Share of state demand puts this catchment in state-wide "
         "context — high values flag concentrated demand here, low "
