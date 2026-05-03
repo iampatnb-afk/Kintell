@@ -1,6 +1,6 @@
 # Open Items
 
-*Last updated: 2026-04-30. The on-disk version supersedes the project-knowledge monolith if they disagree.*
+*Last updated: 2026-05-03. The on-disk version supersedes the project-knowledge monolith if they disagree.*
 
 This file tracks active open items (work not yet done) and a closed list (resolved items, kept for traceability). New items get the next OI-NN number; closed items move to the Closed section with a one-line resolution note.
 
@@ -99,6 +99,15 @@ Mixed-format ARIA codes in upstream sources need consistent normalisation.
 
 Banner says "v2" in the `print()` output even though the file has been patched to v5. The patcher only updated the docstring banner, not the runtime print statement. No functional impact. Fix opportunistically.
 
+
+### OI-29 — `sa2_median_household_income` should be Lite weight per DEC-75
+*Origin: 2026-05-03. Status: open; ~0.1 session.*
+
+Three Census points (2011/2016/2021) is not a trajectory. DEC-75 reclassified the LFP triplet on this exact logic (OI-06); the same logic applies here. Currently rendered as Full weight, which means (a) three dots spanning a decade visually implies more granularity than exists, and (b) the global Trend Window default clips it to a single point on shorter windows — the visible failure mode that triggered OI-25.
+
+Same fix shape as DEC-75 for LFP: set `row_weight: "lite"` on `sa2_median_household_income` in `LAYER3_METRIC_META` (centre_page.py). Renderer drops the trajectory chart for Lite rows; keeps decile strip + chips + intent copy + as-at stamp. Renderer-only — no DB or backend changes.
+
+Note the asymmetry inside the income triplet: `sa2_median_employee_income` and `sa2_median_total_income` are annual-cadence (5 dense points 2018–2022) and stay Full. Only the Census-source `sa2_median_household_income` row gets reclassified.
 ---
 
 ## Active — restructuring residuals
@@ -149,7 +158,13 @@ DEC-65 amended to include sequencing-pass check. Worth a follow-up STD if the is
 ## Active — added 2026-04-30
 
 ### OI-25 — `sa2_median_household_income` trajectory shows single point
-*Origin: 2026-04-30. Status: open; ~0.3 session.*
+*Origin: 2026-04-30. **Closed: 2026-05-03** — premise dissolved by probe.*
+
+**Resolution.** Probe `probe_oi25_income_trajectory.py` (read-only, Patcher pattern per STD-10) confirmed: `abs_sa2_socioeconomic_annual` has 11 rows for `metric_name = 'median_equiv_household_income_weekly'` on verification SA2 118011341 (Bondi Junction-Waverly); backend `_metric_trajectory` correctly returns the 3 non-null points (2011, 2016, 2021); renderer draws 3 dots when global Trend Window is set to "All". The "single point" symptom was visible only on shorter Trend Windows where Census 5-year cadence + window clipping leaves 2021 alone. No backend bug; no renderer bug.
+
+**Real residual issue.** A 3-point Census trajectory rendered as a Full-weight row is visually misleading (smooth interpolation over a decade implies granularity that doesn't exist) and trend-window-fragile (default windows hide the row to a single point). Tracked as **OI-29** (reclassify to Lite weight per DEC-75).
+
+**Original framing (kept for traceability):**
 
 The chart for Median household income on the centre page shows only the latest Census year (2021). The data has 3 Census points (2011, 2016, 2021) — confirmed via diagnostic query against `abs_sa2_socioeconomic_annual` during 2026-04-30 session. The trajectory series reaching the renderer apparently contains only the latest period.
 
