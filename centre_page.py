@@ -1,6 +1,8 @@
 """
 centre_page.py — Phase 2 backend helper for centre.html
-Version: v19 (2026-05-03) — OI-32 polish round 2 (operator screenshot review of v18 missed surfaces). Round-1 cleaned about_data + INDUSTRY_BAND_THRESHOLDS notes; this round cleans the remaining visible "fill" / "soft" terminology in (a) LAYER3_METRIC_META.sa2_demand_supply.band_copy chips ("soft catchment — fill risk" / "demand pull — strong fill expected"), (b) LAYER3_METRIC_INTENT_COPY sa2-prefixed entries for sa2_demand_supply, sa2_supply_ratio, and sa2_adjusted_demand, and (c) INDUSTRY_BAND_THRESHOLDS sa2_demand_supply soft-band LABEL ("soft ramp-up" -> "below break-even"). Band KEY stays "soft" because centre.html cautionKeys references it for the cautionary pill colour. Renderer-side: no change. Unprefixed duplicate INTENT_COPY entries left alone — kept for backward reference per existing comment, not read by _layer3_position.
+Version: v20 (2026-05-03) — OI-32 polish round 3 (operator review of v19 INDUSTRY label semantics + about_data first-line overreach). Two changes on sa2_demand_supply: (a) INDUSTRY_BAND_THRESHOLDS parallel-framed across all 4 bands in supply-vs-demand language only — "below break-even" / "near break-even" replaced with "supply heavy" / "supply leaning" / "approaching balance" / "demand leading" because break-even is a profitability conclusion that the demand/supply ratio alone cannot support (depends on price, cost base, ramp curve, mix). The thresholds (0.40 / 0.55 / 0.85) still derive from break-even/target occupancy maths but the LABEL no longer asserts the conclusion. (b) about_data first line tightened from "the occupancy ramp-up expectation for a centre here" to "a key input to occupancy ramp expectations" — same category-error fix at the descriptive level. Companion centre.html v3.23 -> v3.24 (cohort histogram explainer + SEIFA mini decile strip).
+
+v19 (2026-05-03) — OI-32 polish round 2 (operator screenshot review of v18 missed surfaces). Round-1 cleaned about_data + INDUSTRY_BAND_THRESHOLDS notes; this round cleans the remaining visible "fill" / "soft" terminology in (a) LAYER3_METRIC_META.sa2_demand_supply.band_copy chips ("soft catchment — fill risk" / "demand pull — strong fill expected"), (b) LAYER3_METRIC_INTENT_COPY sa2-prefixed entries for sa2_demand_supply, sa2_supply_ratio, and sa2_adjusted_demand, and (c) INDUSTRY_BAND_THRESHOLDS sa2_demand_supply soft-band LABEL ("soft ramp-up" -> "below break-even"). Band KEY stays "soft" because centre.html cautionKeys references it for the cautionary pill colour. Renderer-side: no change. Unprefixed duplicate INTENT_COPY entries left alone — kept for backward reference per existing comment, not read by _layer3_position.
 
 v18 (2026-05-03) — OI-32 polish round (operator review of v17). Two text edits on sa2_demand_supply: (a) LAYER3_METRIC_ABOUT_DATA copy reframed from "fill expectation / fill risk" to industry-standard "occupancy ramp-up / trade-up risk" terminology — credit readers use these terms, "fill" reads as colloquial; (b) INDUSTRY_BAND_THRESHOLDS rewritten to remove the generic "below 70% break-even at typical 85% occupancy" note (operator: too generic; said nothing band-specific) and replace "fill" in band labels/notes with occupancy-ramp / trade-up language across all 4 bands. No structural change; banding logic + thresholds + STD-34 calibration trace unchanged. Renderer half ships as centre.html v3.22 -> v3.23 in same commit (font bump on the about_data panel only).
 
@@ -364,18 +366,22 @@ INDUSTRY_BAND_THRESHOLDS = {
          "effectively zero choice"),
     ],
     "sa2_demand_supply": [
-        # v18 (OI-32 polish): "fill" replaced with occupancy-ramp / trade-up
-        # framing (industry-standard credit terminology). Soft-band note
-        # rewritten to remove the generic "70% break-even / 85% occupancy"
-        # phrase (operator: said nothing band-specific).
-        (0.40, "soft",     "below break-even",
-         "extended trade-up exposure"),
-        (0.55, "near_be",  "near break-even",
-         "occupancy approaching break-even"),
-        (0.85, "viable",   "viable",
-         "comfortable occupancy build expected"),
-        (float("inf"), "strong", "strong demand pull",
-         "rapid occupancy ramp; growth-supportive"),
+        # v20: parallel-framed labels in supply-vs-demand language only.
+        # The thresholds still derive from break-even/target occupancy
+        # maths but the LABEL no longer asserts a profitability
+        # conclusion the ratio alone cannot support (operator review:
+        # break-even depends on price/cost/ramp/mix, not on the ratio).
+        # Band keys unchanged — centre.html cautionKeys references
+        # them for the cautionary pill colour. Notes parallel the
+        # labels in factual supply-vs-demand language.
+        (0.40, "soft",     "supply heavy",
+         "demand well short of available capacity"),
+        (0.55, "near_be",  "supply leaning",
+         "demand below available capacity"),
+        (0.85, "viable",   "approaching balance",
+         "demand and supply broadly aligned"),
+        (float("inf"), "strong", "demand leading",
+         "demand exceeds available capacity"),
     ],
 }
 
@@ -885,7 +891,7 @@ LAYER3_METRIC_ABOUT_DATA = {
         "Low: each place serves few children — thin demand per place.",
 
     "sa2_demand_supply":
-        "How realistic demand compares to available supply — the occupancy ramp-up expectation for a centre here.\n\n"
+        "How supply compares to realistic demand — a key input to occupancy ramp expectations.\n\n"
         "Formula: adjusted demand ÷ total places.\n\n"
         "High: demand outweighs supply — fast occupancy ramp expected.\n"
         "Low: supply outweighs demand — slow ramp-up, trade-up risk.",

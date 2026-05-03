@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- centre.html v3.24 (2026-05-03) — OI-32 polish round 3 (operator review). Three additive renderer changes: (a) cohort distribution histogram now ships a centred explainer line below the bars ("Distribution of values across the peer cohort. The highlighted bar shows where this SA2 sits; the decile strip below converts that position to the 1–10 scale.") plus the existing cohort-note line switched from right-aligned to centre for visual consistency. (b) New _renderMiniDecileStrip helper renders a compact 10-cell horizontal strip using the same colour grammar as _renderDecileStrip (per-decile tones 6%/13%/20%, accent + outline on active cell, structural gaps between bands). (c) SEIFA decile fact in the Catchment section now calls _renderMiniDecileStrip inline so the SES position is visible at a glance — chosen over colour-coding because SES has no valence in LDC credit (high SES = higher fee tolerance AND more competition). Pairs with centre_page.py v20 (INDUSTRY band relabelling + about_data tightening) in same commit. -->
 <!-- centre.html v3.23 (2026-05-03) — OI-32 polish round (operator review of v3.22): About-this-measure panel font bumped 11.5px -> 12.5px for readability on the longer explainer text. No structural change; _renderAboutData logic unchanged. Pairs with centre_page.py v18 (text edits to sa2_demand_supply about_data + industry-band labels/notes; same commit). -->
 <!-- centre.html v3.22 (2026-05-03) — OI-32 close (Bug 4): catchment metric explainer text. New _renderAboutData(p) helper renders p.about_data as a permanent visible "About this measure" panel inside _renderFullRow, positioned after _renderIntentCopy and before the DER/COM badge row. Reuses the visual pattern established by the workforce row about_data block (v3.17). Splits on \n\n for paragraph breaks; \n within a paragraph becomes <br>. Silent absence per P-2 when p.about_data is null (non-catchment metrics, or catchment metrics with no copy yet). Pairs with centre_page.py v17 in same commit. -->
 <!-- centre.html v3.21 (2026-05-03) — Layer 4.2-A.3c Bug 1b fix: second copy of year-extraction regex in _filterTrajectoryByRange also un-anchored. v3.20 fixed _yearOfPeriod (used for the trend label) but missed this duplicate copy used by the trend window filter. Net effect of the bug: trend window buttons (3Y/5Y/10Y/All) had no effect on catchment trajectory charts. With both copies fixed, the filter clips correctly and the trend label updates with the selected window. -->
@@ -887,6 +888,7 @@ function renderCatchmentCard(centre) {
         <span class="v">
           <b>${c.seifa_decile.value ?? "—"}</b>
           ${c.seifa_decile.value != null ? '<span style="color:var(--text-mute);font-size:11px;">/10</span>' : ""}
+          ${_renderMiniDecileStrip(c.seifa_decile.value)}
           ${renderBadge("OBS", { source: "ABS SEIFA, joined via SA2" }, true)}
         </span>
       </div>
@@ -1669,12 +1671,18 @@ function _renderCohortHistogram(p) {
 
   const cohortNote = `cohort distribution · n=${dist.cohort_n} · range ${dist.min.toFixed(0)}–${dist.max.toFixed(0)}`;
 
+  // v3.24: explainer text added below histogram (centred); cohort
+  // note alignment changed from right to centre to match.
+  const explainerTxt = "Distribution of values across the peer cohort. The highlighted bar shows where this SA2 sits; the decile strip below converts that position to the 1–10 scale.";
   return `
     <div style="margin-top:8px;">
       <div style="display:flex;align-items:flex-end;gap:1px;height:30px;background:transparent;">
         ${barHtml}
       </div>
-      <div style="font-size:9.5px;color:var(--text-mute);letter-spacing:0.04em;margin-top:2px;text-align:right;">
+      <div style="font-size:11px;color:var(--text-mute);font-style:italic;line-height:1.45;margin-top:6px;text-align:center;">
+        ${htmlEscape(explainerTxt)}
+      </div>
+      <div style="font-size:9.5px;color:var(--text-mute);letter-spacing:0.04em;margin-top:4px;text-align:center;">
         ${htmlEscape(cohortNote)}
       </div>
     </div>
@@ -1714,6 +1722,42 @@ function _renderDecileStrip(decile) {
     );
   }
   return `<div style="display:flex;gap:2px;margin-top:8px;">${cells.join("")}</div>`;
+}
+
+// ── v3.24: Mini decile strip for inline use in fact rows ─────────────
+//
+// Compact version of _renderDecileStrip — same colour grammar (per-
+// decile tones 6%/13%/20%, accent fill + outline on active cell,
+// structural gaps between deciles 3-4 and 6-7) but inline-sized
+// (6px wide cells, 10px tall, no number labels). Designed to sit
+// beside a numeric value in a fact row without claiming vertical
+// space. Returns "" when decile is null.
+//
+// Used by the SEIFA decile fact in the Catchment section. Could be
+// reused for any future "decile-as-fact" surface (e.g. ARIA band).
+function _renderMiniDecileStrip(decile) {
+  if (decile == null) return "";
+  const TONE_BY_DECILE = {
+    1: 0.06, 2: 0.06, 3: 0.06,
+    4: 0.13, 5: 0.13, 6: 0.13,
+    7: 0.20, 8: 0.20, 9: 0.20, 10: 0.20,
+  };
+  const cells = [];
+  for (let d = 1; d <= 10; d++) {
+    const isHere = (d === decile);
+    const tone = TONE_BY_DECILE[d];
+    const baseStyle =
+      "display:inline-block;width:6px;height:10px;" +
+      `background:rgba(74,158,255,${tone});` +
+      "border-radius:1px;vertical-align:middle;";
+    const hereStyle = isHere
+      ? "background:var(--accent);box-shadow:0 0 0 1px var(--accent);"
+      : "";
+    const gapBefore = (d === 4 || d === 7) ? "margin-left:3px;"
+                    : (d === 1 ? "" : "margin-left:1px;");
+    cells.push(`<span title="Decile ${d}${isHere ? ' (this SA2)' : ''}" style="${baseStyle}${hereStyle}${gapBefore}"></span>`);
+  }
+  return `<span style="display:inline-flex;align-items:center;margin-left:8px;vertical-align:middle;">${cells.join("")}</span>`;
 }
 
 function _renderBandChips(metric, p) {
