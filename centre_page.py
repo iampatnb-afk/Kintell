@@ -1,6 +1,10 @@
 """
 centre_page.py — Phase 2 backend helper for centre.html
-Version: v16 (2026-05-03) — Layer 4.2-A.3c Bug 2 fix (DEC-74 amendment): perspective toggle fields (reversible, pair_with, default_perspective, perspective_labels) removed from the 3 catchment metrics that had them (sa2_supply_ratio, sa2_child_to_place, sa2_demand_supply). With these metrics now Full row_weight (v15), the inverse views are shown as separate rows in the same card — toggling would just swap to data already visible (supply_ratio / child_to_place are mathematical inverses, displayed side by side). For demand_supply, the natural 'fill' framing is the credit reader's preferred view; inverse 'spare capacity' framing adds little value. Renderer (centre.html line 1749) gates toggle render on p.reversible — with reversible: True removed from META, _layer3_position propagates reversible: False (default), and the toggle silently doesn't render. No renderer change needed for this fix; companion v3.20 ships separately for Bug 1 (year regex).
+Version: v18 (2026-05-03) — OI-32 polish round (operator review of v17). Two text edits on sa2_demand_supply: (a) LAYER3_METRIC_ABOUT_DATA copy reframed from "fill expectation / fill risk" to industry-standard "occupancy ramp-up / trade-up risk" terminology — credit readers use these terms, "fill" reads as colloquial; (b) INDUSTRY_BAND_THRESHOLDS rewritten to remove the generic "below 70% break-even at typical 85% occupancy" note (operator: too generic; said nothing band-specific) and replace "fill" in band labels/notes with occupancy-ramp / trade-up language across all 4 bands. No structural change; banding logic + thresholds + STD-34 calibration trace unchanged. Renderer half ships as centre.html v3.22 -> v3.23 in same commit (font bump on the about_data panel only).
+
+v17 (2026-05-03) — OI-32 close (Bug 4): catchment metric explainer text. New module-level constant LAYER3_METRIC_ABOUT_DATA carries longer plain-language "what is this metric?" copy for the 4 catchment_position Full-weight metrics (sa2_supply_ratio, sa2_child_to_place, sa2_demand_supply, sa2_adjusted_demand). Each entry is a plain string with \n\n paragraph breaks. _layer3_position propagates p.about_data onto every entry it emits (stub + populated) via LAYER3_METRIC_ABOUT_DATA.get(metric_name) — same shape as intent_copy propagation. Missing key = silent absence per P-2; non-catchment metrics see no change. Renderer half ships as centre.html v3.21 -> v3.22 in the same commit (verified together; DEC-22 collapse precedent).
+
+v16 (2026-05-03) — Layer 4.2-A.3c Bug 2 fix (DEC-74 amendment): perspective toggle fields (reversible, pair_with, default_perspective, perspective_labels) removed from the 3 catchment metrics that had them (sa2_supply_ratio, sa2_child_to_place, sa2_demand_supply). With these metrics now Full row_weight (v15), the inverse views are shown as separate rows in the same card — toggling would just swap to data already visible (supply_ratio / child_to_place are mathematical inverses, displayed side by side). For demand_supply, the natural 'fill' framing is the credit reader's preferred view; inverse 'spare capacity' framing adds little value. Renderer (centre.html line 1749) gates toggle render on p.reversible — with reversible: True removed from META, _layer3_position propagates reversible: False (default), and the toggle silently doesn't render. No renderer change needed for this fix; companion v3.20 ships separately for Bug 1 (year regex).
 
 v15 changes (2026-05-03, Layer 4.2-A.3c Part 3a): catchment metrics promoted from Lite to Full row_weight (sa2_supply_ratio, sa2_child_to_place, sa2_adjusted_demand, sa2_demand_supply). Each now ships a quarterly trajectory derived from docs/sa2_history.json (v2 multi-subtype build) plus a per-subtype centre_events array for the renderer overlay. New module-level cache _SA2_HISTORY_CACHE + _load_sa2_history() (~13 MB held once per process). New helper _catchment_trajectory(sa2_code, metric_name, subtype, calibrated_rate) returns (points, kind, events) — same shape as _metric_trajectory plus events. _layer3_position signature gains optional service_sub_type parameter; dispatches to _catchment_trajectory for any metric in CATCHMENT_TRAJECTORY_METRICS frozenset. Single call site in get_centre_payload updated to pass r.get('service_sub_type'). Subtype fallback to LDC for null/Other centres. Calibrated_rate held constant across historical quarters for adjusted_demand / demand_supply (honest as 'supply trajectory adjusted for current demand structure' — renderer surfaces in helper text). Renderer half ships separately as centre.html v3.18 -> v3.19 per DEC-22.
 
@@ -358,14 +362,18 @@ INDUSTRY_BAND_THRESHOLDS = {
          "effectively zero choice"),
     ],
     "sa2_demand_supply": [
-        (0.40, "soft",     "soft fill risk",
-         "below 70% break-even at typical 85% occupancy"),
+        # v18 (OI-32 polish): "fill" replaced with occupancy-ramp / trade-up
+        # framing (industry-standard credit terminology). Soft-band note
+        # rewritten to remove the generic "70% break-even / 85% occupancy"
+        # phrase (operator: said nothing band-specific).
+        (0.40, "soft",     "soft ramp-up",
+         "extended trade-up exposure"),
         (0.55, "near_be",  "near break-even",
-         "approaching 70% break-even occupancy threshold"),
+         "occupancy approaching break-even"),
         (0.85, "viable",   "viable",
-         "comfortable fill expectation"),
-        (float("inf"), "strong", "strong fill",
-         "demand pull; growth-supportive"),
+         "comfortable occupancy build expected"),
+        (float("inf"), "strong", "strong demand pull",
+         "rapid occupancy ramp; growth-supportive"),
     ],
 }
 
@@ -842,6 +850,50 @@ LAYER3_METRIC_INTENT_COPY = {
         "subsidised days — shifts demand floor upward across all "
         "catchments and rewires the family-payment model.",
 }
+
+
+# ─────────────────────────────────────────────────────────────────────
+# v17 (OI-32) — Layer 3 metric "About this measure" copy
+# ─────────────────────────────────────────────────────────────────────
+# Longer plain-language explainer per metric. Renderer surfaces this
+# as a permanent visible "About this measure" panel below the intent
+# copy in _renderFullRow. Currently populated for the 4 Full-weight
+# catchment metrics; other metrics get silent absence.
+#
+# Format conventions:
+#   - Plain text only (no HTML); renderer applies htmlEscape
+#   - "\n\n" separates paragraphs (renders as a visual gap)
+#   - "\n" within a paragraph renders as a tight line break (<br>)
+#
+# Editorial: keep brief. What it measures, the formula in plain words,
+# what high vs low means. Calculations and calibration trace live in
+# the DER badge tooltip — do not duplicate here.
+LAYER3_METRIC_ABOUT_DATA = {
+    "sa2_supply_ratio":
+        "Licensed LDC places per child under five in this catchment.\n\n"
+        "Formula: total places ÷ children under five.\n\n"
+        "High: more places than children — supply-rich, competition tighter.\n"
+        "Low: fewer places than children — undersupplied, opportunity to fill demand.",
+
+    "sa2_child_to_place":
+        "Children under five per licensed LDC place — the inverse view of supply ratio.\n\n"
+        "Formula: children under five ÷ total places.\n\n"
+        "High: many children chasing each place — strong demand per place.\n"
+        "Low: each place serves few children — thin demand per place.",
+
+    "sa2_demand_supply":
+        "How realistic demand compares to available supply — the occupancy ramp-up expectation for a centre here.\n\n"
+        "Formula: adjusted demand ÷ total places.\n\n"
+        "High: demand outweighs supply — fast occupancy ramp expected.\n"
+        "Low: supply outweighs demand — slow ramp-up, trade-up risk.",
+
+    "sa2_adjusted_demand":
+        "The realistic number of children expected to attend formal LDC in this catchment, after adjusting for who actually participates and how often.\n\n"
+        "Formula: children under five × participation rate × attendance factor.\n\n"
+        "High: deep demand pool — supports more capacity.\n"
+        "Low: shallow demand pool — limits absorbable capacity.",
+}
+
 
 # ─────────────────────────────────────────────────────────────────────
 # Layer 4.2-B — trajectory source mapping
@@ -1548,6 +1600,9 @@ def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str], service_s
             "direction": meta.get("direction"),
             "row_weight": meta.get("row_weight", "full"),
             "intent_copy": LAYER3_METRIC_INTENT_COPY.get(metric_name),
+            # v17 (OI-32): about_data — longer plain-language explainer.
+            # Silent absence per P-2 when key missing.
+            "about_data": LAYER3_METRIC_ABOUT_DATA.get(metric_name),
             # Sub-pass 4.3.7 perspective fields (DEC-74). Optional —
             # propagated unconditionally so renderer reads p.reversible
             # without needing a fallback. None / missing = no toggle.
@@ -1641,6 +1696,8 @@ def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str], service_s
             "direction": meta.get("direction"),
             "row_weight": meta.get("row_weight", "full"),
             "intent_copy": LAYER3_METRIC_INTENT_COPY.get(metric_name),
+            # v17 (OI-32): about_data — longer plain-language explainer.
+            "about_data": LAYER3_METRIC_ABOUT_DATA.get(metric_name),
             # Sub-pass 4.3.7 perspective fields (DEC-74).
             "reversible":          meta.get("reversible", False),
             "pair_with":           meta.get("pair_with"),

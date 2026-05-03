@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- centre.html v3.23 (2026-05-03) — OI-32 polish round (operator review of v3.22): About-this-measure panel font bumped 11.5px -> 12.5px for readability on the longer explainer text. No structural change; _renderAboutData logic unchanged. Pairs with centre_page.py v18 (text edits to sa2_demand_supply about_data + industry-band labels/notes; same commit). -->
+<!-- centre.html v3.22 (2026-05-03) — OI-32 close (Bug 4): catchment metric explainer text. New _renderAboutData(p) helper renders p.about_data as a permanent visible "About this measure" panel inside _renderFullRow, positioned after _renderIntentCopy and before the DER/COM badge row. Reuses the visual pattern established by the workforce row about_data block (v3.17). Splits on \n\n for paragraph breaks; \n within a paragraph becomes <br>. Silent absence per P-2 when p.about_data is null (non-catchment metrics, or catchment metrics with no copy yet). Pairs with centre_page.py v17 in same commit. -->
 <!-- centre.html v3.21 (2026-05-03) — Layer 4.2-A.3c Bug 1b fix: second copy of year-extraction regex in _filterTrajectoryByRange also un-anchored. v3.20 fixed _yearOfPeriod (used for the trend label) but missed this duplicate copy used by the trend window filter. Net effect of the bug: trend window buttons (3Y/5Y/10Y/All) had no effect on catchment trajectory charts. With both copies fixed, the filter clips correctly and the trend label updates with the selected window. -->
 <!-- centre.html v3.20 (2026-05-03) — Layer 4.2-A.3c Bug 1 fix: _yearOfPeriod() regex updated to find first 4-digit run anywhere in the period string (was anchored to start of string, returned NaN for quarter-format strings like "Q3 2013"). Restores trend-since labels on the 4 catchment trajectory charts that landed in v3.19. Backward compatible with annual ("2024") and census ("2024-Q3") formats. -->
 <!-- centre.html v3.19 (2026-05-03) — Layer 4.2-A.3c Part 3b: centre-entry/exit overlay added to the 4 catchment_position trajectory charts (supply_ratio, child_to_place, demand_supply, adjusted_demand). New _kintellEventAnnotation Chart.js plugin draws vertical dashed lines at quarters when centres of the matching subtype opened (green) or closed (red) or churned net-zero (grey) in this SA2. Plugin is data-driven via opts.plugins.kintellEventAnnotation = {events}; absent events = silent no-op (Population/Labour Market/Workforce charts unaffected). Companion to centre_page.py v15 which attaches p.centre_events to the 4 catchment metric entries. -->
@@ -1762,6 +1764,48 @@ function _renderIntentCopy(p) {
   `;
 }
 
+// ── v3.22 (OI-32) — "About this measure" panel for Position rows ─────
+//
+// Renders p.about_data as a permanent visible explainer panel inside
+// _renderFullRow, below the italic intent_copy line and above the
+// DER/COM badge row. Visual style mirrors the workforce row about_data
+// block (v3.17): subtle background, left border, uppercase label.
+//
+// Format conventions (mirrored on Python side, LAYER3_METRIC_ABOUT_DATA):
+//   - Plain text only (htmlEscape applied here)
+//   - "\n\n" splits into separate paragraph divs (visual gap)
+//   - "\n" within a paragraph splits into <br> lines (tight)
+//
+// Silent absence per P-2: returns "" when p.about_data is null or
+// empty after trimming. Currently populated only for the 4 Full-weight
+// catchment metrics (sa2_supply_ratio, sa2_child_to_place,
+// sa2_demand_supply, sa2_adjusted_demand); other Position metrics
+// see no panel until copy is added on the Python side.
+function _renderAboutData(p) {
+  const txt = p && p.about_data;
+  if (!txt) return "";
+  const paragraphs = String(txt)
+    .split("\n\n")
+    .map(s => s.trim())
+    .filter(Boolean);
+  if (paragraphs.length === 0) return "";
+  const body = paragraphs.map((par, i) => {
+    const lines = par
+      .split("\n")
+      .map(s => htmlEscape(s.trim()))
+      .filter(Boolean)
+      .join("<br>");
+    const mt = (i === 0) ? "0" : "6px";
+    return `<div style="margin-top:${mt};">${lines}</div>`;
+  }).join("");
+  return `
+    <div style="margin-top:10px;padding:8px 10px;background:rgba(255,255,255,0.02);border-radius:4px;border-left:2px solid var(--border);font-size:12.5px;color:var(--text-mute);line-height:1.5;">
+      <div style="font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:10px;color:var(--text-dim);margin-bottom:6px;">About this measure</div>
+      ${body}
+    </div>
+  `;
+}
+
 // ── Layer 4.3 sub-pass 4.3.7 — perspective toggle (DEC-74) ──────────
 //
 // Infrastructure for the per-row perspective toggle that swaps a
@@ -2020,6 +2064,7 @@ function _renderFullRow(p, ctx) {
       ${_renderBandChips(ctx.metric, p)}
       ${_renderIndustryBand(p)}
       ${_renderIntentCopy(p)}
+      ${_renderAboutData(p)}
       <div style="margin-top:8px;display:flex;justify-content:flex-end;gap:6px;">
         ${derBadge}
         ${comBadge}
