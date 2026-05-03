@@ -1,10 +1,10 @@
 # Project Status
 
-*Last updated: 2026-04-30. The on-disk version supersedes the project-knowledge monolith if they disagree.*
+*Last updated: 2026-05-03. The on-disk version supersedes the project-knowledge monolith if they disagree.*
 
 ## Centre page — current state
 
-`centre_page.py` v12 (Python backend) + `centre.html` v3.17 (renderer) + payload schema `centre_payload_v6`.
+`centre_page.py` v13 (Python backend) + `centre.html` v3.18 (renderer) + payload schema `centre_payload_v6` (unchanged this session — v13 added fields, no schema rev).
 
 The centre page renders the three-temporal-mood pattern (DEC-32) at the leaf level, with the **2026-04-30 page-level reorder** putting credit-lens content first:
 
@@ -30,17 +30,19 @@ The centre page renders the three-temporal-mood pattern (DEC-32) at the leaf lev
 - Catchment context (SEIFA + ARIA + SA2)
 - Tenure (greenfield / brownfield + transfer history)
 
-**POSITION block — Catchment position card (NEW; sub-pass 4.2-A.3, 4.2-A.3b):**
+**POSITION block — Catchment position card (sub-pass 4.2-A.3, 4.2-A.3b, 4.2-A.4):**
 
-| Metric | Weight | Reversibility | Industry band |
-|---|---|---|---|
-| `sa2_supply_ratio` | LITE | reversible ↔ `sa2_child_to_place` | 7 levels (desert / undersupplied / below_bench / at_bench / well_served / at_target / saturated) |
-| `sa2_demand_supply` | LITE | reversible ↔ `demand_supply_inv` (HTML-level) | 4 levels (soft / near_be / viable / strong) |
-| `sa2_child_to_place` | LITE | reversible ↔ `sa2_supply_ratio` | 5 levels (excess_capacity / balanced / tight / constrained / severe) |
-| `sa2_adjusted_demand` | LITE | not reversible | NO industry band (decile only) |
-| `sa2_demand_share_state` | CONTEXT | n/a | n/a (rank-by-construction; reads cache directly) |
+| Metric | Weight | Reversibility | Industry band | Calibration in DER |
+|---|---|---|---|---|
+| `sa2_supply_ratio` | LITE | reversible ↔ `sa2_child_to_place` | 7 levels (desert / undersupplied / below_bench / at_bench / well_served / at_target / saturated) | — (pure ratio) |
+| `sa2_demand_supply` | LITE | reversible ↔ `demand_supply_inv` (HTML-level) | 4 levels (soft / near_be / viable / strong) | YES (4.2-A.4) |
+| `sa2_child_to_place` | LITE | reversible ↔ `sa2_supply_ratio` | 5 levels (excess_capacity / balanced / tight / constrained / severe) | — (pure ratio) |
+| `sa2_adjusted_demand` | LITE | not reversible | NO industry band (decile only) | YES (4.2-A.4) |
+| `sa2_demand_share_state` | CONTEXT | n/a | n/a (rank-by-construction; reads cache directly) | YES (4.2-A.4) |
 
 Two reversible pairs activate the DEC-74 perspective toggle (live in V1).
+
+**STD-34 calibration metadata now surfaces in the DER tooltip** on the three calibration-using rows (4.2-A.4 ship 2026-05-03). Tooltip carries `calibrated_rate=X.XX — <rule_text>` where `rule_text` traces every nudge applied (e.g. `default 0.50; +0.02 income decile 10 (high); +0.02 female LFP top quartile (67.7% ≥ 67.2%); NES share not yet ingested (OI-19; nudge dormant); ARIA band 1 unrecognised (no nudge)`). `_renderContextRow` now ships a conditional DER badge (didn't exist before 4.2-A.4) so `sa2_demand_share_state` carries the surface.
 
 Each Lite catchment row renders: title + value + decile strip + low/mid/high band chips + INDUSTRY band line (when populated) + intent copy + DER+COM badges.
 
@@ -52,9 +54,9 @@ Each Lite catchment row renders: title + value + decile strip + low/mid/high ban
 
 **POSITION block — Labour Market (7 metrics, 1 deferred):**
 - `sa2_unemployment_rate` FULL — band against same-state cohort
-- `sa2_median_employee_income` FULL — band against same-remoteness
-- `sa2_median_household_income` FULL — band against same-remoteness
-- `sa2_median_total_income` FULL — band against same-remoteness
+- `sa2_median_employee_income` FULL — band against same-remoteness (5 dense annual points 2018-2022)
+- `sa2_median_household_income` FULL — band against same-remoteness (3 sparse Census points; **OI-29 queued: should be Lite per DEC-75**)
+- `sa2_median_total_income` FULL — band against same-remoteness (5 dense annual points 2018-2022)
 - `sa2_lfp_persons` LITE — 3 Census points (SALM-extension V1.5)
 - `sa2_lfp_females` LITE — 3 Census points (permanent)
 - `sa2_lfp_males` LITE — 3 Census points (permanent)
@@ -79,12 +81,10 @@ Each Lite catchment row renders: title + value + decile strip + low/mid/high ban
 **Empty-state copy** — unemployment row in SALM-suppressed SA2s renders a named small-population-suppression note (Thread A 4.3.1).
 
 **Standalone module ready for Layer 4.2-A consumption:**
-- `catchment_calibration.py` v1 (sub-pass 4.3.4) — STD-34 calibration function. Now actively consumed: per-SA2 calibrated_rate + rule_text in `service_catchment_cache`.
+- `catchment_calibration.py` v1 (sub-pass 4.3.4) — STD-34 calibration function. Now actively consumed: per-SA2 calibrated_rate + rule_text in `service_catchment_cache`, propagated into payload via centre_page.py v13 `_read_calibration_meta`, surfaced in DER tooltip via centre.html v3.18 `_buildCalibrationRow`.
 
 **What is NOT yet on the centre page:**
-- Subtype-aware new-centre overlay on `sa2_supply_ratio` trajectory (sub-pass 4.2-A.3c, queued)
-- Histograms on the 4 banded catchment metrics (deferred to 4.2-A.3c bundle: promote LITE→FULL on those metrics, histograms auto-render via existing `_renderCohortHistogram`)
-- DER tooltip surface for `rule_text` per STD-34 (sub-pass 4.2-A.4)
+- Subtype-aware new-centre overlay on `sa2_supply_ratio` trajectory (sub-pass 4.2-A.3c, queued; ~1.0 session; locked design D6=c — only supply_ratio gets a trajectory chart, the other 3 banded ratios stay histogram-only by intent per data-honesty principle P-2)
 
 ---
 
@@ -95,20 +95,24 @@ Each Lite catchment row renders: title + value + decile strip + low/mid/high ban
 | 0 | Operator + corporate identity | COMPLETE |
 | 1 | Service NOW slice | COMPLETE |
 | 2 | SA2 cohort + remoteness | COMPLETE |
-| **2.5** | **Catchment cache populator** | **COMPLETE 2026-04-30** (sub-passes 2.5.1 + 2.5.2 shipped; 18,203 cache rows, 9,035 layer3 banding rows) |
+| 2.5 | Catchment cache populator | COMPLETE 2026-04-30 (sub-passes 2.5.1 + 2.5.2 shipped; 18,203 cache rows, 9,035 layer3 banding rows) |
 | 3 | Layer 3 banding (existing 14 metrics) | COMPLETE |
 | 4.1 | Layer 3 banding render-side | COMPLETE |
-| **4.2** | **Centre page renderer** | **In flight** — 4.2-A.3 + 4.2-A.3a-fix + 4.2-A.3b SHIPPED; 4.2-A.3c (subtype-aware overlay) NEXT; 4.2-A.4 (DER rule_text surface) QUEUED |
-| **4.3** | **Centre page polish + workforce** | **COMPLETE** — all 9 sub-passes shipped (4.3.5 + 4.3.5b closed today) |
+| **4.2** | **Centre page renderer** | **In flight** — 4.2-A.3 + 4.2-A.3a-fix + 4.2-A.3b + 4.2-A.4 SHIPPED; **only 4.2-A.3c remains** (subtype-aware overlay, ~1.0 session) |
+| 4.3 | Centre page polish + workforce | COMPLETE — all 9 sub-passes shipped |
 | 4.4 | V1.5 ingests (NES + parent-cohort + schools + SALM-ext) | DEFERRED to V1.5 |
 
 ---
 
 ## What's next
 
-V1 path remaining: ~3.5 sessions if Layer 4.2-A.3c + Layer 4.4 V1.5 ingests land. V1 ships without 4.2-A.3c if needed (it's enrichment, not blocking).
+V1 path remaining: **~1.3 sessions** if Layer 4.2-A.3c lands. V1.5 path adds ~2.0 sessions (Layer 4.4 ingests bundle).
 
-**Immediate next (mechanical):** commit the uncommitted 4.2-A.3b + 4.2-A.3a-fix iter 3+4 work (composite commit covering centre_page.py v9→v12 + centre.html v3.13a→v3.17).
+**Recommended next-session order** (per ROADMAP § 8):
+1. **OI-29** (~0.1 session) — reclassify `sa2_median_household_income` to Lite weight per DEC-75. Trivial. Can interleave anywhere.
+2. **4.2-A.3c** (~1.0 session) — subtype-aware new-centre overlay on supply_ratio trajectory. Largest visible UX upgrade remaining. Requires `build_sa2_history.py` rebuild for subtype tagging.
+3. **OI-12** (~0.1 session) — backup pruning. `data/` >5.8 GB and growing.
+4. **STD-13** (~0.1 session) — WMIC → Get-CimInstance Win32_Process rewrite. Falls through with warning every invocation.
 
 See ROADMAP.md for full dependency-ordered queue.
 
@@ -116,43 +120,35 @@ See ROADMAP.md for full dependency-ordered queue.
 
 ## Database state
 
-Path: `data\kintell.db` (~565 MB; was ~557 MB at session start)
+Path: `data\kintell.db` (~565 MB).
 
-36 tables. Notable populated additions today:
-- `service_catchment_cache` — 18,203 rows (was 0; OI-05 closed)
-- `layer3_sa2_metric_banding` — +9,035 rows (4 catchment metrics added, 1 unbanded by design)
-- `audit_log` — 138 → 142 (5 new rows from this session's mutations)
+36 tables. No DB mutations this session — Layer 4.2-A.4 was a code-only ship (backend reads from existing cache columns; renderer reads from existing payload fields).
 
-6 backups created today in `data/`. OI-12 backup-pruning is now status-critical.
+`audit_log` unchanged at 142 rows (no new mutations).
+
+**OI-12 backup pruning is now status-critical.** Cumulative backups in `data/` exceed 5.8 GB. Approaching the threshold where a single git operation (which scans the working tree) can time out.
 
 ---
 
 ## Git state
 
-HEAD: `beb7bbe` (Layer 4.2-A.3a-fix: trajectory chart polish).
-`origin/master`: `2f95a70` (prior session's HEAD).
-Local ahead of origin: **7 commits**.
+HEAD: `528f9be` (Layer 4.2-A.4: STD-34 calibration metadata surfaced in DER tooltip).
+`origin/master`: `528f9be` (in sync after this session's pushes).
 
 Today's commits (chronological):
-1. `8e944d9` — Layer 4.3 sub-pass 4.3.5: schema migration on `service_catchment_cache`
-2. `5eec075` — Layer 4.3 sub-pass 4.3.5b: rename `capture_rate` → `demand_share_state`
-3. `a65ee57` — Layer 2.5 sub-pass 2.5.1: populate `service_catchment_cache`
-4. `4d49516` — Layer 2.5 sub-pass 2.5.1 v5: fix three null-coverage bugs in populator
-5. `b924524` — Layer 2.5 sub-pass 2.5.2: Layer 3.x catchment metric banding
-6. `d12da0b` — Layer 4.2-A.3: catchment ratios wired into centre page + credit-block reorder
-7. `beb7bbe` — Layer 4.2-A.3a-fix: trajectory chart polish (tooltip + dots + crosshair + external readout)
+1. `a4104b6` — 2026-04-30 doc set landing (PROJECT_STATUS + ROADMAP + OPEN_ITEMS regen + PHASE_LOG append). Closed the doc-discipline gap from the prior session.
+2. `6d30d33` — OI-25 closed (premise dissolved by probe), OI-29 opened (Lite weight reclassification per DEC-75).
+3. `528f9be` — Layer 4.2-A.4: STD-34 calibration metadata surfaced in DER tooltip (centre_page.py v12→v13 + centre.html v3.17→v3.18, two-commit DEC-22 pattern collapsed).
 
-**Uncommitted on disk** (one composite commit pending, draft in chat):
-- `centre_page.py` v9 → v12
-- `docs/centre.html` v3.13a → v3.17
+Plus the doc-set regen commit landing this monolith and the regenerated Tier-2 docs (separate commit; reference at end of PHASE_LOG).
 
-Untracked (gitignored): patch scripts, recon probe artefacts, frontend backups.
+Untracked (gitignored): patch scripts, recon probe artefacts, frontend backups in `docs/`. The `*.v?_backup_*` ignore pattern uses single `?` so `v3_3` doesn't match — minor gitignore tightening worth a 30-second pass at the next consolidation.
 
 ---
 
 ## Parallel work streams
 
-**Daily-rate centre-page integration** — flagged but no progress this session. STD-36+ note holds.
+**Daily-rate centre-page integration** — flagged but no progress. STD-36+ note holds.
 
 **Industry view (training_completions)** — data ready (768 rows; CHC30113/30121/50113/50121 across 2019-2024). Editorial disposition: kept at Industry view per DEC-36.
 
@@ -162,18 +158,25 @@ Untracked (gitignored): patch scripts, recon probe artefacts, frontend backups.
 
 ## Open items summary
 
-See OPEN_ITEMS.md for full text. New this session (OI-25 through OI-28):
-- **OI-25** — `sa2_median_household_income` trajectory shows single point (2021) instead of three Census years. Backend bug in `_layer3_position` trajectory builder. Affects all Census-source income metrics.
-- **OI-26** — `demand_supply` industry thresholds need post-launch calibration review (mathematically grounded but may register false positives in saturated catchments).
-- **OI-27** — 4.2-A.3c subtype-aware new-centre overlay requires `sa2_history.json` rebuild with subtype tagging on centre_events.
-- **OI-28** — `populate_service_catchment_cache.py` cosmetic banner mismatch (says v2 in print, file is v5; no functional impact).
+See OPEN_ITEMS.md for full text.
 
-Closed this session:
-- **OI-05** — `service_catchment_cache` populated (sub-pass 2.5.1).
-- **OI-23** — Global trend-window bar empty-state caption corrected.
+**Closed this session (2026-05-03):**
+- **OI-25** — `sa2_median_household_income` trajectory shows single point. Probe (`probe_oi25_income_trajectory.py`, read-only, Patcher pattern per STD-10) confirmed backend correctness: DB has 11 rows for the metric on test SA2 118011341; backend `_metric_trajectory` returns 3 non-null points (2011, 2016, 2021); renderer draws 3 dots when Trend Window is "All". The "single point" symptom was visible only on shorter Trend Windows where Census 5-year cadence + window clipping leaves 2021 alone. No backend bug; no renderer bug. Real residual issue → tracked as OI-29.
+
+**Opened this session (2026-05-03):**
+- **OI-29** — `sa2_median_household_income` should be Lite weight per DEC-75. Three Census points is not a trajectory; same logic LFP triplet got. ~0.1 session, renderer-only (set `row_weight: "lite"` on the metric in `LAYER3_METRIC_META`). Note the asymmetry inside the income triplet: `sa2_median_employee_income` and `sa2_median_total_income` have annual cadence (5 dense points 2018-2022) and stay Full.
+
+**Carried (unchanged):** OI-01–OI-04 (data quality), OI-06–OI-22 (assorted), OI-24 (DEC-65 protocol traceability), OI-26 (demand_supply industry threshold post-launch review), OI-27 (sa2_history.json subtype rebuild for 4.2-A.3c), OI-28 (populator banner cosmetic).
 
 ---
 
 ## Doc set
 
-The 2026-04-28 restructure produced the 12-doc set. The 2026-04-29c+d closure sessions reflected Layer 4.3 design closure + 8 of 9 sub-passes. **The 2026-04-30 session updated PROJECT_STATUS, ROADMAP, OPEN_ITEMS, PHASE_LOG to reflect Layer 4.3 closeout, Layer 2.5 ship, and the 4.2-A.3 + 4.2-A.3a-fix + 4.2-A.3b run.** STANDARDS and DECISIONS unchanged this session (no new STDs / DECs; DEC-77 candidate flagged for next-session lock if industry thresholds prove themselves in operator use).
+The 2026-04-28 restructure produced the 12-doc set. Update history:
+- 2026-04-29c+d: Layer 4.3 design closure + 8 of 9 sub-passes shipped
+- 2026-04-30: Layer 4.3 closeout (4.3.5 + 4.3.5b) + Layer 2.5 ship + Layer 4.2-A.3 + 4.2-A.3a-fix + 4.2-A.3b. **Doc updates regenerated but not landed** until 2026-05-03 (the doc-discipline gap that triggered this session's STD-35 enforcement work).
+- **2026-05-03: doc-discipline catch-up + Layer 4.2-A.4 + OI-25 dissolution + OI-29 add.** This session regenerated PROJECT_STATUS, ROADMAP, OPEN_ITEMS (already landed via 30/04 patcher path); appended PHASE_LOG entry; produced the 2026-05-03 monolith.
+
+STANDARDS and DECISIONS unchanged this session (no new STDs / DECs). DEC-77 candidate (industry threshold framework) flagged for next-session lock pending operator-use validation.
+
+**STD-35 reinforcement candidate (not yet a STD addition):** the 30/04 → 03/05 doc-discipline gap demonstrated that "regenerate the artefacts at session end" is necessary but not sufficient — the artefacts also need to make it onto disk and into project knowledge. Worth a 2-line addition to STD-35 (or a new STD) requiring an explicit "files moved to disk + monolith uploaded to project knowledge" verification step before declaring session-end. Note for the next consolidation pass.

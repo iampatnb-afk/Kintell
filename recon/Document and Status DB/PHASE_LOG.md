@@ -161,3 +161,78 @@ The corrective work in this session: regenerated `recon/layer4_3_design.md` as v
 **Open items closed:** OI-05 (service_catchment_cache populated), OI-23 (trend-window bar caption corrected — original framing was a misread).
 
 **Standards / decisions:** No new STDs or DECs. DEC-77 candidate (industry threshold framework) flagged for next-session lock pending operator-use validation.
+
+---
+
+## 2026-05-03 — Doc-discipline catch-up + Layer 4.2-A.4 + OI-25 dissolution
+
+Session opened with a stale framing in the kickoff message: "7 commits ahead of origin, uncommitted v9→v12 + v3.13a→v3.17 on disk". Reality (verified via `git status`): working tree clean, branch in sync with origin. The 4.2-A.3 work was already committed and pushed during the prior session (2026-04-30). The doc work, however, was NOT — the 30/04 session produced the regenerated artefacts but never moved them from `/mnt/user-data/outputs/` to disk OR uploaded the new monolith to project knowledge. This was the doc-discipline gap that defined the session.
+
+### Block 1 — Doc-discipline catch-up
+
+Located the 2026-04-30 artefacts in Patrick's Downloads folder (still there, timestamps 30/04 6:51 PM):
+- `kintell_project_status_2026-04-30.txt`
+- `PROJECT_STATUS.md`
+- `ROADMAP.md`
+- `OPEN_ITEMS.md`
+- `PHASE_LOG_entry_2026-04-30.md`
+
+Moved the four Tier-2 docs to `recon/Document and Status DB/` (overwriting the 29/04-era versions on disk). Appended PHASE_LOG entry. Committed as `a4104b6` — "2026-04-30 doc set landing". Synchronously updated project knowledge: deleted `kintell_project_status_2026-04-29d.txt`, uploaded `kintell_project_status_2026-04-30.txt`. Tier-2 .md files deleted from project knowledge as side-effect of the swap; flagged for re-upload at session end.
+
+### Block 2 — OI-25 probe + dissolution
+
+Per DEC-65 probe-before-code, wrote `probe_oi25_income_trajectory.py` (read-only, Patcher pattern STD-10) before touching `_layer3_position`. Probe reproduced the exact SQL `_metric_trajectory` runs against `abs_sa2_socioeconomic_annual` for the 3 Census-source income metrics on verification SA2 118011341 (Bondi Junction-Waverly), with NULL-coercion analysis matching the helper's behaviour.
+
+Probe output: 11 rows in DB for `metric_name = 'median_equiv_household_income_weekly'`. 3 non-null (2011, 2016, 2021); 8 NULL (placeholder rows by ingest design). Backend `_metric_trajectory` correctly returns the 3 valid points and drops the NULLs. Visual confirmation on `centre.html?id=103` with Trend Window set to "All": 3 dots visible on the household income chart.
+
+OI-25 dissolved. The "single point" symptom Patrick observed was almost certainly visible only because the Trend Window default clips Census 5-year-cadence data to the most recent point on shorter windows (3Y window cuts at 2018; only 2021 remains).
+
+Real residual issue identified: a 3-point Census trajectory rendered as a Full-weight row is visually misleading (smooth interpolation over a decade implies more granularity than exists) and trend-window-fragile. Same shape as DEC-75's logic for the LFP triplet. Opened OI-29 for Lite-weight reclassification.
+
+Patcher `patch_oi25_close_oi29_open.py`: 3 substitutions (close OI-25 in place with full resolution note; insert OI-29 after OI-28; bump last-updated). All pre-flight verified for exact-1 match. Committed as `6d30d33`.
+
+### Block 3 — Layer 4.2-A.4 (STD-34 calibration metadata in DER tooltip)
+
+Two-patcher sequence per DEC-22 (data first, then UI), collapsed to a single commit since both files were verified together.
+
+**Backend** (`patch_centre_page_v12_to_v13.py`, 6 mutations):
+- Added `_read_calibration_meta(con, sa2_code) -> Optional[dict]` helper, mirrors `_read_demand_share_state` pattern. Reads `calibrated_rate` + `rule_text` from `service_catchment_cache` once per SA2.
+- Added `uses_calibration: True` to 3 metric entries in `LAYER3_METRIC_META`: `sa2_adjusted_demand`, `sa2_demand_supply`, `sa2_demand_share_state`. The other 2 catchment metrics (`sa2_supply_ratio`, `sa2_child_to_place`) are pure ratios and correctly do NOT opt in.
+- Wired `calib_meta` read into `_layer3_position` after `cache_share` read.
+- Per-entry attachment (with `meta.get("uses_calibration") and calib_meta` guard) in both the regular metric loop and the `sa2_demand_share_state` special-case branch.
+- Bumped version v12 → v13.
+
+Smoke test (`smoke_test_v13_calib.py`, written via heredoc to avoid PowerShell f-string mangling per STD-05): `schema_version=centre_payload_v6`; 3 catchment_position metrics carry `rule_text` + `calibrated_rate=0.54`; 2 don't, as expected.
+
+**Renderer** (`patch_centre_html_v3_17_to_v3_18.py`, 6 mutations):
+- Extended `renderBadge` with a `calibration` field handler (renders as "Calibration" key/value row in the tooltip; placed between Inputs and Threshold per semantic order).
+- Added `_buildCalibrationRow(p)` helper — formats `<code>calibrated_rate=X.XX</code> — <htmlEscape rule_text>` when `p.rule_text` is set; returns `null` otherwise.
+- Wired into `_renderFullRow` and `_renderLiteRow` DER badge calls (additive — silent absence on rows without `rule_text`).
+- Structural change to `_renderContextRow`: added a conditional DER badge that didn't exist before. Carries source + calibration only (no cohort/decile fields — Context has no peer cohort by design). When `_buildCalibrationRow(p)` returns null, no DER badge renders, preserving the prior minimal Context look.
+- Bumped version v3.17 → v3.18.
+
+Visual check on `centre.html?id=103`: DER tooltips on Demand vs supply, Adjusted demand, Share of state demand all carry the new "Calibration" row with the full rule_text trace. Supply ratio and Children per place correctly do not.
+
+Committed as `528f9be` — "Layer 4.2-A.4: STD-34 calibration metadata surfaced in DER tooltip".
+
+### Block 4 — Doc-set regen (this regen)
+
+Per STD-35: PROJECT_STATUS.md and ROADMAP.md regenerated to reflect Layer 4.2-A.4 ship + OI-25 dissolution + OI-29 add + doc-discipline gap closure. OPEN_ITEMS.md already current via the OI-25 patcher. This PHASE_LOG entry appended. New monolith `kintell_project_status_2026-05-03.txt` produced for project knowledge upload.
+
+### Open items movement this session
+
+**Closed:**
+- OI-25 (sa2_median_household_income trajectory shows single point) — premise dissolved by probe; backend + renderer correct; "single point" was Trend Window clipping behaviour.
+
+**Opened:**
+- OI-29 (sa2_median_household_income should be Lite weight per DEC-75) — three Census points is not a trajectory, same logic LFP triplet got. ~0.1 session, renderer-only.
+
+### Standards / decisions
+
+No new STDs or DECs. DEC-77 candidate (industry threshold framework) still flagged for next-session lock.
+
+**STD-35 reinforcement candidate:** the 30/04 → 03/05 doc-discipline gap demonstrated that "regenerate at session end" is necessary but not sufficient; "land on disk + upload to project knowledge" needs explicit verification. Worth a 2-line addition to STD-35 at next consolidation.
+
+### Mood note for future sessions
+
+This session opened with a stale framing in the kickoff message — wrong git state, wrong file versions. Probe-before-code (DEC-65) caught it: rather than executing the kickoff blindly, ran `git status` first and found the inconsistency. Same discipline saved a misdirected fix on OI-25 (probed first, dissolved the bug claim, rather than diving into `_layer3_position`). The substrate work (doc landing) ate ~1/3 of the session but was the right call — without it, every subsequent session would have re-paid the orientation tax. Patrick's pull-up midway ("have you done a full review of all the documents?") was the corrective intervention that triggered the substrate audit.
