@@ -1,6 +1,12 @@
 """
 centre_page.py — Phase 2 backend helper for centre.html
-Version: v14 (2026-05-03) — OI-29 close: sa2_median_household_income reclassified to Lite weight per DEC-75. Three Census points (2011/2016/2021) is not a trajectory; same logic the LFP triplet got in DEC-75. Renderer-only behavioural change at runtime: _renderLiteRow drops the trajectory chart, keeps decile strip + band chips + intent copy + as-at stamp (reads "2021" from the most recent non-null point). sa2_median_employee_income and sa2_median_total_income stay Full (annual cadence, 5 dense points 2018-2022).
+Version: v16 (2026-05-03) — Layer 4.2-A.3c Bug 2 fix (DEC-74 amendment): perspective toggle fields (reversible, pair_with, default_perspective, perspective_labels) removed from the 3 catchment metrics that had them (sa2_supply_ratio, sa2_child_to_place, sa2_demand_supply). With these metrics now Full row_weight (v15), the inverse views are shown as separate rows in the same card — toggling would just swap to data already visible (supply_ratio / child_to_place are mathematical inverses, displayed side by side). For demand_supply, the natural 'fill' framing is the credit reader's preferred view; inverse 'spare capacity' framing adds little value. Renderer (centre.html line 1749) gates toggle render on p.reversible — with reversible: True removed from META, _layer3_position propagates reversible: False (default), and the toggle silently doesn't render. No renderer change needed for this fix; companion v3.20 ships separately for Bug 1 (year regex).
+
+v15 changes (2026-05-03, Layer 4.2-A.3c Part 3a): catchment metrics promoted from Lite to Full row_weight (sa2_supply_ratio, sa2_child_to_place, sa2_adjusted_demand, sa2_demand_supply). Each now ships a quarterly trajectory derived from docs/sa2_history.json (v2 multi-subtype build) plus a per-subtype centre_events array for the renderer overlay. New module-level cache _SA2_HISTORY_CACHE + _load_sa2_history() (~13 MB held once per process). New helper _catchment_trajectory(sa2_code, metric_name, subtype, calibrated_rate) returns (points, kind, events) — same shape as _metric_trajectory plus events. _layer3_position signature gains optional service_sub_type parameter; dispatches to _catchment_trajectory for any metric in CATCHMENT_TRAJECTORY_METRICS frozenset. Single call site in get_centre_payload updated to pass r.get('service_sub_type'). Subtype fallback to LDC for null/Other centres. Calibrated_rate held constant across historical quarters for adjusted_demand / demand_supply (honest as 'supply trajectory adjusted for current demand structure' — renderer surfaces in helper text). Renderer half ships separately as centre.html v3.18 -> v3.19 per DEC-22.
+
+v14 changes (2026-05-03, OI-29 close): sa2_median_household_income reclassified to Lite weight per DEC-75. Three Census points (2011/2016/2021) is not a trajectory; same logic the LFP triplet got in DEC-75. Renderer-only behavioural change at runtime: _renderLiteRow drops the trajectory chart, keeps decile strip + band chips + intent copy + as-at stamp (reads "2021" from the most recent non-null point). sa2_median_employee_income and sa2_median_total_income stay Full (annual cadence, 5 dense points 2018-2022).
+
+v14 changes (2026-05-03, OI-29 close): sa2_median_household_income reclassified to Lite weight per DEC-75. Three Census points (2011/2016/2021) is not a trajectory; same logic the LFP triplet got in DEC-75. Renderer-only behavioural change at runtime: _renderLiteRow drops the trajectory chart, keeps decile strip + band chips + intent copy + as-at stamp (reads "2021" from the most recent non-null point). sa2_median_employee_income and sa2_median_total_income stay Full (annual cadence, 5 dense points 2018-2022).
 
 v13 changes (2026-05-03, Layer 4.2-A.4): STD-34 calibration metadata surfaced on the 3 catchment_position metrics that derive from the participation_rate calibration (sa2_adjusted_demand, sa2_demand_supply, sa2_demand_share_state). New _read_calibration_meta helper reads calibrated_rate + rule_text from service_catchment_cache once per SA2; attached per-entry where meta.uses_calibration=True. Renderer half ships separately (centre.html v3.17 -> v3.18) per DEC-22 two-commit pattern. Other catchment metrics (sa2_supply_ratio, sa2_child_to_place) are pure ratios and correctly do NOT receive this metadata.
 
@@ -160,9 +166,11 @@ v2 fixes (2026-04-26):
 Read-only. No DB mutations.
 """
 
+import json
 import re
 import sqlite3
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 DB_PATH = "data/kintell.db"
@@ -361,6 +369,18 @@ INDUSTRY_BAND_THRESHOLDS = {
     ],
 }
 
+# Layer 4.2-A.3c: catchment metrics whose trajectory is read from
+# docs/sa2_history.json (per-subtype) rather than from a SQL table via
+# _metric_trajectory. Membership in this set causes _layer3_position
+# to dispatch to _catchment_trajectory instead.
+CATCHMENT_TRAJECTORY_METRICS = frozenset({
+    "sa2_supply_ratio",
+    "sa2_child_to_place",
+    "sa2_adjusted_demand",
+    "sa2_demand_supply",
+})
+
+
 def _industry_band_for(metric_name, raw_value):
     """DER. Resolve a raw value to the matching industry band
     entry per INDUSTRY_BAND_THRESHOLDS. Returns dict with key
@@ -549,16 +569,12 @@ LAYER3_METRIC_META = {
         "card": "catchment_position",
         "value_format": "ratio_x",
         "direction": "high_is_concerning",
-        "row_weight": "lite",  # point-in-time data; no trajectory
+        "row_weight": "full",  # v15 (Layer 4.2-A.3c): trajectory from sa2_history.json + centre_events overlay
         "industry_thresholds": True,  # v10
         "source": "service_catchment_cache (places / under-5 pop)",
-        "reversible": True,
-        "pair_with": "sa2_child_to_place",
-        "default_perspective": "forward",
-        "perspective_labels": {
-            "forward": "competition",
-            "inverse": "demand",
-        },
+        # v16 (Layer 4.2-A.3c amendment to DEC-74): perspective toggle removed.
+        # Inverse view (children per place) is shown as a separate row in
+        # the same card; toggling here would just swap to data already visible.
         "band_copy": {
             "low":  "undersupplied — opportunity",
             "mid":  "balanced supply",
@@ -570,16 +586,12 @@ LAYER3_METRIC_META = {
         "card": "catchment_position",
         "value_format": "ratio_x",
         "direction": "high_is_positive",
-        "row_weight": "lite",
+        "row_weight": "full",  # v15 (Layer 4.2-A.3c): trajectory from sa2_history.json (1/supply_ratio per quarter)
         "industry_thresholds": True,  # v10
         "source": "service_catchment_cache (under-5 pop / places)",
-        "reversible": True,
-        "pair_with": "sa2_supply_ratio",
-        "default_perspective": "forward",
-        "perspective_labels": {
-            "forward": "demand-per-place",
-            "inverse": "competition",
-        },
+        # v16 (Layer 4.2-A.3c amendment to DEC-74): perspective toggle removed.
+        # Inverse view (supply ratio) is shown as a separate row in the
+        # same card; toggling here would just swap to data already visible.
         "band_copy": {
             "low":  "thin demand per place",
             "mid":  "balanced demand per place",
@@ -591,7 +603,7 @@ LAYER3_METRIC_META = {
         "card": "catchment_position",
         "value_format": "int",
         "direction": "high_is_positive",
-        "row_weight": "lite",
+        "row_weight": "full",  # v15 (Layer 4.2-A.3c): trajectory = pop_0_4 × current_calibrated_rate × 0.6 per quarter
         "source": "service_catchment_cache (u5 × calibrated_rate × 0.6)",
         "uses_calibration": True,  # v13 — opts in to STD-34 metadata
         "band_copy": {
@@ -605,17 +617,14 @@ LAYER3_METRIC_META = {
         "card": "catchment_position",
         "value_format": "ratio_x",
         "direction": "high_is_positive",
-        "row_weight": "lite",
+        "row_weight": "full",  # v15 (Layer 4.2-A.3c): trajectory = adjusted_demand_per_quarter / places_per_quarter
         "industry_thresholds": True,  # v10
         "source": "service_catchment_cache (adjusted_demand / places)",
         "uses_calibration": True,  # v13 — derives transitively via adjusted_demand
-        "reversible": True,
-        "pair_with": "sa2_demand_supply",  # inverse rendered at HTML level
-        "default_perspective": "forward",
-        "perspective_labels": {
-            "forward": "fill",
-            "inverse": "spare capacity",
-        },
+        # v16 (Layer 4.2-A.3c amendment to DEC-74): perspective toggle removed.
+        # The natural "fill" framing (high = strong demand vs supply) is
+        # what credit readers actually use; the inverse "spare capacity"
+        # framing adds little value for the credit-decision use case.
         "band_copy": {
             "low":  "soft catchment — fill risk",
             "mid":  "in balance",
@@ -924,6 +933,40 @@ LAYER3_METRIC_TRAJECTORY_SOURCE = {
 }
 
 
+# Layer 4.2-A.3c: module-level cache of docs/sa2_history.json.
+# ~13 MB held in memory; keyed by sa2_code for O(1) lookup. Loaded
+# lazily on first call to _load_sa2_history(); shared across all
+# get_centre_payload() invocations within a single Python process.
+_SA2_HISTORY_CACHE = None  # type: ignore[assignment]
+
+
+def _load_sa2_history() -> dict:
+    """DER. Load and cache docs/sa2_history.json once per process.
+
+    Returns dict keyed by sa2_code -> SA2 entry from the JSON. Returns
+    {} if the file is missing or unreadable (degrades to no-trajectory
+    on catchment metrics; other metrics unaffected).
+    """
+    global _SA2_HISTORY_CACHE
+    if _SA2_HISTORY_CACHE is not None:
+        return _SA2_HISTORY_CACHE
+
+    path = Path(__file__).parent / "docs" / "sa2_history.json"
+    if not path.exists():
+        _SA2_HISTORY_CACHE = {}
+        return _SA2_HISTORY_CACHE
+
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        _SA2_HISTORY_CACHE = {}
+        return _SA2_HISTORY_CACHE
+
+    _SA2_HISTORY_CACHE = {s["sa2_code"]: s for s in data.get("sa2s", [])}
+    return _SA2_HISTORY_CACHE
+
+
 def _connect():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -1198,6 +1241,113 @@ def _metric_trajectory(con: sqlite3.Connection,
     return points, kind
 
 
+def _catchment_trajectory(sa2_code,
+                          metric_name,
+                          subtype,
+                          calibrated_rate):
+    """DER. Build per-quarter trajectory + centre_events for a catchment metric.
+
+    Reads docs/sa2_history.json (cached singleton). Returns the trajectory
+    in the standard {period, value} shape (consistent with _metric_trajectory)
+    plus the per-subtype centre_events array.
+
+    Subtype handling: looks up by_subtype[<subtype>]; falls back to LDC if
+    subtype is None or not in {LDC, OSHC, PSK, FDC}. LDC is the V1 focus —
+    OSHC/PSK/FDC trajectories use the same pop_0_4 denominator as a known
+    documented simplification (subtype-correct denominators are V1.5+).
+
+    Calibration semantics: adjusted_demand and demand_supply use the
+    centre's CURRENT calibrated_rate held constant across all historical
+    quarters. This shows supply-side trajectory adjusted for current
+    demand structure (income/LFP/NES/ARIA as they are now). Renderer
+    helper text surfaces this explicitly.
+
+    Methodology note: trajectory uses SA2-level pop_0_4 / places. The
+    point-in-time current value in service_catchment_cache uses
+    catchment-polygon-clipped pop. Numbers won't match exactly at the
+    most recent quarter — trajectory is for shape/trend, current value
+    is for credit decision.
+
+    Returns (points, kind, events):
+      - points = list of {period, value} dicts; empty if no data
+      - kind   = "quarterly" if SA2 found, else None
+      - events = list of centre_events from by_subtype.<subtype>; empty
+                 if no events recorded
+    """
+    if not sa2_code:
+        return [], None, []
+
+    history = _load_sa2_history()
+    sa2 = history.get(sa2_code)
+    if not sa2:
+        return [], None, []
+
+    # Subtype lookup with LDC fallback for null/Other.
+    subtype_key = (subtype or "").upper()
+    if subtype_key not in ("LDC", "OSHC", "PSK", "FDC"):
+        subtype_key = "LDC"
+
+    bs = sa2.get("by_subtype", {}).get(subtype_key)
+    if not bs:
+        return [], "quarterly", []
+
+    quarters = sa2.get("quarters", [])
+    if not quarters:
+        return [], "quarterly", []
+
+    n = len(quarters)
+    sr_arr     = bs.get("supply_ratio", [])
+    places_arr = bs.get("places", [])
+    pop_arr    = sa2.get("pop_0_4", [])
+
+    def _get(arr, i):
+        return arr[i] if i < len(arr) else None
+
+    points = []
+    events = bs.get("centre_events", []) or []
+
+    if metric_name == "sa2_supply_ratio":
+        for i, q in enumerate(quarters):
+            v = _get(sr_arr, i)
+            if v is not None:
+                points.append({"period": q, "value": v})
+
+    elif metric_name == "sa2_child_to_place":
+        for i, q in enumerate(quarters):
+            v = _get(sr_arr, i)
+            if v is not None and v > 0:
+                points.append({"period": q, "value": round(1.0 / v, 3)})
+
+    elif metric_name == "sa2_adjusted_demand":
+        if calibrated_rate is None:
+            return [], "quarterly", events
+        # Source convention (per LAYER3_METRIC_META.sa2_adjusted_demand.source):
+        # adjusted_demand = u5 × calibrated_rate × 0.6
+        for i, q in enumerate(quarters):
+            pop = _get(pop_arr, i)
+            if pop is not None and pop > 0:
+                points.append({
+                    "period": q,
+                    "value":  int(round(pop * calibrated_rate * 0.6)),
+                })
+
+    elif metric_name == "sa2_demand_supply":
+        if calibrated_rate is None:
+            return [], "quarterly", events
+        # demand_supply = adjusted_demand / places
+        for i, q in enumerate(quarters):
+            pop    = _get(pop_arr, i)
+            places = _get(places_arr, i)
+            if pop is not None and pop > 0 and places is not None and places > 0:
+                adjusted = pop * calibrated_rate * 0.6
+                points.append({
+                    "period": q,
+                    "value":  round(adjusted / places, 3),
+                })
+
+    return points, "quarterly", events
+
+
 def _cohort_distribution(con: sqlite3.Connection,
                          metric: str,
                          cohort_def: str,
@@ -1361,7 +1511,7 @@ def _read_calibration_meta(con: sqlite3.Connection,
         "rule_text":       row[1],
     }
 
-def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str]) -> dict:
+def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str], service_sub_type: Optional[str] = None) -> dict:
     """
     DER. Read Layer 3 banding rows for this SA2 + sa2_cohort row for cohort
     labelling. Organises by card (population / labour_market) per
@@ -1536,11 +1686,26 @@ def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str]) -> dict:
         # Only populate for normal/low confidence — for insufficient,
         # the strip is suppressed anyway, and rendering a histogram or
         # a single-point trajectory would be misleading.
+        # Layer 4.2-A.3c (v15): catchment metrics dispatch to
+        # _catchment_trajectory (reads sa2_history.json per subtype) and
+        # also receive a centre_events overlay. Other metrics keep the
+        # existing _metric_trajectory path (reads SQL).
         if confidence in ("normal", "low"):
-            traj_points, traj_kind = _metric_trajectory(con, sa2_code, metric_name)
-            if traj_points:
-                entry["trajectory"] = traj_points
-                entry["trajectory_kind"] = traj_kind
+            if metric_name in CATCHMENT_TRAJECTORY_METRICS:
+                cal_rate = calib_meta.get("calibrated_rate") if calib_meta else None
+                traj_points, traj_kind, traj_events = _catchment_trajectory(
+                    sa2_code, metric_name, service_sub_type, cal_rate,
+                )
+                if traj_points:
+                    entry["trajectory"] = traj_points
+                    entry["trajectory_kind"] = traj_kind
+                if traj_events:
+                    entry["centre_events"] = traj_events
+            else:
+                traj_points, traj_kind = _metric_trajectory(con, sa2_code, metric_name)
+                if traj_points:
+                    entry["trajectory"] = traj_points
+                    entry["trajectory_kind"] = traj_kind
 
             dist = _cohort_distribution(
                 con,
@@ -1772,7 +1937,7 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
         }
 
         # --- POSITION block (Layer 3 banding) ---
-        position = _layer3_position(conn, r.get("sa2_code"))
+        position = _layer3_position(conn, r.get("sa2_code"), r.get("service_sub_type"))
 
         # --- QA SCORES block ---
         qa_scores = _qa_scores(r)

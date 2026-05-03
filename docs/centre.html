@@ -1,4 +1,7 @@
 <!DOCTYPE html>
+<!-- centre.html v3.21 (2026-05-03) — Layer 4.2-A.3c Bug 1b fix: second copy of year-extraction regex in _filterTrajectoryByRange also un-anchored. v3.20 fixed _yearOfPeriod (used for the trend label) but missed this duplicate copy used by the trend window filter. Net effect of the bug: trend window buttons (3Y/5Y/10Y/All) had no effect on catchment trajectory charts. With both copies fixed, the filter clips correctly and the trend label updates with the selected window. -->
+<!-- centre.html v3.20 (2026-05-03) — Layer 4.2-A.3c Bug 1 fix: _yearOfPeriod() regex updated to find first 4-digit run anywhere in the period string (was anchored to start of string, returned NaN for quarter-format strings like "Q3 2013"). Restores trend-since labels on the 4 catchment trajectory charts that landed in v3.19. Backward compatible with annual ("2024") and census ("2024-Q3") formats. -->
+<!-- centre.html v3.19 (2026-05-03) — Layer 4.2-A.3c Part 3b: centre-entry/exit overlay added to the 4 catchment_position trajectory charts (supply_ratio, child_to_place, demand_supply, adjusted_demand). New _kintellEventAnnotation Chart.js plugin draws vertical dashed lines at quarters when centres of the matching subtype opened (green) or closed (red) or churned net-zero (grey) in this SA2. Plugin is data-driven via opts.plugins.kintellEventAnnotation = {events}; absent events = silent no-op (Population/Labour Market/Workforce charts unaffected). Companion to centre_page.py v15 which attaches p.centre_events to the 4 catchment metric entries. -->
 <!-- centre.html v3.18 (2026-05-03) — Layer 4.2-A.4: STD-34 calibration metadata surfaced in DER tooltip on the 3 catchment_position metrics that derive from the participation_rate calibration (sa2_adjusted_demand, sa2_demand_supply, sa2_demand_share_state). New _buildCalibrationRow helper formats `calibrated_rate=X.XX — <rule_text>` for inclusion as a "Calibration" row in the DER tooltip; renderBadge gains a calibration field handler; _renderContextRow gains a conditional DER badge (no cohort/decile fields — Context has no peer cohort by design; carries source + calibration only when present). Companion to centre_page.py v13. -->
 <!-- centre.html v3.17 (2026-04-30) — Layer 4.2-A.3a-fix iter 4 (F1-β): r.about_data rendered as a permanent visible "About this measure" block below the chart on workforce IVI rows. Silent absence when not populated. Pairs with centre_page.py v12. -->
 <!-- centre.html v3.16 (2026-04-30) — Layer 4.2-A.3a-fix iter 3: workforce-section local trend window. New 6M / 1Y / 2Y / 5Y / All selector at top of Workforce Supply Context, default 2Y. Sparklines filter to selected window; Y-axis now uses beginAtZero=false so monthly variance is visible. Re-render is workforce-scoped (other charts untouched). Global trajectory range bar caption corrected. -->
@@ -1069,10 +1072,13 @@ function _setPerChartRange(metric, years, btnEl) {
 // Renderer-implementation choice within DEC-73 (Trajectory window UX)
 // scope, same pattern as Thread A's per-chart overrides — no new DEC.
 
-// Extract the year portion of a period string ("2024" or "2024-Q3")
+// Extract the year portion of a period string. Handles "2024",
+// "2024-Q3", and "Q3 2013" (the catchment trajectory format added
+// in v3.19; the leading-^ anchor in the v3.18 version returned NaN
+// for quarter-leading strings).
 function _yearOfPeriod(period) {
   const s = String(period);
-  const m = /^(\d{4})/.exec(s);
+  const m = /(\d{4})/.exec(s);  // v3.20: find first 4-digit run anywhere
   return m ? parseInt(m[1], 10) : NaN;
 }
 
@@ -1165,14 +1171,19 @@ function _renderTrajectoryRangeBar() {
 }
 
 // Filter trajectory points to those within the last N years from the
-// series' most recent point. Handles both annual ("2024") and quarterly
-// ("2024-Q3") period formats.
+// series' most recent point. Handles annual ("2024"), census ("2024-Q3"),
+// and quarterly ("Q3 2013") period formats.
 function _filterTrajectoryByRange(points, years) {
   if (!years || years <= 0 || !points.length) return points;
-  // Extract the year portion of each point's period
+  // Extract the year portion of each point's period.
+  // v3.21: regex un-anchored so it matches the catchment quarter format
+  // ("Q3 2013") added in v3.19. Pre-v3.21 the ^-anchor returned NaN
+  // for quarter-leading strings, the function bailed out via the
+  // isNaN check below, and the trend window filter never applied to
+  // catchment charts.
   const yearOf = (period) => {
     const s = String(period);
-    const m = /^(\d{4})/.exec(s);
+    const m = /(\d{4})/.exec(s);
     return m ? parseInt(m[1], 10) : NaN;
   };
   const lastYear = yearOf(points[points.length - 1].period);
@@ -1311,6 +1322,59 @@ const _kintellCrosshair = {
     ctx.lineTo(x, ca.bottom);
     ctx.stroke();
     ctx.restore();
+  }
+};
+
+// v3.19 (Layer 4.2-A.3c): centre-entry/exit overlay for catchment charts.
+// Vertical dashed lines at quarters when centres of the matching subtype
+// opened or closed in this SA2. Data-driven via opts.plugins.
+// kintellEventAnnotation = { events: [...] } — when events are absent,
+// the plugin silently no-ops (Population/Labour Market/Workforce charts
+// unaffected). Adapted from dashboard.html's eventAnnotationPlugin
+// pattern but reads events from chart options rather than scope-bound
+// sectorEvents, so each chart can carry its own per-SA2 / per-subtype
+// event set.
+//
+// Color encoding:
+//   additions (net_centres > 0) -> green   — competitive expansion
+//   removals  (net_centres < 0) -> red     — competitive contraction
+//   net-zero churn              -> grey    — same-quarter rebrand etc.
+const _kintellEventAnnotation = {
+  id: "kintellEventAnnotation",
+  afterDraw(chart) {
+    const cfg = chart.options && chart.options.plugins && chart.options.plugins.kintellEventAnnotation;
+    if (!cfg || !cfg.events || !cfg.events.length) return;
+    const events = cfg.events;
+    const ctx2 = chart.ctx;
+    const xAxis = chart.scales.x;
+    const yAxis = chart.scales.y;
+    if (!xAxis || !yAxis) return;
+
+    // Labels currently displayed on the chart (after any range filter).
+    const labels = chart.data.labels || [];
+
+    events.forEach(ev => {
+      const idx = labels.indexOf(ev.quarter);
+      if (idx < 0) return;  // event quarter is outside the visible window
+
+      const xPixel = xAxis.getPixelForValue(idx);
+      if (xPixel < xAxis.left || xPixel > xAxis.right) return;
+
+      const net = Number(ev.net_centres) || 0;
+      const color = net > 0 ? "rgba(0,201,167,0.55)"   // green: additions
+                  : net < 0 ? "rgba(224,92,58,0.55)"   // red: removals
+                  :           "rgba(155,155,155,0.40)"; // grey: churn
+
+      ctx2.save();
+      ctx2.strokeStyle = color;
+      ctx2.lineWidth = 1.5;
+      ctx2.setLineDash([4, 3]);
+      ctx2.beginPath();
+      ctx2.moveTo(xPixel, yAxis.top);
+      ctx2.lineTo(xPixel, yAxis.bottom);
+      ctx2.stroke();
+      ctx2.restore();
+    });
   }
 };
 
@@ -1552,11 +1616,19 @@ function _renderTrajectory(metric, p) {
       },
     };
 
+    // v3.19 (Layer 4.2-A.3c): if this metric carries centre_events
+    // (only the 4 catchment metrics do, per centre_page.py v15), pass
+    // them through to the new _kintellEventAnnotation plugin via opts.
+    if (p && p.centre_events && p.centre_events.length) {
+      if (!opts.plugins) opts.plugins = {};
+      opts.plugins.kintellEventAnnotation = { events: p.centre_events };
+    }
+
     _CHART_INSTANCES[canvasId] = new Chart(el, {
       type: "line",
       data: { labels, datasets: [dataset] },
       options: opts,
-      plugins: [_kintellCrosshair],
+      plugins: [_kintellCrosshair, _kintellEventAnnotation],
     });
   });
 
