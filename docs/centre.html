@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- centre.html v3.18 (2026-05-03) — Layer 4.2-A.4: STD-34 calibration metadata surfaced in DER tooltip on the 3 catchment_position metrics that derive from the participation_rate calibration (sa2_adjusted_demand, sa2_demand_supply, sa2_demand_share_state). New _buildCalibrationRow helper formats `calibrated_rate=X.XX — <rule_text>` for inclusion as a "Calibration" row in the DER tooltip; renderBadge gains a calibration field handler; _renderContextRow gains a conditional DER badge (no cohort/decile fields — Context has no peer cohort by design; carries source + calibration only when present). Companion to centre_page.py v13. -->
 <!-- centre.html v3.17 (2026-04-30) — Layer 4.2-A.3a-fix iter 4 (F1-β): r.about_data rendered as a permanent visible "About this measure" block below the chart on workforce IVI rows. Silent absence when not populated. Pairs with centre_page.py v12. -->
 <!-- centre.html v3.16 (2026-04-30) — Layer 4.2-A.3a-fix iter 3: workforce-section local trend window. New 6M / 1Y / 2Y / 5Y / All selector at top of Workforce Supply Context, default 2Y. Sparklines filter to selected window; Y-axis now uses beginAtZero=false so monthly variance is visible. Re-render is workforce-scoped (other charts untouched). Global trajectory range bar caption corrected. -->
 <!-- centre.html v3.15 (2026-04-30) — Layer 4.2-A.3a-fix extension: workforce supply sparklines now have the same trajectory-polish treatment as Population / Labour Market / Catchment — dot points, vertical crosshair, external HTML readout slot above each chart, all in place. Reuses previously-defined _kintellExternalReadout (v3.13) and _kintellCrosshair (v3.12). -->
@@ -559,6 +560,20 @@ function formatMonYYYY(s) {
   return `${MON_SHORT[mi]} ${y}`;
 }
 
+// ── Calibration row helper (Layer 4.2-A.4) ─────────────────────────
+// Returns the formatted "Calibration" tooltip value when the entry
+// carries STD-34 calibration metadata (calibrated_rate + rule_text
+// from service_catchment_cache, attached by centre_page.py v13 for
+// metrics with uses_calibration=True). Returns null otherwise so
+// renderBadge's if-guard skips the row cleanly.
+function _buildCalibrationRow(p) {
+  if (!p || !p.rule_text) return null;
+  const rate = (p.calibrated_rate != null)
+    ? Number(p.calibrated_rate).toFixed(2)
+    : "—";
+  return `<code>calibrated_rate=${rate}</code> — ${htmlEscape(p.rule_text)}`;
+}
+
 // ── OBS/DER/COM badge renderer ──────────────────────────────────────
 function renderBadge(classification, methodology, rightAnchor=false) {
   const cls = String(classification || "").toLowerCase();
@@ -569,6 +584,7 @@ function renderBadge(classification, methodology, rightAnchor=false) {
   if (m.formula)   rows.push({ k: "Formula",   v: m.formula });
   if (m.rule)      rows.push({ k: "Rule",      v: m.rule });
   if (m.inputs)    rows.push({ k: "Inputs",    v: m.inputs });
+  if (m.calibration) rows.push({ k: "Calibration", v: m.calibration });
   if (m.threshold) rows.push({ k: "Threshold", v: m.threshold });
   if (m.asAt)      rows.push({ k: "As at",     v: m.asAt });
   const tipHtml = rows.length === 0 ? "" : `
@@ -1906,6 +1922,7 @@ function _renderFullRow(p, ctx) {
     rule: htmlEscape(p.cohort_label || ""),
     formula: "decile = NTILE(10) within cohort; band = low (1–3) / mid (4–6) / high (7–10).",
     inputs: `<code>raw_value=${htmlEscape(String(p.raw_value))}</code>, <code>percentile=${htmlEscape(String((p.percentile != null) ? Number(p.percentile).toFixed(1) : ""))}</code>`,
+    calibration: _buildCalibrationRow(p),
     threshold: "Suppress if cohort_n < 10; low-confidence pill if 10 ≤ cohort_n < 20."
   }, true);
   const comBadge = renderBadge("COM", {
@@ -2024,6 +2041,7 @@ function _renderLiteRow(p, ctx) {
     rule: htmlEscape(p.cohort_label || ""),
     formula: "decile = NTILE(10) within cohort; band = low (1–3) / mid (4–6) / high (7–10). Lite weight per DEC-75: <5 dense series points, no trajectory rendered.",
     inputs: `<code>raw_value=${htmlEscape(String(p.raw_value))}</code>, <code>percentile=${htmlEscape(String((p.percentile != null) ? Number(p.percentile).toFixed(1) : ""))}</code>`,
+    calibration: _buildCalibrationRow(p),
     threshold: "Suppress if cohort_n < 10; low-confidence pill if 10 ≤ cohort_n < 20."
   }, true);
   const comBadge = renderBadge("COM", {
@@ -2069,6 +2087,17 @@ function _renderLiteRow(p, ctx) {
 // without retrofit.
 function _renderContextRow(p, ctx) {
   const obsBadge = ctx.obsBadge;
+  // v3.18 (Layer 4.2-A.4): conditional DER on Context rows when
+  // calibration metadata is present (e.g., sa2_demand_share_state).
+  // No cohort/decile fields — Context has no peer cohort by design;
+  // this DER carries source + calibration only.
+  const _calibStr = _buildCalibrationRow(p);
+  const derBadge = _calibStr
+    ? renderBadge("DER", {
+        source: htmlEscape(p.source || ""),
+        calibration: _calibStr,
+      }, true)
+    : "";
   return `
     <div style="padding:10px 0;border-bottom:1px dashed var(--border);">
       <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">
@@ -2077,6 +2106,7 @@ function _renderContextRow(p, ctx) {
           <b style="font-variant-numeric:tabular-nums;color:var(--text);font-weight:500;">${ctx.rawStr}</b>
           ${ctx.periodTag}
           ${obsBadge}
+          ${derBadge}
         </span>
       </div>
       <div style="margin-top:6px;font-size:11px;color:var(--text-mute);font-style:italic;">

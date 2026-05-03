@@ -1,6 +1,8 @@
 """
 centre_page.py — Phase 2 backend helper for centre.html
-Version: v12 (2026-04-30) — Layer 4.2-A.3a-fix iter 4 (F1-β): JSA IVI methodology lifted out of hover-gated OBS tooltip into a new about_data field on IVI rows. Renderer surfaces it as a permanent visible block under the chart so credit readers don't need to discover the OBS hover affordance. OBS source string now carries full methodology one-liner (what the IVI is, where it comes from); intent_copy tightened to credit-relevant framing only. Reader hovers OBS for data provenance, reads inline copy for credit signal.
+Version: v13 (2026-05-03) — Layer 4.2-A.4: STD-34 calibration metadata surfaced on the 3 catchment_position metrics that derive from the participation_rate calibration (sa2_adjusted_demand, sa2_demand_supply, sa2_demand_share_state). New _read_calibration_meta helper reads calibrated_rate + rule_text from service_catchment_cache once per SA2; attached per-entry where meta.uses_calibration=True. Renderer half ships separately (centre.html v3.17 -> v3.18) per DEC-22 two-commit pattern. Other catchment metrics (sa2_supply_ratio, sa2_child_to_place) are pure ratios and correctly do NOT receive this metadata.
+
+v12 changes (2026-04-30, Layer 4.2-A.3a-fix iter 4 (F1-β)): JSA IVI methodology lifted out of hover-gated OBS tooltip into a new about_data field on IVI rows. Renderer surfaces it as a permanent visible block under the chart so credit readers don't need to discover the OBS hover affordance. OBS source string now carries full methodology one-liner (what the IVI is, where it comes from); intent_copy tightened to credit-relevant framing only. Reader hovers OBS for data provenance, reads inline copy for credit signal.
 
 v10 changes (2026-04-30, Layer 4.2-A.3b):
   - INDUSTRY_BAND_THRESHOLDS — declarative table of
@@ -589,6 +591,7 @@ LAYER3_METRIC_META = {
         "direction": "high_is_positive",
         "row_weight": "lite",
         "source": "service_catchment_cache (u5 × calibrated_rate × 0.6)",
+        "uses_calibration": True,  # v13 — opts in to STD-34 metadata
         "band_copy": {
             "low":  "thin calibrated demand",
             "mid":  "average calibrated demand",
@@ -603,6 +606,7 @@ LAYER3_METRIC_META = {
         "row_weight": "lite",
         "industry_thresholds": True,  # v10
         "source": "service_catchment_cache (adjusted_demand / places)",
+        "uses_calibration": True,  # v13 — derives transitively via adjusted_demand
         "reversible": True,
         "pair_with": "sa2_demand_supply",  # inverse rendered at HTML level
         "default_perspective": "forward",
@@ -623,6 +627,7 @@ LAYER3_METRIC_META = {
         "direction": "high_is_positive",
         "row_weight": "context",  # rank-by-construction; no banding
         "source": "service_catchment_cache (this SA2's adjusted_demand / state total)",
+        "uses_calibration": True,  # v13 — derives transitively via adjusted_demand
         "band_copy": {
             "low": "—", "mid": "—", "high": "—",
         },
@@ -1321,6 +1326,39 @@ def _read_demand_share_state(con: sqlite3.Connection,
     return row[0] if row else None
 
 
+def _read_calibration_meta(con: sqlite3.Connection,
+                            sa2_code: Optional[str]
+                            ) -> Optional[dict]:
+    """DER. Read calibrated_rate + rule_text from service_catchment_cache
+    for any service in this SA2.
+
+    The cache broadcasts SA2-level calibration facts to every active
+    service in that SA2 (calibrated_rate and rule_text are SA2 properties,
+    not service properties), so any row's values are canonical for the SA2.
+    Returns None if the SA2 has no active service in the cache, or if the
+    cache row has NULL calibration fields.
+
+    Mirrors _read_demand_share_state pattern. Layer 4.2-A.4 (STD-34
+    surfacing).
+    """
+    if not sa2_code:
+        return None
+    try:
+        row = con.execute(
+            "SELECT calibrated_rate, rule_text FROM service_catchment_cache"
+            " WHERE sa2_code = ? AND calibrated_rate IS NOT NULL"
+            " LIMIT 1",
+            (sa2_code,),
+        ).fetchone()
+    except sqlite3.OperationalError:
+        return None
+    if not row:
+        return None
+    return {
+        "calibrated_rate": row[0],
+        "rule_text":       row[1],
+    }
+
 def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str]) -> dict:
     """
     DER. Read Layer 3 banding rows for this SA2 + sa2_cohort row for cohort
@@ -1411,6 +1449,10 @@ def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str]) -> dict:
     # (rank-by-construction); read raw from cache.
     cache_share = _read_demand_share_state(con, sa2_code)
 
+    # Layer 4.2-A.4 (v13): calibration metadata for opted-in metrics
+    # (uses_calibration=True). Read once per SA2; attached per-entry below.
+    calib_meta = _read_calibration_meta(con, sa2_code)
+
     for metric_name, meta in LAYER3_METRIC_META.items():
         card = meta["card"]
         if meta.get("status") == "deferred":
@@ -1425,6 +1467,10 @@ def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str]) -> dict:
                 stub = _stub(metric_name, meta, "normal")
                 stub["raw_value"] = cache_share
                 stub["period_label"] = "as at 2026-04-30"
+                # v13 (Layer 4.2-A.4): attach calibration metadata.
+                if meta.get("uses_calibration") and calib_meta:
+                    stub["calibrated_rate"] = calib_meta.get("calibrated_rate")
+                    stub["rule_text"]       = calib_meta.get("rule_text")
                 out[card][metric_name] = stub
             continue
 
@@ -1474,6 +1520,15 @@ def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str]) -> dict:
             entry["industry_band"]       = None
             entry["industry_band_label"] = None
             entry["industry_band_note"]  = None
+
+        # Layer 4.2-A.4 (v13): calibration metadata propagation.
+        # For metrics that derive from the participation_rate calibration
+        # (uses_calibration=True), attach calibrated_rate + rule_text from
+        # service_catchment_cache so the renderer can surface them in the
+        # DER tooltip per STD-34. Other metrics see no change.
+        if meta.get("uses_calibration") and calib_meta:
+            entry["calibrated_rate"] = calib_meta.get("calibrated_rate")
+            entry["rule_text"]       = calib_meta.get("rule_text")
 
         # Layer 4.2-B: trajectory + cohort distribution.
         # Only populate for normal/low confidence — for insufficient,
