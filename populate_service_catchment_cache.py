@@ -434,6 +434,34 @@ def stage2_calibration_smoketest(conn, d):
                 flpf_map[sa2] = None
         log(f"  female LFP: {len(flpf_map):,} SA2s")
 
+    # ── A2-WIRE: NES share map ────────────────────────────────────────────
+    # A2-WIRE: nes_map populated 2026-05-04 — closes nes_share_pct dormancy
+    # in calibrate_participation_rate (OI-19). Reads census_nes_share_pct
+    # from abs_sa2_education_employment_annual (ingested by
+    # layer4_4_step_a2_apply.py at audit_id 143). Stored as fraction 0-1
+    # to match calibration's threshold conventions (>=0.30, <=0.05).
+    nes_map = {}
+    cur.execute(
+        "SELECT MAX(year) FROM abs_sa2_education_employment_annual "
+        "WHERE metric_name = 'census_nes_share_pct'"
+    )
+    nes_year_row = cur.fetchone()
+    nes_year = nes_year_row[0] if nes_year_row else None
+    if nes_year is None:
+        log("  NES: no census_nes_share_pct rows found; passing None to calibrator")
+    else:
+        cur.execute(
+            "SELECT sa2_code, value FROM abs_sa2_education_employment_annual "
+            "WHERE metric_name = ? AND year = ?",
+            ("census_nes_share_pct", nes_year),
+        )
+        for sa2, v in cur.fetchall():
+            try:
+                nes_map[sa2] = float(v) if v is not None else None
+            except (ValueError, TypeError):
+                nes_map[sa2] = None
+        log(f"  NES: {len(nes_map):,} SA2s (year {nes_year})")
+
     log("running calibrate_participation_rate over all SA2s")
     rates = []
     rate_counter = Counter()
@@ -445,7 +473,7 @@ def stage2_calibration_smoketest(conn, d):
             rate, rule = calibrate_participation_rate(
                 income_decile=inc_decile_map.get(sa2),
                 female_lfp_pct=flpf_map.get(sa2),
-                nes_share_pct=None,
+                nes_share_pct=nes_map.get(sa2),
                 aria_band=aria_map.get(sa2),
             )
             cal_results[sa2] = (rate, rule)
