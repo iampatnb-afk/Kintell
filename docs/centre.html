@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- centre.html v3.25 (2026-05-04) — C3 ship: absolute-change ("+N places · +M centres") rendered alongside trend % on the 4 catchment trajectory charts. New _computeEventAbsChange(events, startPeriod) helper sums centre_events.places_change and centre_events.net_centres for events at or after the active trend-window startPeriod. Inline with existing _formatTrendPct label inside the trendLabel HTML. Silent absence when p.centre_events absent or empty (Population / Labour Market / Workforce rows unaffected per P-2). -->
 <!-- centre.html v3.24 (2026-05-03) — OI-32 polish round 3 (operator review). Three additive renderer changes: (a) cohort distribution histogram now ships a centred explainer line below the bars ("Distribution of values across the peer cohort. The highlighted bar shows where this SA2 sits; the decile strip below converts that position to the 1–10 scale.") plus the existing cohort-note line switched from right-aligned to centre for visual consistency. (b) New _renderMiniDecileStrip helper renders a compact 10-cell horizontal strip using the same colour grammar as _renderDecileStrip (per-decile tones 6%/13%/20%, accent + outline on active cell, structural gaps between bands). (c) SEIFA decile fact in the Catchment section now calls _renderMiniDecileStrip inline so the SES position is visible at a glance — chosen over colour-coding because SES has no valence in LDC credit (high SES = higher fee tolerance AND more competition). Pairs with centre_page.py v20 (INDUSTRY band relabelling + about_data tightening) in same commit. -->
 <!-- centre.html v3.23 (2026-05-03) — OI-32 polish round (operator review of v3.22): About-this-measure panel font bumped 11.5px -> 12.5px for readability on the longer explainer text. No structural change; _renderAboutData logic unchanged. Pairs with centre_page.py v18 (text edits to sa2_demand_supply about_data + industry-band labels/notes; same commit). -->
 <!-- centre.html v3.22 (2026-05-03) — OI-32 close (Bug 4): catchment metric explainer text. New _renderAboutData(p) helper renders p.about_data as a permanent visible "About this measure" panel inside _renderFullRow, positioned after _renderIntentCopy and before the DER/COM badge row. Reuses the visual pattern established by the workforce row about_data block (v3.17). Splits on \n\n for paragraph breaks; \n within a paragraph becomes <br>. Silent absence per P-2 when p.about_data is null (non-catchment metrics, or catchment metrics with no copy yet). Pairs with centre_page.py v17 in same commit. -->
@@ -1118,6 +1119,32 @@ function _computeTrendPctChange(points) {
 }
 
 
+// ── C3: absolute-change helper ─────────────────────────────────────
+//
+// Aggregates centre_events.places_change and centre_events.net_centres
+// for events whose quarter sits at or after the active trend-window
+// startPeriod. Returns {placesChange, centresChange, eventCount} or
+// null when there are no qualifying events. Used inline with the
+// trend-% label on catchment trajectory charts.
+function _computeEventAbsChange(events, startPeriod) {
+  if (!events || !events.length || !startPeriod) return null;
+  const startYr = _yearOfPeriod(startPeriod);
+  if (startYr == null || isNaN(startYr)) return null;
+  let pl = 0, c = 0, n = 0;
+  for (const e of events) {
+    if (!e || !e.quarter) continue;
+    const eyr = _yearOfPeriod(e.quarter);
+    if (eyr == null || isNaN(eyr)) continue;
+    if (eyr < startYr) continue;
+    pl += (e.places_change || 0);
+    c  += (e.net_centres   || 0);
+    n  += 1;
+  }
+  if (n === 0) return null;
+  return { placesChange: pl, centresChange: c, eventCount: n };
+}
+
+
 // Buttons-only emit for inline composition with the trend-% label
 // (sub-pass 4.3.8). Returns the button HTML without an outer wrapper
 // div — caller wraps. Returns "" if metric has no per-chart options.
@@ -1491,10 +1518,16 @@ function _renderTrajectory(metric, p) {
   // v3.6 — prominence bump: 11→13px, --text-mute → --text-dim,
   // value rendered semibold so the % reads as the headline.
   const trend = _computeTrendPctChange(points);
+  const absChange = (trend && p.centre_events && p.centre_events.length)
+    ? _computeEventAbsChange(p.centre_events, trend.startPeriod)
+    : null;
+  const absChangeLabel = absChange
+    ? ` · <span style="color:var(--text-mute);">${absChange.placesChange >= 0 ? "+" : ""}${absChange.placesChange} places · ${absChange.centresChange >= 0 ? "+" : ""}${absChange.centresChange} ${Math.abs(absChange.centresChange) === 1 ? "centre" : "centres"}</span>`
+    : "";
   const trendLabel = (trend && p.row_weight !== "lite" && p.row_weight !== "context")
     ? `<span style="font-size:13px;color:var(--text-dim);font-variant-numeric:tabular-nums;">
          <b style="font-weight:600;color:var(--text);">${_formatTrendPct(trend.pct)}</b>
-         <span style="color:var(--text-mute);"> since ${htmlEscape(String(_yearOfPeriod(trend.startPeriod)))}</span>
+         <span style="color:var(--text-mute);"> since ${htmlEscape(String(_yearOfPeriod(trend.startPeriod)))}</span>${absChangeLabel}
        </span>`
     : "";
   const perChartBtns = _renderPerChartRangeBarButtons(metric);
