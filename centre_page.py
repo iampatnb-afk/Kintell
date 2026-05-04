@@ -659,6 +659,19 @@ LAYER3_METRIC_META = {
             "low": "—", "mid": "—", "high": "—",
         },
     },
+    "sa2_nes_share": {
+        "display": "Non-English-speaking share",
+        "card": "catchment_position",
+        "value_format": "percent",
+        "direction": "high_is_positive",  # neutral framing; credit signal lives in calibration nudge
+        "row_weight": "lite",  # 3 Census points (2011/2016/2021) per DEC-75
+        "source": "ABS Census 2021 T10A+T10B (census_nes_share_pct)",
+        "band_copy": {
+            "low":  "predominantly English-speaking",
+            "mid":  "moderate language diversity",
+            "high": "high cultural-linguistic diversity",
+        },
+    },
 }
 
 # Display order within each card (drives section order in the UI).
@@ -858,6 +871,11 @@ LAYER3_METRIC_INTENT_COPY = {
         "Three-Day Guarantee (Jan 2026) entitles every child to three "
         "subsidised days — shifts demand floor upward across all "
         "catchments and rewires the family-payment model.",
+    "sa2_nes_share":
+        "Share of residents speaking a language other than English at home — "
+        "a proxy for cultural-linguistic diversity. Historically, ECEC "
+        "engagement is lower in high-NES catchments due to language barriers "
+        "and cultural preferences for family-based care.",
 }
 
 
@@ -991,6 +1009,13 @@ LAYER3_METRIC_TRAJECTORY_SOURCE = {
     # trajectory source yet. Their LAYER3_METRIC_META entry already has
     # status='deferred', so _layer3_position never reaches the trajectory
     # branch for them.
+    "sa2_nes_share": {
+        "table":         "abs_sa2_education_employment_annual",
+        "value_col":     "value",
+        "period_col":    "year",
+        "filter_clause": "metric_name = 'census_nes_share_pct'",
+        "kind":          "annual",
+    },
 }
 
 
