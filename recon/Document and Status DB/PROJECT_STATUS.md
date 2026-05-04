@@ -99,8 +99,8 @@ This evening's commits (chronological from afternoon HEAD `bc52f3c`):
 
 1. `1a90bf7` — OI-32 close (Bug 4) rounds 1+2 (centre_page.py v16→v18 + centre.html v3.21→v3.23). New `LAYER3_METRIC_ABOUT_DATA` constant + `_renderAboutData` helper. Round 2: panel font 11.5px→12.5px; sa2_demand_supply about_data + INDUSTRY_BAND_THRESHOLDS reframed from "fill" terminology.
 2. `83738ac` — OI-32 polish r2 (centre_page.py v18→v19). Operator screenshot review caught remaining "fill"/"soft" in band_copy chips + INTENT_COPY italic + INDUSTRY soft-band label. Cleaned across `sa2_demand_supply` band_copy + sa2-prefixed INTENT_COPY for 3 catchment metrics; INDUSTRY label "soft ramp-up" → "below break-even".
-3. `<v20-commit>` — OI-32 v20 bundle (centre_page.py v19→v20 + centre.html v3.23→v3.24). INDUSTRY parallel-framing per DEC-77 review; about_data first-line tightening; cohort histogram explainer + center alignment; `_renderMiniDecileStrip` helper for SEIFA fact.
-4. `<doc-commit>` — End-of-session doc refresh + OI-30 probe artefact (this commit).
+3. `11b27e2` — OI-32 v20 bundle (centre_page.py v19→v20 + centre.html v3.23→v3.24). INDUSTRY parallel-framing per DEC-77 review; about_data first-line tightening; cohort histogram explainer + center alignment; `_renderMiniDecileStrip` helper for SEIFA fact.
+4. `54bacfe` — End-of-session doc refresh + OI-30 probe artefact (this commit).
 
 ---
 

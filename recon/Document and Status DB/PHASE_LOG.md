@@ -348,7 +348,7 @@ V1.5 path queued:
 
 ## 2026-05-03 (evening) — OI-32 close + DEC-77 mint + OI-30 probe + OI-12 dry-run
 
-Continuation session. V1 was at HEAD `bc52f3c` at session start. Ended at `<doc-commit>` after the polish + doc bundle. 4 commits this evening (3 code + 1 doc).
+Continuation session. V1 was at HEAD `bc52f3c` at session start. Ended at `54bacfe` after the polish + doc bundle. 4 commits this evening (3 code + 1 doc).
 
 ### Session shape
 
