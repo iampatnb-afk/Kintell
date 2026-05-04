@@ -342,3 +342,128 @@ V1.5 path queued:
 - OI-32 (absolute change alongside %)
 - Layer 4.4 ingests bundle (NES + parent-cohort + schools + SALM-ext)
 - Subtype-correct denominators (folds into Layer 4.4)
+
+
+---
+
+## 2026-05-03 (evening) — OI-32 close + DEC-77 mint + OI-30 probe + OI-12 dry-run
+
+Continuation session. V1 was at HEAD `bc52f3c` at session start. Ended at `<doc-commit>` after the polish + doc bundle. 4 commits this evening (3 code + 1 doc).
+
+### Session shape
+
+Polish round on the catchment-position card surfaces, driven by operator visual review. Three iterative polish rounds on the same OI-32 deliverable plus a hypothesis-refuting probe (OI-30) and a deferred-decision dry-run (OI-12). Pattern: probe → propose copy → ship → operator visual review → repeat. Each round caught regressions or category errors the previous round didn't see — the "below break-even" fix in particular was a category error (asserting profitability conclusion from a supply/demand ratio) that only became visible after the "fill" cleanup landed.
+
+### Block 1 — OI-32 round 1+2 (commit `1a90bf7`)
+
+`patch_oi32_about_data.py` + `patch_oi32_polish.py` bundled into single commit per DEC-22 collapse pattern.
+
+**Backend (centre_page.py v16 → v18, 7 mutations across 2 patchers):**
+
+v17 (about_data field added):
+- New module-level constant `LAYER3_METRIC_ABOUT_DATA` carrying plain-language "what is this metric?" copy for the 4 Full-weight catchment metrics
+- `_layer3_position` propagates `p.about_data` onto stub + populated entries via `LAYER3_METRIC_ABOUT_DATA.get(metric_name)` — same shape as `intent_copy` propagation
+
+v18 (operator review of v17 visuals):
+- Panel font 11.5px → 12.5px in `_renderAboutData`
+- `sa2_demand_supply` about_data text reframed from "fill expectation / fill risk" to "occupancy ramp-up / trade-up risk"
+- INDUSTRY_BAND_THRESHOLDS sa2_demand_supply: replaced "fill" terminology in band labels/notes; removed generic "below 70% break-even at typical 85% occupancy" note
+
+**Renderer (centre.html v3.21 → v3.23, 5 mutations across 2 patchers):**
+
+v3.22:
+- New `_renderAboutData(p)` helper rendering p.about_data as permanent visible "About this measure" panel (uppercase label, left-border, muted background, splits on `\n\n` for paragraphs and `\n` within paragraphs for line breaks)
+- Inserted call inside `_renderFullRow` between `_renderIntentCopy(p)` and the DER/COM badge row
+- Reuses visual pattern from workforce-row about_data block (v3.17)
+
+v3.23:
+- Font bump 11.5px → 12.5px in the About panel container
+
+### Block 2 — OI-32 polish r2 (commit `83738ac`)
+
+`patch_oi32_polish_r2.py`. Operator screenshot review caught remaining "fill"/"soft" surfaces that round-1 didn't cover.
+
+**Backend (centre_page.py v18 → v19, 6 mutations):**
+
+- `band_copy` chips on `sa2_demand_supply` reframed: "soft catchment — fill risk" → "supply outweighs demand — trade-up risk"; "demand pull — strong fill expected" → "demand outweighs supply — fast occupancy ramp"
+- `LAYER3_METRIC_INTENT_COPY` sa2-prefixed entries cleaned: `sa2_demand_supply`, `sa2_supply_ratio`, `sa2_adjusted_demand` all had visible "fill" terminology in the italic intent line
+- INDUSTRY_BAND soft-band label "soft ramp-up" → "below break-even" (key stays "soft" because centre.html cautionKeys references it for visual treatment)
+- Unprefixed duplicate INTENT_COPY entries left alone (kept for backward reference per existing comment, not read by `_layer3_position`)
+
+**Diagnosis interlude.** Operator's first screenshot post-Block 1 showed unchanged old text. Initially diagnosed as browser cache. Probe of `centre.html` revealed the page fetches `/api/...` from `review_server.py` — a long-running Python process that imports `centre_page` at module load. Python module cache prevents on-disk `centre_page.py` changes from taking effect until server restart. Operator restarted server (multiple instances had to be killed first via Win11-safe `Get-CimInstance Win32_Process` filter); v17/v18 changes then visible. Worth banking as a reminder for any future centre_page.py mutation.
+
+### Block 3 — OI-32 v20 bundle
+
+`patch_oi32_v20_bundle.py`. Operator review of v19 surfaced two more issues:
+
+1. The INDUSTRY label "below break-even" makes a profitability claim the demand/supply ratio alone cannot support (break-even depends on price, cost base, ramp curve, mix). Same category-error fix at the about_data level: "the occupancy ramp-up expectation for a centre here" overreaches similarly.
+2. Cohort histogram needs explainer text + horizontal centering. SEIFA decile would benefit from a visual position indicator (mini decile strip chosen over colour-coding because SES has no valence in LDC credit).
+
+**Backend (centre_page.py v19 → v20, 3 mutations):**
+
+- INDUSTRY_BAND_THRESHOLDS sa2_demand_supply parallel-framed in supply-vs-demand language only:
+  - soft → "supply heavy" / "demand well short of available capacity"
+  - near_be → "supply leaning" / "demand below available capacity"
+  - viable → "approaching balance" / "demand and supply broadly aligned"
+  - strong → "demand leading" / "demand exceeds available capacity"
+- about_data first line tightened: "How supply compares to realistic demand — a key input to occupancy ramp expectations"
+
+**Renderer (centre.html v3.23 → v3.24, 4 mutations):**
+
+- `_renderCohortHistogram` ships centred italic explainer text below the bars; cohort-note alignment switched from right to centre
+- New `_renderMiniDecileStrip(decile)` helper — compact 10-cell horizontal strip, same colour grammar as `_renderDecileStrip` (per-decile tones 6%/13%/20%, accent + outline on active cell, structural gaps between bands), inline-sized (6px wide cells, 10px tall, no number labels)
+- SEIFA decile fact in Catchment section gains inline `_renderMiniDecileStrip` call
+
+### Block 4 — DEC-77 mint
+
+Industry-absolute threshold framework formalised. Layer 4.2-A.3b shipped (2026-04-30) the framework; v20 round finalised the demand_supply labels. Now operator-validated and locked. DEC-77 entry recorded in DECISIONS.md.
+
+### Block 5 — OI-30 probe (read-only; recon artefact)
+
+`probe_oi30_asgs_coverage.py`. Per DEC-65, probe-before-design.
+
+**Result: hypothesis refuted.** Bondi Junction-Waverly (118011341 — established 2016-ASGS area, no expected concordance issue) shows the same 6-year coverage (2019-2024) as Bayswater (211011251). 98.9% of catchment-anchored SA2s (2,269 / 2,294) sit in the same 6-11 year coverage bucket. The issue is platform-wide: `abs_sa2_erp_annual` ingest covers 2019-2024 across the entire dataset, not a code-mismatch between ASGS editions.
+
+**Disposition:**
+- OI-30 closed (probe complete; hypothesis refuted; real fix is platform-wide ABS ERP ingest extension that folds into OI-19 V1.5 bundle).
+- 25 outlier SA2s (16 zero + 9 sparse) split out as new OI-33 for tracking.
+- Probe artefact written to `recon/oi30_asgs_coverage_probe.md`.
+
+### Block 6 — OI-12 prune dry-run
+
+`prune_db_backups.py` (no `--apply`). Reported **0 deletions** under current default-conservative keep policy: all 36 backups in current set qualify as either `pre_*` named milestone anchors (34) or within most-recent-3 timestamped (2).
+
+**Disposition:** OI-12 status updated with this finding. Operator decision needed on relaxing keep policy if disk pressure becomes real (legacy `pre_step*`/`pre_layer3` anchors dominate the 7.7 GB and are now historically inert). No deletion executed this session.
+
+### Open items movement this session (evening)
+
+**Closed:**
+- **OI-32** (Catchment metric explainer text, Bug 4) — 3 polish rounds shipped via Blocks 1-3
+- **OI-30** (pre-2019 pop_0_4 coverage gap) — closed by Block 5 probe; real fix folds into OI-19
+
+**Opened:**
+- **OI-33** — 25 outlier SA2s with zero/sparse pop_0_4 coverage (split from OI-30 probe finding). Tracking only.
+
+**Updated:**
+- **OI-12** status note: prune dry-run reported 0 deletions; operator decision on policy relaxation deferred
+- **OI-19** scope expanded: ABS ERP backward extension folds in (~0.3 session added to bundle)
+
+### Standards / decisions
+
+**New:** **DEC-77** — Industry-absolute threshold framework for catchment ratios. Recorded in DECISIONS.md.
+
+**No STD changes.**
+
+### What's banked for next session
+
+V1 is shippable and at HEAD. Optional polish queue:
+- Various housekeeping (gitignore tightening OI-13, OI-28 cosmetic banner, codebase scans OI-14/OI-15)
+- OI-12 keep-policy relaxation decision (only if disk pressure bites)
+
+V1.5 path:
+- OI-19 V1.5 ingest bundle (NES + parent-cohort + schools + SALM-extension + ABS ERP backward extension per OI-30 finding) — ~2 sessions
+- OI-31 click-on-event detail — ~1 session
+
+### Session shape note
+
+Iterative polish on a single OI took 3 rounds because each round surfaced category errors the previous round didn't see. The pattern (operator screenshot → I propose fix → ship → operator screenshot → repeat) is the right mode for visual/copy work — caught issues that abstract review would have missed (notably the "below break-even" profitability overreach which only became visible once the cruder "fill"/"soft" cleanup made room to read the surface critically). DEC-65 probe-before-code earned its keep at OI-30 — refuted the original hypothesis before any concordance code was written, saving ~0.5 session.

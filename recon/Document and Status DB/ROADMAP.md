@@ -151,3 +151,22 @@ Two monoliths produced today: `kintell_project_status_2026-05-03.txt` (AM, swapp
 Optional housekeeping anytime: gitignore tightening (OI-13), untracked recon sweep, "Remara" hangover cleanup, OI-12 deletion.
 
 If pivoting elsewhere (parallel streams, industry view, operator page enhancements): consult this ROADMAP and PROJECT_STATUS for full context.
+
+
+---
+
+## Updates — 2026-05-03 evening session
+
+**Closed:**
+- **OI-32** (Catchment metric explainer text) — 3 polish rounds shipped, see PHASE_LOG.md evening block.
+- **OI-30** (pre-2019 pop_0_4 coverage gap) — closed by probe (`probe_oi30_asgs_coverage.py`). 2021-ASGS hypothesis refuted; the issue is platform-wide ABS ERP ingest scope, not code-specific. Real fix folds into OI-19 V1.5 ingest bundle (~0.3 session added).
+
+**Opened:**
+- **OI-33** — 25 outlier SA2s (16 zero + 9 sparse pop_0_4 coverage). Tracking only.
+
+**New decision:**
+- **DEC-77** — Industry-absolute threshold framework for catchment ratios. LIVE (mint 2026-05-03 evening; formalises framework that Layer 4.2-A.3b shipped 2026-04-30 and v20 polish round finalised in supply-vs-demand language only).
+
+**Status updates:**
+- **OI-12** — Prune dry-run this session reported 0 deletions under current default-conservative keep policy. Operator decision deferred on policy relaxation.
+- **OI-19** — Scope expanded by OI-30 finding (ABS ERP backward extension folds in).

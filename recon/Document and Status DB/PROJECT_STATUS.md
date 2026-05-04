@@ -95,8 +95,6 @@ Path: `data\kintell.db` (~565 MB). 36 tables. `audit_log: 142 rows` (no DB mutat
 
 ## Git state
 
-**HEAD:** `<v20-commit-hash>` (OI-32 v20 bundle). Branch in sync with origin after this session's doc commit.
-
 This evening's commits (chronological from afternoon HEAD `bc52f3c`):
 
 1. `1a90bf7` — OI-32 close (Bug 4) rounds 1+2 (centre_page.py v16→v18 + centre.html v3.21→v3.23). New `LAYER3_METRIC_ABOUT_DATA` constant + `_renderAboutData` helper. Round 2: panel font 11.5px→12.5px; sa2_demand_supply about_data + INDUSTRY_BAND_THRESHOLDS reframed from "fill" terminology.
@@ -138,5 +136,3 @@ See OPEN_ITEMS.md for full text.
 The 2026-04-28 restructure produced the 12-doc set. Update history:
 - 2026-04-29c+d → 2026-04-30 → 2026-05-03 morning → 2026-05-03 PM (HEAD `bc52f3c` regen).
 - **2026-05-03 evening:** OI-32 closed across 3 polish rounds, DEC-77 minted, OI-30 closed by probe, OI-33 opened, OI-12 status updated. This session's doc commit lands updated PROJECT_STATUS / OPEN_ITEMS / PHASE_LOG / ROADMAP / DECISIONS plus the new `recon/oi30_asgs_coverage_probe.md` artefact.
-
-This doc set reflects state as of the v20 commit + the doc commit immediately following.

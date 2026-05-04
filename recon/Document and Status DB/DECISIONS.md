@@ -1061,3 +1061,24 @@ Each row carries an explicit "state-level — no SA2 peer cohort" stamp (or "nat
 State-level sparklines render here because the trend in vacancy intensity is meaningful even where SA2 peer comparison is missing. What's absent is the peer band, not the trend.
 
 Consequences: Workforce supply is visible on the centre page without faking SA2 resolution it doesn't have. The block becomes the canonical home for any future state/national Context-only metric. `jsa_vacancy_rate` moves here from its Position-deferred slot. V1.5 enrichments (direct SEEK-by-SA2 scrape, NCVER VET enrolments at SA2/remoteness, advertised-wage data) tracked as OI-20. Refines DEC-23 / DEC-36: state-level supply data is now admissible on the centre page in Context-only weight where it informs centre-specific staffing risk; the framing remains "this is state-level information bearing on your centre", consistent with P-7.
+
+
+---
+
+## DEC-77 — Industry-absolute threshold framework for catchment ratios
+Status: Active
+Date: 2026-05-03
+
+Context: Layer 4.2-A.3b shipped (2026-04-30) an industry-absolute band line beneath the per-cohort decile chips for the three catchment ratio metrics with meaningful industry-grounded thresholds. The framework had been operating in production for 3 days. The 2026-05-03 evening v20 polish round reframed the demand-supply band labels in supply-vs-demand language only after operator review caught that the original "below break-even" labels asserted a profitability conclusion the demand/supply ratio alone cannot support (break-even depends on price, cost base, ramp curve, mix). The framework is now operator-validated; locking the design.
+
+Decision: Three catchment metrics opt in to industry-absolute banding via `industry_thresholds: True` on their `LAYER3_METRIC_META` entry. Bands derived from three locked sources:
+
+- **`sa2_supply_ratio`** — 7 levels. Productivity Commission universal-access target (1.0 places/child = all children, three days/week) anchors the upper bound. Low/mid/high tiers grounded in the absolute supply landscape (desert / undersupplied / below_bench / at_bench / well_served / at_target / saturated).
+- **`sa2_child_to_place`** — 5 levels (excess_capacity / balanced / tight / constrained / severe). Derived from Remara Strategic Insights v4.2 real distribution by SES + remoteness.
+- **`sa2_demand_supply`** — 4 levels. Thresholds (0.40 / 0.55 / 0.85) inherit Credit Committee Brief break-even (70%) + target (85%) occupancy maths. **Labels reframed in supply-vs-demand language only — break-even is a profitability conclusion the ratio alone cannot support, and the label must not assert it.** v20 final labels: "supply heavy" / "supply leaning" / "approaching balance" / "demand leading" with parallel-framed notes.
+
+`sa2_adjusted_demand` is intentionally NOT banded (decile-only) because it is a count not a ratio.
+
+Renderer: `_renderIndustryBand` reads `p.industry_band` (band key, drives cautionary/positive pill colour via `cautionKeys` / `positiveKeys`), `p.industry_band_label` (visible text inside the pill), `p.industry_band_note` (descriptor next to the pill). Silent absence per P-2 when metric not opted in or raw_value is null. Band keys are stable identifiers — relabel the visible text without changing the key, otherwise the pill colour treatment breaks.
+
+Consequences: Industry-absolute bands now operate as a first-class lens on top of the per-cohort decile lens. Future ratio metrics can opt in by adding to `INDUSTRY_BAND_THRESHOLDS` and setting `industry_thresholds: True`. Any future label work must respect the supply-vs-demand discipline established by v20: visible labels describe what the ratio measures, not what it implies for downstream financials. OI-26 (post-launch review of demand_supply thresholds in saturated catchments) remains active under this DEC.
