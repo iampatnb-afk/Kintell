@@ -1,20 +1,20 @@
 # Layer 3 banding apply - APPLY
 
-_Generated: 2026-04-28T12:22:42_
+_Generated: 2026-05-04T14:20:55_
 
 Banding rules (per `recon/layer3_decisions.md` D2):
 - low  = decile 1-3
 - mid  = decile 4-6
 - high = decile 7-10
 
-Total rows produced: **23,946**
-Metrics processed: 10
+Total rows produced: **26,363**
+Metrics processed: 11
 
 ## Apply outcome
 
-- Rows inserted: **23,946**
-- audit_id: **136**
-- Backup: `data/kintell.db.backup_pre_layer3_20260428_122241`
+- Rows inserted: **26,363**
+- audit_id: **148**
+- Backup: `data/kintell.db.backup_pre_layer3_20260504_142054`
 
 ## Per-metric summary
 
@@ -30,6 +30,7 @@ Metrics processed: 10
 | `sa2_lfp_persons` | 2021 | 2401 | 2,401 | 0 |
 | `sa2_lfp_females` | 2021 | 2398 | 2,386 | 12 |
 | `sa2_lfp_males` | 2021 | 2412 | 2,397 | 15 |
+| `sa2_nes_share` | 2021 | 2432 | 2,417 | 15 |
 
 ## Cohort sizes per metric
 
@@ -288,6 +289,46 @@ Metrics processed: 10
 | `9_2` | 1 |
 | `9_5` | 3 |
 
+### `sa2_nes_share` (2021)
+
+| cohort_key | size |
+|---|---:|
+| `1_1` | 416 |
+| `1_2` | 155 |
+| `1_3` | 59 |
+| `1_4` | 7 |
+| `1_5` | 3 |
+| `2_1` | 347 |
+| `2_2` | 131 |
+| `2_3` | 38 |
+| `2_4` | 2 |
+| `3_1` | 300 |
+| `3_2` | 110 |
+| `3_3` | 92 |
+| `3_4` | 20 |
+| `3_5` | 19 |
+| `4_1` | 101 |
+| `4_2` | 23 |
+| `4_3` | 30 |
+| `4_4` | 9 |
+| `4_5` | 7 |
+| `5_1` | 168 |
+| `5_2` | 36 |
+| `5_3` | 26 |
+| `5_4` | 14 |
+| `5_5` | 13 |
+| `6_2` | 51 |
+| `6_3` | 41 |
+| `6_4` | 3 |
+| `6_5` | 2 |
+| `7_3` | 42 |
+| `7_4` | 8 |
+| `7_5` | 16 |
+| `8_1` | 120 |
+| `8_2` | 4 |
+| `9_2` | 1 |
+| `9_5` | 3 |
+
 ## Band distribution per metric
 
 | Metric | low | mid | high |
@@ -299,6 +340,7 @@ Metrics processed: 10
 | `sa2_median_employee_income` | 721 | 719 | 958 |
 | `sa2_median_household_income` | 726 | 723 | 962 |
 | `sa2_median_total_income` | 722 | 720 | 960 |
+| `sa2_nes_share` | 739 | 725 | 953 |
 | `sa2_total_population` | 740 | 725 | 953 |
 | `sa2_under5_count` | 709 | 703 | 935 |
 | `sa2_unemployment_rate` | 703 | 701 | 932 |

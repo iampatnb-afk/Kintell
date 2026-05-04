@@ -145,6 +145,14 @@ METRICS = [
         "year_column": "year",
         "cohort_def": "state_x_remoteness",
     },
+    {
+        "canonical": "sa2_nes_share",
+        "source_table": "abs_sa2_education_employment_annual",
+        "value_column": "value",
+        "filter_clause": "metric_name = 'census_nes_share_pct'",
+        "year_column": "year",
+        "cohort_def": "state_x_remoteness",
+    },
 ]
 
 
