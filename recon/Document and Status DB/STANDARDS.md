@@ -105,6 +105,33 @@ The end-of-session monolith is the cross-session ground-truth. The structured do
 
 This standard supersedes the implicit "produce a monolith only when restructuring" assumption from the 2026-04-28 doc restructure. Monoliths now ship every session that materially changes Tier-2 state.
 
+### STD-36 — Session-start upload convention
+*Origin: 2026-05-04*
+
+At the start of every chat session, the operator uploads a fixed set of files so Claude is working from on-disk ground truth rather than potentially-stale project knowledge. This eliminates the recurring multi-round-trip context-recovery probe that opens otherwise.
+
+**Required uploads at session start:**
+
+1. **Active code files** under edit or likely to be touched:
+   - `centre_page.py`
+   - `docs/centre.html`
+   - Any other code file the session will modify (e.g. a build script if it's the focus)
+
+2. **Tier-2 doc set** (all 5 from `recon/Document and Status DB/`):
+   - `PROJECT_STATUS.md`
+   - `OPEN_ITEMS.md`
+   - `PHASE_LOG.md`
+   - `ROADMAP.md`
+   - `DECISIONS.md`
+
+3. **Plus a one-line `git log --oneline -1`** in the kickoff message so HEAD is verified at the actual hash, not assumed from project knowledge.
+
+**Why.** Project knowledge lags HEAD by 0-N commits depending on whether monoliths have been re-uploaded; Tier-2 docs in project knowledge are a snapshot of last upload, not on-disk current. Without the upload convention, Claude's first 3-5 turns of a session are spent probing for ground truth — work that adds zero value to the actual task. With the convention, Claude has on-disk current state in turn 1 and can begin productive work immediately.
+
+**STANDARDS.md is NOT in the required uploads** because Claude reads it from project knowledge as the institutional standard reference, and it changes infrequently. If a session is going to modify STANDARDS.md, upload it then.
+
+**What this is not.** This is not a substitute for end-of-session doc refresh (STD-35) or for monolith regen — those remain mandatory. STD-36 governs the inbound side of every session; STD-35 governs the outbound side.
+
 ---
 
 ## Coding
