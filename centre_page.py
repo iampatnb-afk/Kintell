@@ -1,5 +1,7 @@
 """
 centre_page.py — Phase 2 backend helper for centre.html
+Version: v21 (2026-05-05) — OI-36 close: sa2_nes_share added to POSITION_CARD_ORDER["catchment_position"] for Python-side consistency with centre.html's render order. Data-side registration was already complete at v20 (LAYER3_METRIC_META + INTENT_COPY + TRAJECTORY_SOURCE in commit 3ddcf18); the metric was being emitted by _layer3_position but not rendered because centre.html L2349 hardcoded its own order array excluding NES. Surgical scope. Refactor to drive JS render order from the POSITION_CARD_ORDER payload (eliminating the JS-side array entirely) banked as separate housekeeping OI. Companion centre.html v3.26 in same commit.
+
 Version: v20 (2026-05-03) — OI-32 polish round 3 (operator review of v19 INDUSTRY label semantics + about_data first-line overreach). Two changes on sa2_demand_supply: (a) INDUSTRY_BAND_THRESHOLDS parallel-framed across all 4 bands in supply-vs-demand language only — "below break-even" / "near break-even" replaced with "supply heavy" / "supply leaning" / "approaching balance" / "demand leading" because break-even is a profitability conclusion that the demand/supply ratio alone cannot support (depends on price, cost base, ramp curve, mix). The thresholds (0.40 / 0.55 / 0.85) still derive from break-even/target occupancy maths but the LABEL no longer asserts the conclusion. (b) about_data first line tightened from "the occupancy ramp-up expectation for a centre here" to "a key input to occupancy ramp expectations" — same category-error fix at the descriptive level. Companion centre.html v3.23 -> v3.24 (cohort histogram explainer + SEIFA mini decile strip).
 
 v19 (2026-05-03) — OI-32 polish round 2 (operator screenshot review of v18 missed surfaces). Round-1 cleaned about_data + INDUSTRY_BAND_THRESHOLDS notes; this round cleans the remaining visible "fill" / "soft" terminology in (a) LAYER3_METRIC_META.sa2_demand_supply.band_copy chips ("soft catchment — fill risk" / "demand pull — strong fill expected"), (b) LAYER3_METRIC_INTENT_COPY sa2-prefixed entries for sa2_demand_supply, sa2_supply_ratio, and sa2_adjusted_demand, and (c) INDUSTRY_BAND_THRESHOLDS sa2_demand_supply soft-band LABEL ("soft ramp-up" -> "below break-even"). Band KEY stays "soft" because centre.html cautionKeys references it for the cautionary pill colour. Renderer-side: no change. Unprefixed duplicate INTENT_COPY entries left alone — kept for backward reference per existing comment, not read by _layer3_position.
@@ -684,6 +686,7 @@ POSITION_CARD_ORDER = {
         "sa2_child_to_place",
         "sa2_adjusted_demand",
         "sa2_demand_share_state",
+        "sa2_nes_share",
     ],
     "population": [
         "sa2_under5_count",

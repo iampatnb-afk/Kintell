@@ -1,4 +1,7 @@
 <!DOCTYPE html>
+<!-- centre.html v3.28 (2026-05-05) — OI-36b fix: _renderLiteDelta currency branch corrected. v3.27 matched 'currency_aud' which does not exist in this codebase; the actual formats are currency_weekly (sa2_median_household_income) and currency_annual (sa2_median_employee_income, sa2_median_total_income). Branch now matches both, with '/week' suffix appended for currency_weekly to match the parent value's display unit (e.g. '+$291/week from 2011 to 2021' for Bayswater median household income). currency_annual renders without suffix ('+$N,NNN from YYYY to YYYY'); these are currently Full-weight so don't render the badge in practice but the branch is kept consistent for future Lite re-classifications. No data-side change. -->
+<!-- centre.html v3.27 (2026-05-05) — OI-36b: delta badge on all Lite rows. New _renderLiteDelta(p) helper reads p.trajectory and emits a small first-to-last delta badge ('+9.5pp from 2011 to 2021' for NES Bayswater) inside the Lite row template, alongside the existing 'as at YYYY' stamp. Unit-aware via p.value_format (percent/percent_share -> 'pp', currency_aud -> '$N', ratio_x -> 'N×', else plain numeric). P-2 silent absence for <2 numeric points / unreadable years / zero delta. Always-show (P1); window-aware variant (P2) banked as future OI since _setTrajectoryRange does not trigger Lite re-render. Affects sa2_lfp_persons / sa2_lfp_females / sa2_lfp_males / sa2_median_household_income / sa2_nes_share. No data-side change. -->
+<!-- centre.html v3.26 (2026-05-05) — OI-36 close: sa2_nes_share added to renderCatchmentPositionCard.order so the Lite NES row renders in the Catchment Position card. Data-side already shipped at 3ddcf18 (LAYER3_METRIC_META + INTENT_COPY + TRAJECTORY_SOURCE entries for sa2_nes_share). Surgical scope: one entry added to one hardcoded array. Refactor to drive render order from POSITION_CARD_ORDER payload (eliminating JS-side hardcoded array entirely) banked as separate housekeeping OI. Companion centre_page.py v21 (POSITION_CARD_ORDER mirror) in same commit. -->
 <!-- centre.html v3.25 (2026-05-04) — C3 ship: absolute-change ("+N places · +M centres") rendered alongside trend % on the 4 catchment trajectory charts. New _computeEventAbsChange(events, startPeriod) helper sums centre_events.places_change and centre_events.net_centres for events at or after the active trend-window startPeriod. Inline with existing _formatTrendPct label inside the trendLabel HTML. Silent absence when p.centre_events absent or empty (Population / Labour Market / Workforce rows unaffected per P-2). -->
 <!-- centre.html v3.24 (2026-05-03) — OI-32 polish round 3 (operator review). Three additive renderer changes: (a) cohort distribution histogram now ships a centred explainer line below the bars ("Distribution of values across the peer cohort. The highlighted bar shows where this SA2 sits; the decile strip below converts that position to the 1–10 scale.") plus the existing cohort-note line switched from right-aligned to centre for visual consistency. (b) New _renderMiniDecileStrip helper renders a compact 10-cell horizontal strip using the same colour grammar as _renderDecileStrip (per-decile tones 6%/13%/20%, accent + outline on active cell, structural gaps between bands). (c) SEIFA decile fact in the Catchment section now calls _renderMiniDecileStrip inline so the SES position is visible at a glance — chosen over colour-coding because SES has no valence in LDC credit (high SES = higher fee tolerance AND more competition). Pairs with centre_page.py v20 (INDUSTRY band relabelling + about_data tightening) in same commit. -->
 <!-- centre.html v3.23 (2026-05-03) — OI-32 polish round (operator review of v3.22): About-this-measure panel font bumped 11.5px -> 12.5px for readability on the longer explainer text. No structural change; _renderAboutData logic unchanged. Pairs with centre_page.py v18 (text edits to sa2_demand_supply about_data + industry-band labels/notes; same commit). -->
@@ -2197,6 +2200,75 @@ function _renderIndustryBand(p) {
 // histogram. Honest absence (P-2) — the SA2 still has a peer-position,
 // but the underlying data is too thin to justify a trajectory chart or
 // a cohort distribution view.
+
+// ── OI-36b (centre.html v3.27): delta badge for Lite rows ────────────
+//
+// Lite metrics (LFP triplet, median household income, sa2_nes_share)
+// have a trajectory array in the payload but render no chart per
+// DEC-75 (3 Census points or fewer is not a continuous series). A
+// small delta badge surfaces the headline first-to-last change so
+// the slow-moving demographic shifts (NES +9.5pp 2011-2021, etc.)
+// are visible at a glance.
+//
+// Always-show variant (P1). Window-aware variant (P2) is banked —
+// existing _setTrajectoryRange doesn't trigger a page re-render, so
+// window-awareness on Lite rows would need new event-subscription
+// wiring beyond today's scope.
+//
+// Returns "" silently when:
+//   - no trajectory in payload
+//   - fewer than 2 numeric points
+//   - earliest and latest periods cannot be year-extracted
+//   - delta is exactly zero (avoids "+0.0pp from 2011 to 2021" noise)
+//
+// Format dispatch by p.value_format:
+//   percent / percent_share  ->  "+9.5pp from 2011 to 2021"
+//   currency_aud             ->  "+$1,234 from 2018 to 2022"
+//   other                    ->  "+0.04× from 2011 to 2021"
+function _renderLiteDelta(p) {
+  const traj = (p && p.trajectory) || [];
+  if (traj.length < 2) return "";
+
+  // First and last numeric points (skip nulls per Census triplet
+  // pattern where one period may be missing).
+  const numericPts = traj.filter(pt => pt && pt.value != null
+                                       && !isNaN(Number(pt.value)));
+  if (numericPts.length < 2) return "";
+
+  const first = numericPts[0];
+  const last  = numericPts[numericPts.length - 1];
+  const firstYear = _yearOfPeriod(first.period);
+  const lastYear  = _yearOfPeriod(last.period);
+  if (isNaN(firstYear) || isNaN(lastYear) || firstYear === lastYear) {
+    return "";
+  }
+
+  const delta = Number(last.value) - Number(first.value);
+  if (delta === 0) return "";
+
+  const sign = delta > 0 ? "+" : "";
+  const fmt = p.value_format || "";
+  let deltaStr;
+  if (fmt === "percent" || fmt === "percent_share") {
+    deltaStr = `${sign}${delta.toFixed(1)}pp`;
+  } else if (fmt === "currency_weekly" || fmt === "currency_annual") {
+    const rounded = Math.round(delta);
+    const abs = Math.abs(rounded).toLocaleString();
+    const suffix = (fmt === "currency_weekly") ? "/week" : "";
+    deltaStr = `${rounded < 0 ? "−" : "+"}$${abs}${suffix}`;
+  } else if (fmt === "ratio_x") {
+    deltaStr = `${sign}${delta.toFixed(2)}×`;
+  } else {
+    deltaStr = `${sign}${delta.toFixed(2)}`;
+  }
+
+  return `<span style="margin-left:8px;color:var(--text-dim);
+                       font-size:11px;font-weight:500;
+                       font-variant-numeric:tabular-nums;">
+            ${deltaStr} from ${firstYear} to ${lastYear}
+          </span>`;
+}
+
 function _renderLiteRow(p, ctx) {
   const decile = p.decile;
   const band = p.band || "mid";
@@ -2258,6 +2330,7 @@ function _renderLiteRow(p, ctx) {
       ${_renderBandChips(ctx.metric, p)}
       ${_renderIndustryBand(p)}
       ${asAtStamp}
+      ${_renderLiteDelta(p)}
       ${_renderIntentCopy(p)}
       <div style="margin-top:8px;display:flex;justify-content:flex-end;gap:6px;">
         ${derBadge}
@@ -2352,6 +2425,7 @@ function renderCatchmentPositionCard(centre) {
     "sa2_child_to_place",
     "sa2_adjusted_demand",
     "sa2_demand_share_state",
+    "sa2_nes_share",
   ];
   const hasAny = order.some(k => {
     const e = pos[k];
