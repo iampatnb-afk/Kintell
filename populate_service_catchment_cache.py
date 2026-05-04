@@ -457,7 +457,8 @@ def stage2_calibration_smoketest(conn, d):
         )
         for sa2, v in cur.fetchall():
             try:
-                nes_map[sa2] = float(v) if v is not None else None
+                # A2-WIRE-V2: nes_map divides by 100 (storage in percentage)
+                nes_map[sa2] = float(v) / 100.0 if v is not None else None
             except (ValueError, TypeError):
                 nes_map[sa2] = None
         log(f"  NES: {len(nes_map):,} SA2s (year {nes_year})")

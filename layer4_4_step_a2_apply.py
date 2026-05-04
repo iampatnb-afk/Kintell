@@ -1,29 +1,32 @@
 r"""
-layer4_4_step_a2_apply.py — A2 NES share ingest (v2).
+layer4_4_step_a2_apply.py — A2 NES share ingest (v3).
 
-v2 (2026-05-04, post-dry-run-1): corrected source columns. Uses T10B's
-`Tot_C21_P` as denominator (T10's own scope) and subtracts both
-`Uses_Engl_only` (T10A) and `Lang_used_home_NS` (T10B) from numerator.
-v1 had used T01 as denominator and (total - english_only) as numerator,
-which incorrectly included "language not stated" in the NES count.
-v1 dry-run produced 28% national share; v2 expected to land ~22% to
-match published ABS methodology.
+v3 (2026-05-04, post-B2-discovery): UNIT FIX.
+  v2 stored NES as fraction (0-1), e.g. 0.31. This was inconsistent with
+  the project convention for census_*_pct metrics (LFP family stores
+  percentage 0-100). When registered for centre-page render with
+  value_format='percent', a fraction-stored value would display as
+  "0.31%" instead of "31%".
+
+  v3 stores NES as percentage (0-100). The calibration's existing
+  fraction thresholds (>=0.30, <=0.05) are now satisfied by the wire
+  (populate_service_catchment_cache.py) dividing by 100 on read before
+  passing to calibrate_participation_rate.
+
+  Net effect on calibrated_rate values: identical (same fraction reaches
+  the calibration). The change is purely about storage convention.
 
 Reads from abs_data/2021_TSP_SA2_for_AUS_short-header.zip:
   T10A: Uses_Engl_only_C{11,16,21}_P
   T10B: Tot_C{11,16,21}_P, Lang_used_home_NS_C{11,16,21}_P
 
-Derives NES fraction per SA2 per Census year (2011, 2016, 2021):
+Derives NES percentage per SA2 per Census year (2011, 2016, 2021):
 
-    nes_frac = (tot - uses_engl_only - lang_used_home_ns) / tot
+    nes_pct = (tot - uses_engl_only - lang_used_home_ns) / tot * 100
 
 Persists into abs_sa2_education_employment_annual under metric_name
-'census_nes_share_pct'. Stored as fraction (0-1) — exception to the
-'_pct' suffix convention, kept to mirror calibrate_participation_rate's
-existing threshold conventions (>=0.30, <=0.05).
-
-Closes the dormant NES nudge in calibrate_participation_rate per OI-19.
-First piece of the V1.5 Phase A ingest bundle (CENTRE_PAGE_V1.5_ROADMAP).
+'census_nes_share_pct'. v3 stores PERCENTAGE — consistent with
+census_lfp_*_pct family.
 
 STD-30 pre-mutation discipline:
   - Pre-state inventory + idempotency check
@@ -55,7 +58,7 @@ ZIP_PATH = Path("abs_data") / "2021_TSP_SA2_for_AUS_short-header.zip"
 TARGET_TABLE = "abs_sa2_education_employment_annual"
 METRIC_NAME = "census_nes_share_pct"
 ACTOR = "layer4_4_step_a2_apply"
-ACTION = "census_nes_share_ingest_v2"
+ACTION = "census_nes_share_ingest_v3"
 
 T10A_NAME = "2021 Census TSP Statistical Area 2 for AUS/2021Census_T10A_AUST_SA2.csv"
 T10B_NAME = "2021 Census TSP Statistical Area 2 for AUS/2021Census_T10B_AUST_SA2.csv"
@@ -107,7 +110,6 @@ def preflight():
 
 
 def read_source():
-    """Read T10A + T10B from TSP zip. Returns dict[sa2] -> {year: (tot, engl, lns)}."""
     try:
         import pandas as pd
     except ImportError:
@@ -177,6 +179,7 @@ def read_source():
 
 
 def derive_nes(source):
+    """Compute NES percentage. Returns list of (sa2, year, percentage) tuples."""
     rows = []
     skipped_zero_total = 0
     skipped_null = 0
@@ -193,9 +196,9 @@ def derive_nes(source):
             if nes_count < 0:
                 clamped_negative += 1
                 nes_count = 0
-            frac = nes_count / tot
-            frac = max(0.0, min(1.0, frac))
-            rows.append((sa2, yr, round(frac, 6)))
+            pct = (nes_count / tot) * 100.0
+            pct = max(0.0, min(100.0, pct))
+            rows.append((sa2, yr, round(pct, 4)))
 
     print(f"  Rows derived: {len(rows):,}")
     print(f"  Skipped — null values:    {skipped_null:,}")
@@ -209,10 +212,10 @@ def sanity_checks(source, rows):
         print("  ERROR: no rows derived.")
         sys.exit(3)
 
-    fracs = [r[2] for r in rows]
-    in_range = sum(1 for f in fracs if 0 <= f <= 1)
-    out_range = len(fracs) - in_range
-    print(f"  Values in [0, 1]: {in_range:,} / {len(fracs):,} ({out_range} outside)")
+    pcts = [r[2] for r in rows]
+    in_range = sum(1 for p in pcts if 0 <= p <= 100)
+    out_range = len(pcts) - in_range
+    print(f"  Values in [0, 100]: {in_range:,} / {len(pcts):,} ({out_range} outside)")
 
     print("\n  National NES share by year (weighted):")
     natl_by_year = {}
@@ -226,27 +229,27 @@ def sanity_checks(source, rows):
             nes = max(0, tot - eng - lns)
             tot_sum += tot
             nes_sum += nes
-        nat = nes_sum / tot_sum if tot_sum else 0
-        natl_by_year[yr] = nat
+        nat_pct = (nes_sum / tot_sum) * 100.0 if tot_sum else 0
+        natl_by_year[yr] = nat_pct
         flag = ""
         if yr == 2021:
-            if 0.20 <= nat <= 0.25:
+            if 20.0 <= nat_pct <= 25.0:
                 flag = "  [in published 22-24% band]"
             else:
-                flag = f"  [WARN: expected 0.20-0.25, got {nat:.4f}]"
-        print(f"    {yr}: {nat:.4f} ({nat*100:.2f}%){flag}")
+                flag = f"  [WARN: expected 20-25, got {nat_pct:.2f}]"
+        print(f"    {yr}: {nat_pct:.2f}%{flag}")
 
     by_year = {}
     for _, yr, _ in rows:
         by_year[yr] = by_year.get(yr, 0) + 1
     print(f"\n  Rows by year: {sorted(by_year.items())}")
 
-    print("\n  Verification SA2s (NES fraction by year):")
-    by_sa2_year = {(s, y): f for s, y, f in rows}
+    print("\n  Verification SA2s (NES % by year):")
+    by_sa2_year = {(s, y): p for s, y, p in rows}
     for sa2_code, name in VERIFY_SA2:
         vals = [(yr, by_sa2_year.get((sa2_code, yr))) for yr in CENSUS_YEARS]
         cells = " ".join(
-            f"{yr}={v:.3f}" if v is not None else f"{yr}=NA"
+            f"{yr}={v:.2f}%" if v is not None else f"{yr}=NA"
             for yr, v in vals
         )
         print(f"    {sa2_code} ({name}): {cells}")
@@ -254,9 +257,9 @@ def sanity_checks(source, rows):
     return {
         "rows_total": len(rows),
         "rows_in_range": in_range,
-        "national_2011": round(natl_by_year[2011], 6),
-        "national_2016": round(natl_by_year[2016], 6),
-        "national_2021": round(natl_by_year[2021], 6),
+        "national_2011_pct": round(natl_by_year[2011], 4),
+        "national_2016_pct": round(natl_by_year[2016], 4),
+        "national_2021_pct": round(natl_by_year[2021], 4),
         "by_year": by_year,
     }
 
@@ -278,7 +281,7 @@ def pre_state(con):
 
 def backup_db():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_path = DB_PATH.parent / f"pre_layer4_4_step_a2_{timestamp}.db"
+    backup_path = DB_PATH.parent / f"pre_layer4_4_step_a2_v3_{timestamp}.db"
     print(f"  Backup: copying {DB_PATH} -> {backup_path}")
     shutil.copy2(DB_PATH, backup_path)
     size_mb = backup_path.stat().st_size / (1024 * 1024)
@@ -315,10 +318,11 @@ def write_audit_log(con, before, after):
             0,
             json.dumps(before),
             json.dumps(after),
-            "A2 NES share ingest (v2) from 2021 TSP T10A+T10B; closes nes_share_pct "
-            "dormancy in calibrate_participation_rate per OI-19. Formula: "
-            "(Tot - Uses_Engl_only - Lang_used_home_NS) / Tot. Stored as fraction "
-            "(0-1) to match calibration's threshold conventions.",
+            "A2 NES share ingest (v3) — UNIT FIX. Stores percentage (0-100) "
+            "matching census_*_pct convention. Wire (populate_service_catchment_cache.py) "
+            "divides by 100 on read before passing to calibrate_participation_rate "
+            "(which keeps its fraction thresholds per STD-34 lock). "
+            "Formula: ((Tot - Uses_Engl_only - Lang_used_home_NS) / Tot) * 100.",
         ),
     )
     new_id = cur.execute("SELECT MAX(audit_id) FROM audit_log").fetchone()[0]
@@ -333,8 +337,8 @@ def post_state(con):
         (METRIC_NAME,),
     ).fetchone()
     print(f"  Rows for metric: {rows[0]:,}")
-    print(f"  value range:     [{rows[1]:.4f}, {rows[2]:.4f}]")
-    print(f"  value mean:      {rows[3]:.4f}")
+    print(f"  value range:     [{rows[1]:.2f}%, {rows[2]:.2f}%]")
+    print(f"  value mean:      {rows[3]:.2f}%")
     print()
     print("  Verification SA2 spot-check (2021):")
     for sa2_code, name in VERIFY_SA2:
@@ -343,7 +347,7 @@ def post_state(con):
             f"WHERE sa2_code = ? AND metric_name = ? AND year = 2021",
             (sa2_code, METRIC_NAME),
         ).fetchone()
-        v_str = f"{v[0]:.4f}" if v else "MISSING"
+        v_str = f"{v[0]:.2f}%" if v else "MISSING"
         print(f"    {sa2_code} ({name}): {v_str}")
 
 
@@ -357,7 +361,8 @@ def main():
     print(f"Target:    {TARGET_TABLE} (metric_name='{METRIC_NAME}')")
     print(f"Mode:      {'APPLY' if apply_mode else 'DRY-RUN'}"
           f"{'  REPLACE' if replace else ''}")
-    print(f"Formula:   nes = (Tot - Uses_Engl_only - Lang_used_home_NS) / Tot")
+    print(f"Formula:   nes_pct = ((Tot - Uses_Engl_only - Lang_used_home_NS) / Tot) * 100")
+    print(f"Storage:   PERCENTAGE (0-100) — v3 unit fix")
 
     preflight()
 
@@ -371,14 +376,14 @@ def main():
         print()
         print(f"  ERROR: {before['existing_rows_for_metric']} rows already exist "
               f"for metric_name='{METRIC_NAME}'.")
-        print(f"  Re-run with --replace to overwrite, or investigate the existing rows.")
+        print(f"  Re-run with --replace to overwrite (this is the v2->v3 unit-fix path).")
         con.close()
         sys.exit(4)
 
     section("Reading source")
     source = read_source()
 
-    section("Deriving NES fractions")
+    section("Deriving NES percentages")
     rows = derive_nes(source)
 
     section("Sanity checks")
@@ -406,11 +411,12 @@ def main():
         "rows_inserted": inserted,
         "sa2_count": len({r[0] for r in rows}),
         "years": sorted({r[1] for r in rows}),
-        "national_2011_share": sanity["national_2011"],
-        "national_2016_share": sanity["national_2016"],
-        "national_2021_share": sanity["national_2021"],
+        "national_2011_pct": sanity["national_2011_pct"],
+        "national_2016_pct": sanity["national_2016_pct"],
+        "national_2021_pct": sanity["national_2021_pct"],
         "backup": str(backup_path),
         "replaced": replace,
+        "unit": "percentage_0_to_100",
     }
     new_audit_id = write_audit_log(con, before, after_payload)
     print(f"  audit_log row written: audit_id={new_audit_id}")
