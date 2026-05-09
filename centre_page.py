@@ -769,6 +769,49 @@ LAYER3_METRIC_META = {
             "high": "high share of women 25-34 with at least one child",
         },
     },
+    # Layer 4.4 A4 — Schools at SA2 (DEC-82 first direct-primary-source ingest).
+    # 3 metrics rendered in V1 via the new "Education infrastructure" card.
+    # The other 5 banded ACARA metrics (sector breakdowns by school count and
+    # by enrolment) sit in the DB ready for V2 / Excel export / group page.
+    "sa2_school_count_total": {
+        "display": "Schools in catchment",
+        "card": "education_infrastructure",
+        "value_format": "int",
+        "direction": "high_is_positive",
+        "row_weight": "lite",
+        "source": "ACARA School Profile 2008-2025 + School Location 2025 (acara_school_count_total)",
+        "band_copy": {
+            "low":  "few schools in this catchment",
+            "mid":  "moderate school presence",
+            "high": "high school presence",
+        },
+    },
+    "sa2_school_enrolment_total": {
+        "display": "Total student enrolment",
+        "card": "education_infrastructure",
+        "value_format": "int",
+        "direction": "high_is_positive",
+        "row_weight": "lite",
+        "source": "ACARA School Profile 2008-2025 (acara_school_enrolment_total)",
+        "band_copy": {
+            "low":  "low total student enrolment",
+            "mid":  "moderate total student enrolment",
+            "high": "high total student enrolment",
+        },
+    },
+    "sa2_school_enrolment_govt_share": {
+        "display": "Government-school enrolment share",
+        "card": "education_infrastructure",
+        "value_format": "percent",
+        "direction": "high_is_positive",  # neutral framing — public/private mix
+        "row_weight": "lite",
+        "source": "ACARA School Profile 2008-2025 (acara_school_enrolment_govt_share_pct)",
+        "band_copy": {
+            "low":  "low government-school share (private-dominant catchment)",
+            "mid":  "balanced public/private mix",
+            "high": "high government-school share",
+        },
+    },
 }
 
 # Display order within each card (drives section order in the UI).
@@ -808,6 +851,15 @@ POSITION_CARD_ORDER = {
         "sa2_lfp_females",
         "sa2_lfp_males",
         "jsa_vacancy_rate",
+    ],
+    # Layer 4.4 A4 — Education infrastructure card (DEC-82 first direct-primary-source ingest).
+    # New top-level Position card themed around school context. Future home for
+    # preschool series + tertiary/VET. 3 V1 rows; 5 sector breakdowns banked
+    # in DB but not rendered in V1.
+    "education_infrastructure": [
+        "sa2_school_count_total",
+        "sa2_school_enrolment_total",
+        "sa2_school_enrolment_govt_share",
     ],
 }
 
@@ -1017,6 +1069,24 @@ LAYER3_METRIC_INTENT_COPY = {
         "more directly childcare-relevant fertility cut. Tracks active "
         "parenting timing for the cohort most likely to have children "
         "currently in the 0-5 ECEC window.",
+    "sa2_school_count_total":
+        "Number of currently-operating schools located in this SA2. Includes "
+        "Government, Catholic, and Independent across primary, secondary, "
+        "and combined sectors. A higher count signals broader school "
+        "infrastructure and — particularly relevant for OSHC investment — "
+        "more candidate sites for school-attached after-school programs.",
+    "sa2_school_enrolment_total":
+        "Total student enrolment summed across all schools located in this "
+        "catchment. Indicates the active school-aged population served by "
+        "schools located here. Note: students cross SA2 borders to attend "
+        "school, so this measures 'enrolment AT schools in this SA2', not "
+        "'school-aged kids living in this SA2'.",
+    "sa2_school_enrolment_govt_share":
+        "Share of student enrolment in government schools within this "
+        "catchment. Captures the public-private school mix in a single "
+        "number — low values signal Catholic / Independent school dominance "
+        "and typically correlate with higher catchment SES, while high "
+        "values indicate predominantly public-school communities.",
 }
 
 
@@ -1205,6 +1275,29 @@ LAYER3_METRIC_TRAJECTORY_SOURCE = {
         "value_col":     "value",
         "period_col":    "year",
         "filter_clause": "metric_name = 'census_women_25_34_with_child_share_pct'",
+        "kind":          "annual",
+    },
+    # Layer 4.4 A4 — Schools at SA2 (DEC-82 direct ACARA ingest).
+    # Annual 18-point trajectory 2008-2025 — richest trajectory in the build.
+    "sa2_school_count_total": {
+        "table":         "abs_sa2_education_employment_annual",
+        "value_col":     "value",
+        "period_col":    "year",
+        "filter_clause": "metric_name = 'acara_school_count_total'",
+        "kind":          "annual",
+    },
+    "sa2_school_enrolment_total": {
+        "table":         "abs_sa2_education_employment_annual",
+        "value_col":     "value",
+        "period_col":    "year",
+        "filter_clause": "metric_name = 'acara_school_enrolment_total'",
+        "kind":          "annual",
+    },
+    "sa2_school_enrolment_govt_share": {
+        "table":         "abs_sa2_education_employment_annual",
+        "value_col":     "value",
+        "period_col":    "year",
+        "filter_clause": "metric_name = 'acara_school_enrolment_govt_share_pct'",
         "kind":          "annual",
     },
 }
@@ -1809,9 +1902,11 @@ def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str], service_s
     source.
     """
     out: dict = {
-        "catchment_position": {},
-        "population":         {},
-        "labour_market":      {},
+        "catchment_position":      {},
+        "population":              {},
+        "labour_market":           {},
+        # Layer 4.4 A4 — new top-level card per DEC-82 (direct ACARA ingest)
+        "education_infrastructure": {},
     }
 
     # Helper to seed a metric slot with status (deferred / unavailable).

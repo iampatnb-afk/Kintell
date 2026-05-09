@@ -1097,6 +1097,40 @@ Consequences: Banding registry (`layer3_apply.py` METRICS list), centre-page reg
 
 ---
 
+## DEC-82 — Direct to primary source for new ingests; track derivative-sourced metrics for V2 migration
+Status: Active
+Date: 2026-05-10 (locked at A4 design ratification)
+
+Context: A4 design (Schools at SA2) surfaced that the existing `Education and employment database.xlsx` workbook from ABS Data by Region (DBR) is a **derivative source** — ABS bakes Census, ERP, ATO, ACARA, Jobs in Australia and other primary sources into one annual workbook. Convenient for breadth, but ties refresh cadence and provenance to ABS's release schedule rather than the upstream primary publishers'. Patrick's commercial-product framing made this load-bearing: data freshness and update independence are competitive differentiators against incumbents (GapMaps, Qikmaps at ~$1,500/user/month), and routing through derivative sources concedes both. The A4 alternative — direct ACARA ingest with spatial join to SA2 — has equivalent or better refresh cadence (ACARA publishes ~3 months post-school-year-end vs ABS DBR ~12-18 months), opens downstream metrics the workbook can never expose (NAPLAN, ICSEA, year-level breakdowns, sub-types), and builds reusable spatial-join infrastructure for V2 PropCo / hospital / transport ingests.
+
+Decision:
+
+1. **Primary-source-first policy for new ingests.** Any new SA2-level data ingest from this point forward MUST consider primary-source ingestion before falling back to a derivative source. Acceptable rationale to use a derivative source: (a) the primary publisher does not publish at SA2 resolution and ABS aggregates it (e.g., ATO median income, published at LGA only — ABS aggregates to SA2 for DBR); (b) the primary source is paywalled or licensing-restricted in a way that breaks the commercial model; (c) the derivative is materially better-maintained for the specific signal (rare but possible). Document the rationale in the ingest script docstring and in a tracked OI for periodic review.
+
+2. **A4 ratified as the first direct-primary-source ingest.** ACARA School Profile + School Locations CSVs sourced directly from ACARA Data Access Service (or data.gov.au mirror). Spatial join (school point → SA2 polygon) via existing `ASGS_2021_Main_Structure_GDA2020.gpkg`. New table `abs_sa2_schools_annual` (SA2 × year × school sector × metric — likely sector breakdown via wide or extra column). Spatial-join helper lives in `proc_helpers.py` as `point_to_sa2(lat, lon, gpkg_path)` — reusable for V2 PropCo property location → SA2, hospital catchment area → SA2, transport station coverage → SA2.
+
+3. **V2 migration backlog for existing derivative-sourced metrics.** The `abs_sa2_education_employment_annual` table currently holds 16 metrics ingested from ABS Data by Region (Education and employment database.xlsx via `layer2_step5b_prime_apply.py`):
+   - Preschool series (3): `ee_preschool_4yo_count`, `ee_preschool_total_count`, `ee_preschool_15h_plus_count` — primary source: AEDC + state preschool registries (varies by state, harder to consolidate)
+   - Education attainment (2): `ee_year12_completion_pct`, `ee_bachelor_degree_pct` — primary source: Census TSP T20/T22 (we already have the zip)
+   - Employment (4): `ee_unemployment_rate_persons_pct`, `ee_lfp_persons_pct`, `ee_jobs_females_count`, `ee_jobs_total_count` — primary source: Census TSP (LFP) + ATO Jobs in Australia (jobs counts; not at SA2 directly)
+   - Occupation/industry (7): `ee_managers_pct`, `ee_professionals_pct`, `ee_clerical_admin_pct`, `ee_jobs_info_media_count`, `ee_jobs_finance_count`, `ee_jobs_professional_scientific_count`, `ee_jobs_admin_support_count` — primary source: Census TSP (occupation %) + ATO Jobs in Australia (industry counts)
+
+   These are NOT migrated in V1.5 — too much rework for limited freshness gain; ABS DBR refresh cadence is acceptable for the underlying metrics. Tracked as a V2 backlog OI (OI-NEW-20). Migration order if pursued: education attainment + LFP first (Census TSP already on disk, zero new acquisition); jobs/industry counts later (require ATO Jobs in Australia primary-source ingest); preschool series last (AEDC + state-by-state primary sources are fragmented).
+
+4. **No retroactive renaming of derivative-sourced metrics.** Existing `ee_*` and `census_*` namespaces stay. Direct-primary-source new ingests use a clean naming convention (e.g., `acara_*` for ACARA, `aihw_*` for future AIHW ingests, etc.) so the DB is self-documenting about provenance without breaking existing renderer wiring.
+
+5. **OSHC-school adjacency intelligence (related, V2-banked).** Once ACARA schools land with lat/lon, the same spatial-join helper enables a service-level derived flag: "is this OSHC service co-located with or adjacent to a school?" — a key institutional context signal for OSHC investment / credit decisions (per Patrick: "having a school attached to an after-school care facility is a key indicator of success in that industry"). Tracked as OI-NEW-19. V2 work; data infrastructure (ACARA ingest) ships in V1.5.
+
+Consequences:
+
+- A4 effort: ~1.0 sess. Spatial-join helper amortises across future point-feature ingests (PropCo, hospitals, transport).
+- The `abs_sa2_schools_annual` table joins the data inventory as the first direct-primary-source SA2 table. Naming convention `acara_*` for any school-level metrics that aren't share-derived (e.g., `acara_school_count_govt`, `acara_school_enrolment_total`).
+- DEC-82 is a strategic principle, not a hard architectural constraint — the documented rationale carve-out (item 1) gives flexibility where primary sources don't exist at our resolution.
+- V2 migration of the 16 ABS DBR metrics is a tracked backlog (OI-NEW-20) but explicitly NOT V1 work; commercial-product readiness is achieved by going direct on NEW ingests, not by retroactively re-ingesting everything.
+- Centre page provenance display (the existing `source` field in `LAYER3_METRIC_META`) is the first place this strategic principle becomes user-visible — when ACARA metrics ship, their source line will read "ACARA School Profile <year> + School Locations <year>" instead of "ABS Data by Region", giving Patrick a clean talking point for institutional buyers about freshness and data lineage.
+
+---
+
 ## DEC-81 — Stream C V1 scope: parent-cohort 25-44 + partnered 25-44 + women-with-child fertility cuts (35-44 + 25-34)
 Status: Active
 Date: 2026-05-10 (locked at A3 + Stream C close)

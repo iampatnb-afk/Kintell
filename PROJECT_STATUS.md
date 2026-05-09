@@ -1,8 +1,41 @@
 # Project Status
 
-*Last updated: 2026-05-10 (PM session — A3 + Stream C bundle shipped end-to-end). The on-disk version supersedes the project-knowledge monolith if they disagree.*
+*Last updated: 2026-05-10 PM session 2 close — A4 Schools at SA2 shipped (DEC-82 first direct-primary-source ingest). Trajectory regression Patrick spotted during visual review confirmed pre-existing data gap (sa2_history.json covers 1,267/~2,400 SA2s); minted as OI-NEW-21 — V1-priority HIGH for next session per Patrick. The on-disk version supersedes the project-knowledge monolith if they disagree.*
 
-## Headline (2026-05-10 PM)
+> **NEXT-SESSION HEADLINE:** start with **OI-NEW-21 — Catchment trajectory coverage gap** (V1 priority HIGH per Patrick). See OPEN_ITEMS.md for the full investigation path + fix-shape estimates. Address before A5/A6/B/C remaining work.
+
+## Headline (2026-05-10 PM session 2)
+
+**A4 Schools at SA2 shipped end-to-end. New "Education infrastructure" Position card.** First direct-primary-source ingest (ACARA School Profile 2008-2025 + School Location 2025) per the new strategic principle DEC-82 ("primary-source-first for new ingests; track derivative-sourced ABS-DBR metrics for V2 migration"). Eight new metrics ingested into `abs_sa2_education_employment_annual` (316,859 rows across 18 years 2008-2025), three rendered in the V1 card (school count + total enrolment + govt-school enrolment share); the other five sector breakdowns sit in DB ready for V2 / Excel export / group page. New top-level Position card alongside Catchment / Population / Labour Market — future home for preschool series + tertiary/VET context. audit_id 164 → 174 (8 ingest + 1 layer3_apply + 1 catchment-rebanding).
+
+**Spatial-join helper landed in `geo_helpers.py`** — generic `point_to_sa2()` + `points_to_sa2()` infrastructure reusable for V2 PropCo property locations, hospital catchments, transport stations, and the OI-NEW-19 OSHC-school adjacency derived flag. ACARA pre-computes SA2 in their Location 2025 file, so A4 used ACARA's SA2 mapping directly; the geo_helpers cross-validation (sjoin against same lat/lng) confirmed 99.93% match — 8 mismatches in 11,039 schools were all multi-campus institutions where ACARA manually allocates campuses to specific SA2s in a way a centroid sjoin can't replicate. Within tolerance.
+
+**Verification SA2 institutional stories (2024):**
+- Bayswater Vic — 5 schools, 1,058 students, 92% govt (suburban family belt, predominantly state schools)
+- Bondi Junction NSW — 6 schools, 5,330 students, **4.9% govt** (eastern Sydney Catholic+Independent dominance — striking)
+- Bentley-Wilson WA — 5 schools, 1,264 students, 69% govt (student-heavy mixed catchment)
+- Outback NT — 10 schools, 1,573 students, 91% govt (remote, predominantly state)
+
+**This session 2's deliverables (all on disk):**
+- `recon/probes/probe_a4_schools_columns.py` (initial probe — surfaced no ACARA file present, drove design)
+- `recon/probes/probe_a4_acara_files.py` (post-arrival probe — confirmed all V1 fields)
+- `recon/a4_schools_design.md` (probe-first design doc; D-B1 path + sector mix + sanity check ratified)
+- `geo_helpers.py` (new module — `point_to_sa2`, `points_to_sa2`, module-level GPKG cache)
+- `layer4_4_step_a4_schools_apply.py` (8 metrics ingest + cross-validation, audit 165–172)
+- `patch_b2_layer3_add_a4_schools.py` (8 banding entries appended to layer3_apply.py METRICS)
+- 4 surgical edits to `centre_page.py` v23 (LAYER3_METRIC_META + INTENT_COPY + TRAJECTORY_SOURCE + POSITION_CARD_ORDER + `_layer3_position` `out` dict — 3+3+3+1+1 entries; new `education_infrastructure` card key)
+- 2 surgical edits to `docs/centre.html` v3.31 (`renderEducationInfrastructureCard` function + page composition)
+- DEC-82 minted in canonical DECISIONS.md
+- OI-NEW-19 (OSHC-school adjacency derived flag, V2) + OI-NEW-20 (V2 migration backlog of 16 derivative-sourced ABS-DBR metrics) added to OPEN_ITEMS
+- Smoke-test capture rebuilt at `docs/a10_c8_review.html` (4 SA2s) + new `docs/centre_a4_review_2358.html` (single-LDC view)
+
+**DB state.** 1 fresh backup (`data/pre_layer4_4_step_a4_schools_*.db` 556.8 MB). 316,859 new long-format rows in `abs_sa2_education_employment_annual` (39,613 each for the 5 schools-count metrics + 39,598 each for the 3 enrolment-share metrics — 2,233 SA2s × 18 years). Plus banding rebuild: ~17,840 banded rows added to `layer3_sa2_metric_banding` (8 metrics × ~2,230 SA2s × 1 latest-period). audit_log 164 → 174 (10 new rows: 8 ingest + 1 layer3_apply + 1 catchment-rebanding).
+
+**Verification.** National 2024 totals all within ABS-published bands: 9,736 schools (in 8k-12k band), 4.18M enrolment (in 3.5M-4.5M band), 63.7% govt-share-by-enrolment (in 60-68% band). 99.93% ACARA-vs-sjoin match (8 mismatches all multi-campus edge cases, manually verified as defensible). 18-point trajectories 2008-2025 — richest cadence in the build (vs parent-cohort 6pt, Census 3pt).
+
+---
+
+## Headline (2026-05-10 PM session 1 — preserved for traceability)
 
 **A3 + Stream C bundle shipped end-to-end. Demographic mix sub-panel grows from 4 to 8 Lite rows.** Four new SA2-level metrics: parent-cohort 25-44 share (ERP, annual 6-point 2019-2024) + partnered 25-44 share (TSP T05, Census 3-point) + share of women 35-44 with at least one child (TSP T07, Census 3-point) + share of women 25-34 with at least one child (TSP T07, Census 3-point). audit_id 158 → 164 (4 ingest + 1 layer3_apply + 1 OI-35 catchment rebanding). DEC-81 minted to lock the V1 Stream C scope (sharp 25-44 partnered window; two fertility cohorts; NS-handling convention; ERP col 3 not 121 for total_persons). Probe-before-code (DEC-65) confirmed the column shapes; A10 had already banked T05 + T07 as sibling-tables which made this bundle a clean re-application of the A10 template.
 
@@ -123,15 +156,15 @@ Always-show variant (P1). P-2 silent absence for <2 numeric points / unreadable 
 
 ## What's next
 
-**V1 path remaining: ~0 sessions.** No mandatory work.
+**HIGHEST V1 PRIORITY — OI-NEW-21: Catchment trajectory coverage gap.** Surfaced during A4 visual review on 2026-05-10 PM session 2: `docs/sa2_history.json` covers 1,267 of ~2,400 Australian SA2s; the 1,133 absent SA2s render no catchment-position trajectories. Two of the four verifying SA2s (Bentley-Wilson WA, Outback NT) are in the gap. Patrick: this **must** be fixed for V1 — a ~47% national coverage gap on the headline credit-direct trajectory rendering is unacceptable for a commercial product. **Address before A5 / A6 / B / C remaining work.** ~0.3-0.7 sess depending on root cause (filter, structural, or missing-denominator). Probe first per DEC-65 — read `build_sa2_history.py` to identify the SA2 coverage filter, then decide between relaxing the filter, building a fallback trajectory path, or adding upstream ingest for missing denominators. Full investigation path + likely fix shape detailed in OI-NEW-21 (OPEN_ITEMS.md).
 
-**V1.5 next-session priority:** **A4 — Schools at SA2 (ACARA enrolment counts) (~0.5 sess)**. With A3 + Stream C closed and the Demographic mix sub-panel locked at 8 rows, Phase A's remaining ingests (A4/A5/A6) are independent of one another and any of them could be picked up next; A4 is the largest single piece.
+**V1.5 next-session priority** (after OI-NEW-21 closes): **A5 — Subtype-correct denominators (~0.3 sess)** OR **A6 — SALM extension (~0.2 sess)**. A5 is more impactful (refines `sa2_supply_ratio` per LDC/FDC/OSHC subtype — credit-direct metric); A6 is faster (promotes LFP triplet from Lite to Full row weight). Either can be picked first; both are independent.
 
-**V1.5 path remaining (~1.0 sess):**
-- **A4** (~0.5 sess) — Schools at SA2 (ACARA enrolment counts)
+**V1.5 path remaining (~0.5-0.7 sess + OI-NEW-21 ~0.3-0.7 sess = ~0.8-1.4 sess):**
+- **OI-NEW-21** (~0.3-0.7 sess) — **HIGH** Catchment trajectory coverage gap fix
 - **A5** (~0.3 sess) — Subtype-correct denominators (LDC/FDC/OSHC distinct catchment populations)
 - **A6** (~0.2 sess) — SALM extension (promotes LFP triplet from Lite to Full)
-- **B1, B3, B4** (~0.7 sess) — Phase B core (depend on A4/A5)
+- **B1, B3, B4** (~0.7 sess) — Phase B core (B1 = `sa2_jsa_vacancy_rate` peer banding; B3 = schools-derived banding [partially done with A4]; B4 = subtype-aware banding depends on A5)
 - **C2-other + C6** (~0.4 sess) — Phase C core remaining (depend on B-pass)
 
 See **CENTRE_PAGE_V1_5_ROADMAP.md** for the canonical V1.5 dependency-ordered queue and **ROADMAP.md** for the parent dependency view.

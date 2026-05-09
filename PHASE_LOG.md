@@ -1,3 +1,56 @@
+## 2026-05-10 PM session 2 — Layer 4.4 A4 Schools at SA2 ship (DEC-82)
+
+**Session type:** Probe → design → ratify (Path B chosen) → ACARA file source → ingest with cross-validation → banding → render (new card) → smoke-test → tier-2 doc refresh + DEC-82 mint.
+
+**Context entering session.** A3 + Stream C committed (`36010a0`). A4 roadmap entry assumed ACARA SA2-level enrolment counts were quick. Initial probe revealed no ACARA file in `abs_data/`; the candidate alternative (extra preschool cuts from existing ABS DBR `Education and employment database.xlsx`) was the cheap path. Patrick raised the commercial-product framing: derivative ABS DBR sources tie our refresh cadence to ABS, going direct to ACARA gives independent control. **Strategic shift locked as DEC-82.**
+
+**Work shipped this session.**
+
+**1. DEC-82 minted (strategic principle).** Direct-to-primary-source for new ingests. 16 existing derivative-sourced ABS-DBR metrics tracked as V2 migration backlog (OI-NEW-20). Carve-out: where primary source isn't published at our SA2 resolution, derivative is acceptable with documented rationale.
+
+**2. OI-NEW-19 added.** OSHC-school adjacency derived flag, V2 work; uses A4 spatial-join helper + proximity threshold.
+
+**3. Path B ratified for A4.** Full ACARA ingest with sector breakdown (Govt/Catholic/Independent) + cross-validation of ACARA's pre-computed SA2 against own sjoin. Patrick downloaded School Profile 2025, School Location 2025, School Profile 2008-2025.
+
+**4. `geo_helpers.py` built.** Reusable spatial-join infrastructure: `load_sa2_polygons()`, `points_to_sa2()`, `point_to_sa2()`, module-level GPKG cache. Verified against 4 known SA2s (3/4 perfect; 4th was test-coord error not helper bug). Reusable for V2 PropCo / hospital / transport ingests + OI-NEW-19.
+
+**5. A4 ingest (`layer4_4_step_a4_schools_apply.py`).** 8 metrics → `abs_sa2_education_employment_annual` (316,859 rows, 2,233 SA2s × 18 years 2008-2025). Backup `pre_layer4_4_step_a4_schools_*.db` (556.8 MB). Cross-validation 99.93% match (8 mismatches all multi-campus schools, within 1% threshold). National 2024 sanity: 9,736 schools, 4.18M enrolment, 63.7% govt-share, all in ABS bands. audit_id 165–172.
+
+**6. B-pass banding (`patch_b2_layer3_add_a4_schools.py`).** 8 entries appended to layer3_apply.py METRICS, all state×remoteness. `layer3_apply.py --apply` lands ~17,840 banded rows; `layer3_x_catchment_metric_banding.py --apply` rebuilds catchment metrics. audit_id 173 + 174.
+
+**7. C-pass render — new top-level Position card.** `renderEducationInfrastructureCard()` in centre.html v3.31; inserted between Population and Labour Market in the page composition. centre_page.py v23: 3 LAYER3_METRIC_META + 3 INTENT_COPY + 3 TRAJECTORY_SOURCE + 1 new POSITION_CARD_ORDER key + 1 new `out` dict key in `_layer3_position`. Three Lite rows (school count + total enrolment + govt-school enrolment share); 18-point trajectories — richest cadence in the build.
+
+**8. Verifying SA2 institutional stories.** Bayswater 92% govt; **Bondi Junction 4.9% govt** (eastern Sydney private dominance — striking story); Bentley-Wilson 69% govt; Outback NT 91% govt.
+
+**9. Smoke-test captures rebuilt.** `docs/a10_c8_review.html` (4 SA2s switchable, 523.4 KB) and new `docs/centre_a4_review_2358.html` (single Sparrow Bayswater, 247.4 KB).
+
+**Files touched:**
+- `recon/probes/probe_a4_schools_columns.py` (initial gap-finding probe)
+- `recon/probes/probe_a4_acara_files.py` (post-arrival probe)
+- `recon/a4_schools_design.md` (probe-first design, ratified inline)
+- `geo_helpers.py` (new module)
+- `layer4_4_step_a4_schools_apply.py` (new ingest)
+- `patch_b2_layer3_add_a4_schools.py` (new banding patcher)
+- `layer3_apply.py` (8 METRICS entries appended via patcher)
+- `centre_page.py` v23 (3 META + 3 INTENT + 3 TRAJ + POSITION_CARD_ORDER + `out` dict)
+- `docs/centre.html` v3.31 (new render fn + page composition + version comments)
+- `docs/a10_c8_review.html` + new `docs/centre_a4_review_2358.html` (smoke captures)
+- `recon/Document and Status DB/DECISIONS.md` (DEC-82 minted)
+- `OPEN_ITEMS.md` (OI-NEW-19 + OI-NEW-20 added)
+- `PROJECT_STATUS.md`, `CENTRE_PAGE_V1_5_ROADMAP.md`, `PHASE_LOG.md` (this entry)
+- `recon/db_inventory.md` (post-state regen)
+- 1 backup: `data/pre_layer4_4_step_a4_schools_*.db`
+
+**audit_log:** 164 → 174 (10 new rows: 8 ingest + 1 layer3_apply + 1 catchment-rebanding).
+
+**State at session end.** A4 closed end-to-end. New "Education infrastructure" Position card live on centre page with 3 Lite rows + 18-pt trajectories. DEC-82 strategic principle locked.
+
+**Trajectory regression spotted during visual review — confirmed pre-existing, not caused by A4 changes.** Patrick noticed catchment-position trajectories absent on Bentley-Wilson WA + Outback NT centres in the multi-LDC capture. Browser-based investigation via Claude Preview confirmed: `docs/sa2_history.json` covers 1,267 of ~2,400 Australian SA2s; absent SA2s correctly render no canvas (per `_renderTrajectory` returning empty when `allPoints.length === 0`). Last `sa2_history.json` modification was commit `36c2f78` (Layer 4.2-A.3c Part 2, well before A4) — A4 changes did not touch `_catchment_trajectory` or `build_sa2_history.py`. Minted as **OI-NEW-21** — V1-priority HIGH per Patrick: this gap is unacceptable for a commercial product targeting Australia-wide institutional decision-support. Next session begins with OI-NEW-21 before any A5/A6/B/C remaining work.
+
+**V1.5 path remaining ~0.8-1.4 sess** (OI-NEW-21 ~0.3-0.7 + A5 ~0.3 + A6 ~0.2 + B1/B4 ~0.7 + C2-other/C6 ~0.4).
+
+---
+
 ## 2026-05-10 PM — Layer 4.4 A3 + Stream C bundle ship
 
 **Session type:** Probe → design → ratify → ingest → banding → render → smoke-test → tier-2 doc refresh. End-to-end V1.5 close in one session.

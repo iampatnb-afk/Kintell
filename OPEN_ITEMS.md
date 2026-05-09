@@ -162,6 +162,83 @@ V1 readiness artefacts (not certification — that's V2). Includes:
 - Audit-trail visibility (already strong via STD-11 + DEC-62; surface to customers in Excel export provenance rows)
 - Multi-tenancy / auth architecture design pass (deployment in V2; design only in V1)
 
+### OI-NEW-19 — OSHC-school adjacency derived flag
+*Origin: 2026-05-10 PM (DEC-82 #5 sub-item). Status: open; ~0.4 sess. V2 deliverable; data infrastructure ships in V1.5 with A4.*
+
+Once ACARA School Locations land via A4 (`abs_sa2_schools_annual` with lat/lon), the same `point_to_sa2()` spatial-join helper enables a **service-level** derived flag for every OSHC service in `services`: "is this OSHC co-located with or adjacent to a school?" Operationalisation likely via a proximity threshold (e.g., service point within 200m of any school point) plus an optional name-match heuristic (school name token appears in service name). Per Patrick: "having a school attached to an after-school care facility is a key indicator of success in that industry" — so this is not a marginal nice-to-have but a load-bearing institutional context signal for OSHC investment / credit decisions.
+
+**Dependencies:**
+- ACARA ingest (A4) lands first — provides the school points
+- `point_to_sa2()` helper in `proc_helpers.py` (built as part of A4) generalises easily to `nearest_point_within(threshold_m, ...)` for proximity queries
+
+**Sub-item: LDC-school adjacency.** Same spatial proximity logic applies to LDC services as a parental convenience signal (after-school transition logistics for siblings, drop-off coordination). Worth deriving in the same pass once we're already computing distances.
+
+**Implementation pattern:**
+1. Compute `(service_id, nearest_school_id, distance_m)` for every service via spatial query
+2. Derive boolean `service_school_adjacent_flag` at threshold (200m TBD)
+3. Surface on operator page + centre page for OSHC services as a Lite row context
+4. For LDC, surface as a context-only row (less load-bearing for credit, more relevant for parental-convenience UX framing)
+
+**V2 banking rationale:** the spatial join itself ships in V1.5 (A4), but the service-level flag derivation + render placement is a separate scoping pass that touches OSHC + LDC service surfaces. Not blocking V1 ship.
+
+### OI-NEW-21 — Catchment trajectory coverage gap (V1 — HIGH priority next session)
+*Origin: 2026-05-10 PM session 2; surfaced during A4 visual review when Patrick switched between verifying centres in the multi-LDC capture and noticed catchment-position trajectories rendering for Bayswater Vic + Bondi Junction NSW but absent for Bentley-Wilson WA + Outback NT. Status: open; ~0.3-0.7 sess depending on root cause. **V1 deliverable per Patrick — fix before next non-trivial centre-page work.***
+
+**Symptom.** `docs/sa2_history.json` covers **1,267 of ~2,400 Australian SA2s**. The 1,133 absent SA2s render no catchment-position trajectories on the centre page (no sparkline / trend% / centre-events overlay for `sa2_supply_ratio`, `sa2_demand_supply`, `sa2_child_to_place`, `sa2_adjusted_demand`). The renderer correctly suppresses the canvas per P-2 (`_renderTrajectory` returns "" when `allPoints.length === 0`), so the gap is silent — visible only when comparing centres in covered vs uncovered SA2s.
+
+**Verifying SA2 coverage table:**
+| SA2 | In sa2_history.json? | Catchment trajectory renders? |
+|---|---|---|
+| 211011251 Bayswater Vic | YES | YES (23 quarterly points) |
+| 118011341 Bondi Junction NSW | YES | YES (13 quarterly points) |
+| 506031124 Bentley-Wilson WA | NO | NO |
+| 702041063 Outback NT | NO | NO |
+
+**Why this is V1 critical.** Novara Intelligence is positioned as institutional decision-support across the full Australian childcare market (per DEC-79). A ~47% national SA2 coverage gap on the headline credit-direct trajectory rendering is unacceptable for a commercial product — it will show up in Excel exports, group-page rollups, lender / valuer demos, and screen-recorded marketing material. Patrick: "we need to fix the SA-2 data gap, of course, as a version one, and as soon as it needs to be done, that's the key piece."
+
+**Investigation path (probe first per DEC-65).**
+
+1. Read `build_sa2_history.py` to identify the SA2 coverage filter — likely one of:
+   - SA2s with no LDC services in NQAITS source (filter applied during NQAITS aggregation)
+   - SA2s with sparse-historical-quarter coverage (filter applied during quarter-trim)
+   - SA2s missing from a join key (e.g. `pop_0_4` denominator absent)
+2. Spot-check a few absent SA2s — if they're remote / no-LDC catchments, gap may be expected; if they have LDC services but were filtered, that's a bug.
+3. Decision point: relax the filter, OR build a "fallback" trajectory path (e.g., compute on-demand from `services_quarterly_snapshot` or similar primary table when SA2 is missing from the cached file).
+
+**Likely fix shape** (estimate, refines after probe):
+
+- If the gap is filter-driven and the filter is conservative, relax it and rebuild `sa2_history.json` (script: `build_sa2_history.py`). Requires re-publishing the JSON to docs/. Effort: ~0.3 sess.
+- If the gap is structural (e.g., SA2s without LDC services have no supply_ratio meaning anyway), introduce a graceful "no LDC services in this SA2" placeholder Lite row + bank a smaller follow-up to ensure the data inventory is honest. Effort: ~0.4 sess.
+- If the gap is a missing-denominator issue (some SA2s lack `pop_0_4` etc. in the source), add the upstream ingest that populates them, then rebuild. Effort: ~0.7 sess.
+
+**Discipline:**
+- STD-30 pre-mutation `db_inventory.md` snapshot (if DB-touching) plus `sa2_history.json` md5 capture before regen.
+- Re-validate the 4 verifying SA2s post-fix; expect WA + NT to flip from no-trajectory to trajectory-present.
+- Update PROJECT_STATUS coverage stats once `sa2_history.json` regenerates.
+
+**Adjacent benefit.** Fixing this also unblocks the Group page (OI-NEW-17) operator-network rollups, which expect catchment trajectories at scale, and improves Excel export provenance for any institutional demo that hits a remote-area SA2.
+
+**Sequencing recommendation for next session.** Address OI-NEW-21 BEFORE A5 / A6 / B-pass remaining work. The gap is silent today but high-visibility once Patrick or any institutional viewer browses outside the four hand-picked verifying SA2s.
+
+---
+
+### OI-NEW-20 — V2 migration backlog: derivative-sourced ABS DBR metrics → primary sources
+*Origin: 2026-05-10 PM (DEC-82 #3). Status: open; tracking. V2 deliverable.*
+
+The `abs_sa2_education_employment_annual` table currently holds **16 metrics ingested from ABS Data by Region** via `layer2_step5b_prime_apply.py`. Per DEC-82's primary-source-first policy, these are flagged for V2 migration to direct primary sources — but explicitly NOT V1 work; commercial-product readiness is achieved by going direct on NEW ingests, not by retroactively re-ingesting everything.
+
+**Migration order if pursued (cheapest first):**
+1. **Education attainment (2 metrics)** — `ee_year12_completion_pct`, `ee_bachelor_degree_pct` → Census TSP T20/T22. Zero new acquisition (zip already on disk). ~0.4 sess.
+2. **LFP (1 metric)** — `ee_lfp_persons_pct` → Census TSP T33 (already used for `census_lfp_*` family). ~0.2 sess.
+3. **Occupation %** (3 metrics) — `ee_managers_pct`, `ee_professionals_pct`, `ee_clerical_admin_pct` → Census TSP T11. ~0.4 sess.
+4. **Unemployment rate** — `ee_unemployment_rate_persons_pct` → SALM (already used for some) + Census TSP cross-validation. Tied to A6. ~0.3 sess.
+5. **Jobs counts + industry** (7 metrics) — `ee_jobs_*_count`, `ee_jobs_<industry>_count` → ATO Jobs in Australia primary source ingest (new acquisition). ~1.0 sess.
+6. **Preschool series** (3 metrics) — `ee_preschool_*_count` → AEDC + state preschool registries. Fragmented sources, hardest. ~1.5 sess.
+
+**Total V2 effort if all migrated:** ~3.8 sess. Likely cherry-picked rather than all-at-once.
+
+**Naming convention for migrated metrics:** new metrics use `census_*` (Census-source) or `acara_*` / `aihw_*` / etc. namespaces consistent with DEC-82 #4. Existing `ee_*` namespace stays for back-compat during transition, dual-populated until renderer cuts over.
+
 ---
 
 ## OPEN — EXISTING (carried)

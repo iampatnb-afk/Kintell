@@ -1,8 +1,8 @@
 # DB Inventory — `data/kintell.db`
 
-Generated: 2026-05-10T01:03:46
-DB size: 556.8 MB
-Tables: 37 | Total rows: 1,642,487
+Generated: 2026-05-10T02:20:15
+DB size: 615.3 MB
+Tables: 37 | Total rows: 1,977,211
 
 Read-only snapshot. Pre-Step-1b reference.
 
@@ -12,12 +12,12 @@ Read-only snapshot. Pre-Step-1b reference.
 |---:|---|---:|
 | 1 | `abs_sa2_births_annual` | 34,300 |
 | 2 | `abs_sa2_country_of_birth_top_n` | 7,102 |
-| 3 | `abs_sa2_education_employment_annual` | 267,771 |
+| 3 | `abs_sa2_education_employment_annual` | 584,630 |
 | 4 | `abs_sa2_erp_annual` | 88,344 |
 | 5 | `abs_sa2_language_at_home_top_n` | 7,060 |
 | 6 | `abs_sa2_socioeconomic_annual` | 161,964 |
 | 7 | `abs_sa2_unemployment_quarterly` | 142,496 |
-| 8 | `audit_log` | 164 |
+| 8 | `audit_log` | 174 |
 | 9 | `brands` | 349 |
 | 10 | `entities` | 7,143 |
 | 11 | `entity_financials` | 0 |
@@ -29,7 +29,7 @@ Read-only snapshot. Pre-Step-1b reference.
 | 17 | `jsa_ivi_remoteness_monthly` | 348 |
 | 18 | `jsa_ivi_state_monthly` | 4,338 |
 | 19 | `jsa_sa4_remoteness_concordance` | 88 |
-| 20 | `layer3_sa2_metric_banding` | 52,027 |
+| 20 | `layer3_sa2_metric_banding` | 69,882 |
 | 21 | `link_candidates` | 823 |
 | 22 | `metric_definitions` | 6 |
 | 23 | `model_assumptions` | 13 |
@@ -47,7 +47,7 @@ Read-only snapshot. Pre-Step-1b reference.
 | 35 | `services` | 18,223 |
 | 36 | `training_completions` | 768 |
 | 37 | `training_completions_ingest_run` | 1 |
-| | **TOTAL** | **1,642,487** |
+| | **TOTAL** | **1,977,211** |
 
 ## 2. Per-table schema, indexes, last-update
 
@@ -93,7 +93,7 @@ Indexes:
 
 ### `abs_sa2_education_employment_annual`
 
-Rows: **267,771**
+Rows: **584,630**
 
 Columns:
 
@@ -110,7 +110,7 @@ Indexes:
 - `idx_abs_sa2_ee_metric` (c) on (metric_name)
 - `sqlite_autoindex_abs_sa2_education_employment_annual_1` UNIQUE (pk) on (sa2_code, year, metric_name)
 
-- `year` range: 2011 → 2024 (9 distinct)
+- `year` range: 2008 → 2025 (18 distinct)
 
 ### `abs_sa2_erp_annual`
 
@@ -196,7 +196,7 @@ Indexes:
 
 ### `audit_log`
 
-Rows: **164**
+Rows: **174**
 
 Columns:
 
@@ -524,7 +524,7 @@ Indexes:
 
 ### `layer3_sa2_metric_banding`
 
-Rows: **52,027**
+Rows: **69,882**
 
 Columns:
 
@@ -1052,12 +1052,12 @@ Tables exposing an SA2 column. NULLs and distinct-SA2 cardinality both shown.
 |---|---|---:|---:|---:|
 | `abs_sa2_births_annual` | `sa2_code` | 2,450 | 0 | 34,300 |
 | `abs_sa2_country_of_birth_top_n` | `sa2_code` | 2,386 | 0 | 7,102 |
-| `abs_sa2_education_employment_annual` | `sa2_code` | 2,452 | 0 | 267,771 |
+| `abs_sa2_education_employment_annual` | `sa2_code` | 2,452 | 0 | 584,630 |
 | `abs_sa2_erp_annual` | `sa2_code` | 2,454 | 0 | 88,344 |
 | `abs_sa2_language_at_home_top_n` | `sa2_code` | 2,374 | 0 | 7,060 |
 | `abs_sa2_socioeconomic_annual` | `sa2_code` | 2,454 | 0 | 161,964 |
 | `abs_sa2_unemployment_quarterly` | `sa2_code` | 2,336 | 0 | 142,496 |
-| `layer3_sa2_metric_banding` | `sa2_code` | 2,454 | 0 | 52,027 |
+| `layer3_sa2_metric_banding` | `sa2_code` | 2,454 | 0 | 69,882 |
 | `sa2_cohort` | `sa2_code` | 2,473 | 0 | 2,473 |
 | `service_catchment_cache` | `sa2_code` | 2,294 | 0 | 18,203 |
 | `services` | `sa2_code` | 2,294 | 20 | 18,223 |
@@ -1067,7 +1067,7 @@ Tables exposing an SA2 column. NULLs and distinct-SA2 cardinality both shown.
 | Table | Year col | Min | Max | Distinct |
 |---|---|---:|---:|---:|
 | `abs_sa2_births_annual` | `year` | 2011 | 2024 | 14 |
-| `abs_sa2_education_employment_annual` | `year` | 2011 | 2024 | 9 |
+| `abs_sa2_education_employment_annual` | `year` | 2008 | 2025 | 18 |
 | `abs_sa2_erp_annual` | `year` | 2011 | 2024 | 9 |
 | `abs_sa2_socioeconomic_annual` | `year` | 2011 | 2025 | 11 |
 | `layer3_sa2_metric_banding` | `year` | 2021 | 2025 | 4 |
@@ -1223,11 +1223,13 @@ By `state` (all services):
 | `kintell.db.backup_pre_2_5_2_20260509_234302` | 546.0 | 2026-05-09T23:43:02 |
 | `kintell.db.backup_pre_layer3_20260510_005250` | 554.4 | 2026-05-10T00:51:48 |
 | `kintell.db.backup_pre_2_5_2_20260510_005320` | 554.8 | 2026-05-10T00:52:51 |
-| **TOTAL** | **12,868.1** | |
+| `kintell.db.backup_pre_layer3_20260510_020650` | 611.1 | 2026-05-10T02:05:52 |
+| `kintell.db.backup_pre_2_5_2_20260510_020652` | 613.3 | 2026-05-10T02:06:52 |
+| **TOTAL** | **14,092.5** | |
 
 ## 6. `audit_log` summary
 
-Total rows: **164**
+Total rows: **174**
 Columns: `audit_id`, `actor`, `action`, `subject_type`, `subject_id`, `before_json`, `after_json`, `reason`, `occurred_at`
 
 ### 6a. Counts by `action`
@@ -1235,9 +1237,9 @@ Columns: `audit_id`, `actor`, `action`, `subject_type`, `subject_id`, `before_js
 | action | Count |
 |---|---:|
 | `accept_merge` | 110 |
-| `layer3_banding_v1` | 5 |
+| `layer3_banding_v1` | 6 |
+| `layer3_catchment_banding_v1` | 5 |
 | `service_catchment_cache_populate_v1` | 4 |
-| `layer3_catchment_banding_v1` | 4 |
 | `rename_group` | 3 |
 | `data_seed` | 2 |
 | `service_catchment_cache_rename_column_v1` | 1 |
@@ -1273,6 +1275,14 @@ Columns: `audit_id`, `actor`, `action`, `subject_type`, `subject_id`, `before_js
 | `census_nes_share_ingest_v2` | 1 |
 | `census_atsi_share_ingest_v1` | 1 |
 | `add_model_assumption` | 1 |
+| `acara_school_independent_share_ingest_v1` | 1 |
+| `acara_school_govt_share_ingest_v1` | 1 |
+| `acara_school_enrolment_total_ingest_v1` | 1 |
+| `acara_school_enrolment_independent_share_ingest_v1` | 1 |
+| `acara_school_enrolment_govt_share_ingest_v1` | 1 |
+| `acara_school_enrolment_catholic_share_ingest_v1` | 1 |
+| `acara_school_count_total_ingest_v1` | 1 |
+| `acara_school_catholic_share_ingest_v1` | 1 |
 | `abs_sa2_socioeconomic_ingest_v1` | 1 |
 | `abs_sa2_education_employment_ingest_v1` | 1 |
 | `abs_sa2_births_ingest_v1` | 1 |
@@ -1445,6 +1455,16 @@ Columns: `audit_id`, `actor`, `action`, `subject_type`, `subject_id`, `before_js
 | 162 | layer4_4_step_a3_streamc_apply | census_women_25_34_with_child_share_ingest_v1 | abs_sa2_education_employment_annual | 0 | {"existing_rows_for_metric": 0} | {"rows_inserted": 7069, "sa2_count": 2375, "years": [2011, 2016, 2021], "national_pct_by_year": {... | Stream C women-25-34 with at least one child share ingest (v1). Stores percentage (0-100). Formul... | 2026-05-09 14:51:48 |
 | 163 | layer3_apply | layer3_banding_v1 | layer3_sa2_metric_banding | 0 | {"rows": 0} | {"rows": 42992} | Layer 3 banding: percentile/decile/band per (metric x SA2 x latest-year x cohort). 42992 rows. 18... | 2026-05-09 14:52:51 |
 | 164 | layer3_x_catchment_apply | layer3_catchment_banding_v1 | layer3_sa2_metric_banding | 0 | {"prior_rows_for_metrics": 0} | {"inserted_rows": 9035, "metrics": ["sa2_supply_ratio", "sa2_child_to_place", "sa2_adjusted_deman... | Layer 2.5 sub-pass 2.5.2: Layer 3.x catchment metric banding. Bands 4 catchment metrics from serv... | 2026-05-09 14:53:21 |
+| 165 | layer4_4_step_a4_schools_apply | acara_school_count_total_ingest_v1 | abs_sa2_education_employment_annual | 0 | {"existing_rows_for_metric": 0} | {"rows_inserted": 39613, "sa2_count": 2233, "years": [2008, 2009, 2010, 2011, 2012, 2013, 2014, 2... | School count per SA2 per year. Source: ACARA School Profile 2008-2025. Currently-operating school... | 2026-05-09 16:05:49 |
+| 166 | layer4_4_step_a4_schools_apply | acara_school_enrolment_total_ingest_v1 | abs_sa2_education_employment_annual | 0 | {"existing_rows_for_metric": 0} | {"rows_inserted": 39613, "sa2_count": 2233, "years": [2008, 2009, 2010, 2011, 2012, 2013, 2014, 2... | Total student enrolment per SA2 per year, summed across all schools in this catchment. Source: AC... | 2026-05-09 16:05:50 |
+| 167 | layer4_4_step_a4_schools_apply | acara_school_govt_share_ingest_v1 | abs_sa2_education_employment_annual | 0 | {"existing_rows_for_metric": 0} | {"rows_inserted": 39613, "sa2_count": 2233, "years": [2008, 2009, 2010, 2011, 2012, 2013, 2014, 2... | Government-sector share of school count per SA2 per year. Numerator: count of Government-sector s... | 2026-05-09 16:05:50 |
+| 168 | layer4_4_step_a4_schools_apply | acara_school_catholic_share_ingest_v1 | abs_sa2_education_employment_annual | 0 | {"existing_rows_for_metric": 0} | {"rows_inserted": 39613, "sa2_count": 2233, "years": [2008, 2009, 2010, 2011, 2012, 2013, 2014, 2... | Catholic-sector share of school count per SA2 per year. | 2026-05-09 16:05:50 |
+| 169 | layer4_4_step_a4_schools_apply | acara_school_independent_share_ingest_v1 | abs_sa2_education_employment_annual | 0 | {"existing_rows_for_metric": 0} | {"rows_inserted": 39613, "sa2_count": 2233, "years": [2008, 2009, 2010, 2011, 2012, 2013, 2014, 2... | Independent-sector share of school count per SA2 per year. | 2026-05-09 16:05:51 |
+| 170 | layer4_4_step_a4_schools_apply | acara_school_enrolment_govt_share_ingest_v1 | abs_sa2_education_employment_annual | 0 | {"existing_rows_for_metric": 0} | {"rows_inserted": 39598, "sa2_count": 2231, "years": [2008, 2009, 2010, 2011, 2012, 2013, 2014, 2... | Government-sector share of student enrolment per SA2 per year. Captures the public/private mix in... | 2026-05-09 16:05:51 |
+| 171 | layer4_4_step_a4_schools_apply | acara_school_enrolment_catholic_share_ingest_v1 | abs_sa2_education_employment_annual | 0 | {"existing_rows_for_metric": 0} | {"rows_inserted": 39598, "sa2_count": 2231, "years": [2008, 2009, 2010, 2011, 2012, 2013, 2014, 2... | Catholic-sector share of student enrolment per SA2 per year. | 2026-05-09 16:05:51 |
+| 172 | layer4_4_step_a4_schools_apply | acara_school_enrolment_independent_share_ingest_v1 | abs_sa2_education_employment_annual | 0 | {"existing_rows_for_metric": 0} | {"rows_inserted": 39598, "sa2_count": 2231, "years": [2008, 2009, 2010, 2011, 2012, 2013, 2014, 2... | Independent-sector share of student enrolment per SA2 per year. | 2026-05-09 16:05:52 |
+| 173 | layer3_apply | layer3_banding_v1 | layer3_sa2_metric_banding | 0 | {"rows": 0} | {"rows": 60847} | Layer 3 banding: percentile/decile/band per (metric x SA2 x latest-year x cohort). 60847 rows. 26... | 2026-05-09 16:06:52 |
+| 174 | layer3_x_catchment_apply | layer3_catchment_banding_v1 | layer3_sa2_metric_banding | 0 | {"prior_rows_for_metrics": 0} | {"inserted_rows": 9035, "metrics": ["sa2_supply_ratio", "sa2_child_to_place", "sa2_adjusted_deman... | Layer 2.5 sub-pass 2.5.2: Layer 3.x catchment metric banding. Bands 4 catchment metrics from serv... | 2026-05-09 16:06:53 |
 
 ---
 
