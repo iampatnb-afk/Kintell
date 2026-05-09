@@ -177,6 +177,38 @@ METRICS = [
         "year_column": "year",
         "cohort_def": "state_x_remoteness",
     },
+    {
+        "canonical": "sa2_parent_cohort_25_44_share",
+        "source_table": "abs_sa2_education_employment_annual",
+        "value_column": "value",
+        "filter_clause": "metric_name = 'erp_parent_cohort_25_44_share_pct'",
+        "year_column": "year",
+        "cohort_def": "state_x_remoteness",
+    },
+    {
+        "canonical": "sa2_partnered_25_44_share",
+        "source_table": "abs_sa2_education_employment_annual",
+        "value_column": "value",
+        "filter_clause": "metric_name = 'census_partnered_25_44_share_pct'",
+        "year_column": "year",
+        "cohort_def": "state_x_remoteness",
+    },
+    {
+        "canonical": "sa2_women_35_44_with_child_share",
+        "source_table": "abs_sa2_education_employment_annual",
+        "value_column": "value",
+        "filter_clause": "metric_name = 'census_women_35_44_with_child_share_pct'",
+        "year_column": "year",
+        "cohort_def": "state_x_remoteness",
+    },
+    {
+        "canonical": "sa2_women_25_34_with_child_share",
+        "source_table": "abs_sa2_education_employment_annual",
+        "value_column": "value",
+        "filter_clause": "metric_name = 'census_women_25_34_with_child_share_pct'",
+        "year_column": "year",
+        "cohort_def": "state_x_remoteness",
+    },
 ]
 
 

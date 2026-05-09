@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- centre.html v3.30 (2026-05-10) — Layer 4.4 A3 + Stream C bundle: 4 new Lite rows appended to the Demographic mix sub-panel inside Catchment Position card (sa2_parent_cohort_25_44_share + sa2_partnered_25_44_share + sa2_women_35_44_with_child_share + sa2_women_25_34_with_child_share). One surgical change: demoMetrics array in renderCatchmentPositionCard extended with the 4 new keys after sa2_single_parent_family_share. No new render helpers needed; existing _renderLiteRow + _renderLiteDelta handle annual (parent-cohort 6-point 2019-2024) and 3-point (Census) trajectories transparently via p.value_format + p.trajectory. Pairs with centre_page.py v22 (LAYER3_METRIC_META + INTENT_COPY + TRAJECTORY_SOURCE + POSITION_CARD_ORDER mirror, 4 entries each) in same commit. -->
+<!-- centre.html v3.29 (2026-05-10) — Layer 4.4 A10 + C8 Demographic Mix bundle ship (header comment back-filled): renderCatchmentPositionCard split into creditMetrics + demoMetrics with a dashed-divider sub-panel header "Demographic mix"; new _renderTopNCountriesOfBirth + _renderTopNLanguagesAtHome helpers via shared _renderTopNContext renderer. Pairs with centre_page.py v21 + new abs_sa2_country_of_birth_top_n + abs_sa2_language_at_home_top_n tables. -->
 <!-- centre.html v3.28 (2026-05-05) — OI-36b fix: _renderLiteDelta currency branch corrected. v3.27 matched 'currency_aud' which does not exist in this codebase; the actual formats are currency_weekly (sa2_median_household_income) and currency_annual (sa2_median_employee_income, sa2_median_total_income). Branch now matches both, with '/week' suffix appended for currency_weekly to match the parent value's display unit (e.g. '+$291/week from 2011 to 2021' for Bayswater median household income). currency_annual renders without suffix ('+$N,NNN from YYYY to YYYY'); these are currently Full-weight so don't render the badge in practice but the branch is kept consistent for future Lite re-classifications. No data-side change. -->
 <!-- centre.html v3.27 (2026-05-05) — OI-36b: delta badge on all Lite rows. New _renderLiteDelta(p) helper reads p.trajectory and emits a small first-to-last delta badge ('+9.5pp from 2011 to 2021' for NES Bayswater) inside the Lite row template, alongside the existing 'as at YYYY' stamp. Unit-aware via p.value_format (percent/percent_share -> 'pp', currency_aud -> '$N', ratio_x -> 'N×', else plain numeric). P-2 silent absence for <2 numeric points / unreadable years / zero delta. Always-show (P1); window-aware variant (P2) banked as future OI since _setTrajectoryRange does not trigger Lite re-render. Affects sa2_lfp_persons / sa2_lfp_females / sa2_lfp_males / sa2_median_household_income / sa2_nes_share. No data-side change. -->
 <!-- centre.html v3.26 (2026-05-05) — OI-36 close: sa2_nes_share added to renderCatchmentPositionCard.order so the Lite NES row renders in the Catchment Position card. Data-side already shipped at 3ddcf18 (LAYER3_METRIC_META + INTENT_COPY + TRAJECTORY_SOURCE entries for sa2_nes_share). Surgical scope: one entry added to one hardcoded array. Refactor to drive render order from POSITION_CARD_ORDER payload (eliminating JS-side hardcoded array entirely) banked as separate housekeeping OI. Companion centre_page.py v21 (POSITION_CARD_ORDER mirror) in same commit. -->
@@ -2435,6 +2437,11 @@ function renderCatchmentPositionCard(centre) {
     "sa2_atsi_share",
     "sa2_overseas_born_share",
     "sa2_single_parent_family_share",
+    // Layer 4.4 A3 + Stream C — appended 2026-05-10
+    "sa2_parent_cohort_25_44_share",
+    "sa2_partnered_25_44_share",
+    "sa2_women_35_44_with_child_share",
+    "sa2_women_25_34_with_child_share",
   ];
   const order = [...creditMetrics, ...demoMetrics];
   const hasAny = order.some(k => {

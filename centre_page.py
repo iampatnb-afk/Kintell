@@ -715,6 +715,60 @@ LAYER3_METRIC_META = {
             "high": "high one-parent-family share among family households",
         },
     },
+    # Layer 4.4 A3 + Stream C — Parent-cohort + marital + fertility bundle
+    # (4 Lite rows). Neutral framing per A10 precedent; calibration deferred.
+    "sa2_parent_cohort_25_44_share": {
+        "display": "Parent-cohort (25-44) share",
+        "card": "catchment_position",
+        "value_format": "percent",
+        "direction": "high_is_positive",  # neutral framing
+        "row_weight": "lite",
+        "source": "ABS ERP (erp_parent_cohort_25_44_share_pct)",
+        "band_copy": {
+            "low":  "low share of 25-44 year-olds in resident population",
+            "mid":  "moderate share of 25-44 year-olds in resident population",
+            "high": "high share of 25-44 year-olds in resident population",
+        },
+    },
+    "sa2_partnered_25_44_share": {
+        "display": "Partnered (25-44) share",
+        "card": "catchment_position",
+        "value_format": "percent",
+        "direction": "high_is_positive",  # neutral framing
+        "row_weight": "lite",
+        "source": "ABS Census 2021 T05 (census_partnered_25_44_share_pct)",
+        "band_copy": {
+            "low":  "low share of 25-44s in registered or de-facto partnerships",
+            "mid":  "moderate share of 25-44s in registered or de-facto partnerships",
+            "high": "high share of 25-44s in registered or de-facto partnerships",
+        },
+    },
+    "sa2_women_35_44_with_child_share": {
+        "display": "Share of women aged 35 to 44 with at least one child",
+        "card": "catchment_position",
+        "value_format": "percent",
+        "direction": "high_is_positive",  # neutral framing
+        "row_weight": "lite",
+        "source": "ABS Census 2021 T07 (census_women_35_44_with_child_share_pct)",
+        "band_copy": {
+            "low":  "low share of women 35-44 with at least one child",
+            "mid":  "moderate share of women 35-44 with at least one child",
+            "high": "high share of women 35-44 with at least one child",
+        },
+    },
+    "sa2_women_25_34_with_child_share": {
+        "display": "Share of women aged 25 to 34 with at least one child",
+        "card": "catchment_position",
+        "value_format": "percent",
+        "direction": "high_is_positive",  # neutral framing
+        "row_weight": "lite",
+        "source": "ABS Census 2021 T07 (census_women_25_34_with_child_share_pct)",
+        "band_copy": {
+            "low":  "low share of women 25-34 with at least one child",
+            "mid":  "moderate share of women 25-34 with at least one child",
+            "high": "high share of women 25-34 with at least one child",
+        },
+    },
 }
 
 # Display order within each card (drives section order in the UI).
@@ -733,6 +787,11 @@ POSITION_CARD_ORDER = {
         "sa2_atsi_share",
         "sa2_overseas_born_share",
         "sa2_single_parent_family_share",
+        # Layer 4.4 A3 + Stream C — appended 2026-05-10
+        "sa2_parent_cohort_25_44_share",
+        "sa2_partnered_25_44_share",
+        "sa2_women_35_44_with_child_share",
+        "sa2_women_25_34_with_child_share",
     ],
     "population": [
         "sa2_under5_count",
@@ -939,6 +998,25 @@ LAYER3_METRIC_INTENT_COPY = {
         "Share of family households that are single-parent — a structural "
         "signal of CCS-eligible utilisation pressure, full-time-care intensity, "
         "and reduced flexibility for family-based alternatives.",
+    "sa2_parent_cohort_25_44_share":
+        "Share of residents aged 25-44 — the population window where active "
+        "parenting of 0-5 year olds is concentrated. A higher share signals a "
+        "deeper natural demand pool for ECEC services in this catchment.",
+    "sa2_partnered_25_44_share":
+        "Share of 25-44 year-olds in a registered or de-facto partnership — "
+        "an institutional context signal alongside the parent cohort. "
+        "Catchments with lower partnered shares often correlate with "
+        "later-fertility profiles and shifted ECEC demand timing.",
+    "sa2_women_35_44_with_child_share":
+        "Share of women aged 35-44 who have had at least one child — a "
+        "completed-fertility proxy. By this age the cohort's lifetime "
+        "fertility profile is largely settled; useful as a community-level "
+        "indicator of fertility intensity rather than active timing.",
+    "sa2_women_25_34_with_child_share":
+        "Share of women aged 25-34 who have had at least one child — the "
+        "more directly childcare-relevant fertility cut. Tracks active "
+        "parenting timing for the cohort most likely to have children "
+        "currently in the 0-5 ECEC window.",
 }
 
 
@@ -1098,6 +1176,35 @@ LAYER3_METRIC_TRAJECTORY_SOURCE = {
         "value_col":     "value",
         "period_col":    "year",
         "filter_clause": "metric_name = 'census_single_parent_family_share_pct'",
+        "kind":          "annual",
+    },
+    # Layer 4.4 A3 + Stream C — appended 2026-05-10
+    "sa2_parent_cohort_25_44_share": {
+        "table":         "abs_sa2_education_employment_annual",
+        "value_col":     "value",
+        "period_col":    "year",
+        "filter_clause": "metric_name = 'erp_parent_cohort_25_44_share_pct'",
+        "kind":          "annual",
+    },
+    "sa2_partnered_25_44_share": {
+        "table":         "abs_sa2_education_employment_annual",
+        "value_col":     "value",
+        "period_col":    "year",
+        "filter_clause": "metric_name = 'census_partnered_25_44_share_pct'",
+        "kind":          "annual",
+    },
+    "sa2_women_35_44_with_child_share": {
+        "table":         "abs_sa2_education_employment_annual",
+        "value_col":     "value",
+        "period_col":    "year",
+        "filter_clause": "metric_name = 'census_women_35_44_with_child_share_pct'",
+        "kind":          "annual",
+    },
+    "sa2_women_25_34_with_child_share": {
+        "table":         "abs_sa2_education_employment_annual",
+        "value_col":     "value",
+        "period_col":    "year",
+        "filter_clause": "metric_name = 'census_women_25_34_with_child_share_pct'",
         "kind":          "annual",
     },
 }

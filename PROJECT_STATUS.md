@@ -1,8 +1,30 @@
 # Project Status
 
-*Last updated: 2026-05-10 (A10 + C8 Demographic Mix bundle shipped end-to-end). The on-disk version supersedes the project-knowledge monolith if they disagree.*
+*Last updated: 2026-05-10 (PM session — A3 + Stream C bundle shipped end-to-end). The on-disk version supersedes the project-knowledge monolith if they disagree.*
 
-## Headline (2026-05-10)
+## Headline (2026-05-10 PM)
+
+**A3 + Stream C bundle shipped end-to-end. Demographic mix sub-panel grows from 4 to 8 Lite rows.** Four new SA2-level metrics: parent-cohort 25-44 share (ERP, annual 6-point 2019-2024) + partnered 25-44 share (TSP T05, Census 3-point) + share of women 35-44 with at least one child (TSP T07, Census 3-point) + share of women 25-34 with at least one child (TSP T07, Census 3-point). audit_id 158 → 164 (4 ingest + 1 layer3_apply + 1 OI-35 catchment rebanding). DEC-81 minted to lock the V1 Stream C scope (sharp 25-44 partnered window; two fertility cohorts; NS-handling convention; ERP col 3 not 121 for total_persons). Probe-before-code (DEC-65) confirmed the column shapes; A10 had already banked T05 + T07 as sibling-tables which made this bundle a clean re-application of the A10 template.
+
+**Patient-cohort framing locked**: the 25-34 "with at least one child" cohort is the active-childcare-timing signal; the 35-44 cohort is the completed-fertility community-profile signal. Patrick's framing question "what's your sense here that feels old as an age for child care?" surfaced the asymmetry — childcare demand is more directly indexed to 25-34 active parenting, whereas 35-44 captures completed fertility once the lifetime profile has settled. Both cuts ship.
+
+**This session's deliverables (all on disk):**
+- `recon/probes/probe_a3_streamc_columns.py` (read-only TSP zip + ERP column probe)
+- `recon/a3_streamc_design.md` (probe-first design doc; D-B1..D-B5 ratified)
+- `layer4_4_step_a3_streamc_apply.py` (4 metrics ingest, audit 159–162)
+- `patch_b2_layer3_add_a3_streamc.py` (4 banding entries appended to `layer3_apply.py` METRICS)
+- 4 surgical edits to `centre_page.py` (LAYER3_METRIC_META, LAYER3_METRIC_INTENT_COPY, LAYER3_METRIC_TRAJECTORY_SOURCE, POSITION_CARD_ORDER — 4 entries each)
+- 1 surgical edit to `docs/centre.html` v3.29 → v3.30: `demoMetrics` array extended with 4 new keys (renderer transparently picks up annual + 3-point trajectories via existing `_renderLiteRow` + `_renderLiteDelta`)
+- DEC-81 minted in canonical DECISIONS.md
+- Re-built static-HTML capture `docs/a10_c8_review.html` for visual review of all 13 catchment-position rows across the 4 verifying SA2s
+
+**DB state.** 1 fresh backup (`data/pre_layer4_4_step_a3_streamc_20260510_005147.db` 548.1 MB). 35,324 new long-format rows in `abs_sa2_education_employment_annual` (14,120 parent-cohort + 7,063 partnered + 7,072 women-35-44 + 7,069 women-25-34). Plus banding rebuild: layer3_sa2_metric_banding total ~42,992 rows (4 new metrics × ~2,353-2,358 rows each = ~9,420 banded rows added). audit_log 158 → 164 (6 new rows: 4 ingest + 1 layer3_apply + 1 OI-35 catchment rebanding).
+
+**Verification.** National 2021 totals all within ABS-published bands: parent-cohort 28.20% (ABS ERP ~28-30%), partnered 25-44 65.56% (ABS ~58-65% — at upper end), women-35-44-with-child 78.43% (ABS ~75-82%), women-25-34-with-child 41.19% (in band 38-55, reflecting Australia's later-fertility shift). Four verifying SA2s render cleanly: Bondi Junction-Waverly NSW shows the urban late-fertility profile (parent-cohort 39%, partnered 62%, w35-44 60.9%, w25-34 just 11.3%) — clean separation from Outback NT's high-early-fertility profile (32%, 47%, 84.5%, 72.1%).
+
+---
+
+## Headline (2026-05-10 AM — preserved for traceability)
 
 **A10 + C8 Demographic Mix bundle shipped end-to-end.** Three new SA2-level Census-derived metrics (ATSI share, overseas-born share, single-parent-family share) plus two new top-N display tables (top-3 country of birth; top-3 language at home) plus a "Demographic mix" sub-panel inside the Catchment Position card. Audit_id 150 → 158 (5 schema/ingest mutations across two scripts). Table-mapping correction banked: roadmap had T07/T08/T19 — actual subjects are T06 (ATSI), T08 (country of birth), T14 (family composition); T07 is fertility and T19 is tenure/landlord. Probe-before-code (DEC-65) caught it before any wrong data shipped. DEC-78 (Census 0–100 storage convention) promoted from Reserved → Active; DEC-80 minted to lock the top-N table convention + TSP-table-number verification discipline + Demographic Mix scope.
 
@@ -103,14 +125,13 @@ Always-show variant (P1). P-2 silent absence for <2 numeric points / unreadable 
 
 **V1 path remaining: ~0 sessions.** No mandatory work.
 
-**V1.5 next-session priority:** **A3 — Parent-cohort 25-44 SA2 series (~0.4 sess)** — also touches Stream C (childbearing-age + marital-status depth, OI-NEW-12) which extends T05 (marital status) and T07 (children-ever-born by age) — both validated by this session's A10 probe and bankable into the same TSP-zip ingest pass.
+**V1.5 next-session priority:** **A4 — Schools at SA2 (ACARA enrolment counts) (~0.5 sess)**. With A3 + Stream C closed and the Demographic mix sub-panel locked at 8 rows, Phase A's remaining ingests (A4/A5/A6) are independent of one another and any of them could be picked up next; A4 is the largest single piece.
 
-**V1.5 path remaining (~1.7 sess):**
-- **A3** (~0.4 sess + Stream C T05/T07 bundle ~+0.3 sess) — Parent cohort + marital + fertility
+**V1.5 path remaining (~1.0 sess):**
 - **A4** (~0.5 sess) — Schools at SA2 (ACARA enrolment counts)
 - **A5** (~0.3 sess) — Subtype-correct denominators (LDC/FDC/OSHC distinct catchment populations)
 - **A6** (~0.2 sess) — SALM extension (promotes LFP triplet from Lite to Full)
-- **B1, B3, B4, B5** (~0.9 sess) — Phase B core (depend on A4/A5/A3)
+- **B1, B3, B4** (~0.7 sess) — Phase B core (depend on A4/A5)
 - **C2-other + C6** (~0.4 sess) — Phase C core remaining (depend on B-pass)
 
 See **CENTRE_PAGE_V1_5_ROADMAP.md** for the canonical V1.5 dependency-ordered queue and **ROADMAP.md** for the parent dependency view.

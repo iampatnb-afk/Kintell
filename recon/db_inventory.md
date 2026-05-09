@@ -1,8 +1,8 @@
 # DB Inventory — `data/kintell.db`
 
-Generated: 2026-04-28T10:46:18
-DB size: 526.5 MB
-Tables: 33 | Total rows: 1,491,348
+Generated: 2026-05-10T01:03:46
+DB size: 556.8 MB
+Tables: 37 | Total rows: 1,642,487
 
 Read-only snapshot. Pre-Step-1b reference.
 
@@ -11,39 +11,43 @@ Read-only snapshot. Pre-Step-1b reference.
 | # | Table | Rows |
 |---:|---|---:|
 | 1 | `abs_sa2_births_annual` | 34,300 |
-| 2 | `abs_sa2_education_employment_annual` | 203,527 |
-| 3 | `abs_sa2_erp_annual` | 88,344 |
-| 4 | `abs_sa2_socioeconomic_annual` | 161,964 |
-| 5 | `abs_sa2_unemployment_quarterly` | 142,496 |
-| 6 | `audit_log` | 134 |
-| 7 | `brands` | 349 |
-| 8 | `entities` | 7,143 |
-| 9 | `entity_financials` | 0 |
-| 10 | `entity_snapshots` | 0 |
-| 11 | `evidence` | 10,263 |
-| 12 | `group_snapshots` | 0 |
-| 13 | `groups` | 6,507 |
-| 14 | `intelligence_notes` | 0 |
-| 15 | `jsa_ivi_remoteness_monthly` | 348 |
-| 16 | `jsa_ivi_state_monthly` | 4,338 |
-| 17 | `jsa_sa4_remoteness_concordance` | 88 |
-| 18 | `link_candidates` | 823 |
-| 19 | `metric_definitions` | 6 |
-| 20 | `model_assumptions` | 13 |
-| 21 | `nqs_history` | 807,526 |
-| 22 | `people` | 0 |
-| 23 | `person_roles` | 0 |
-| 24 | `portfolios` | 4,187 |
-| 25 | `properties` | 0 |
-| 26 | `regulatory_events` | 0 |
-| 27 | `service_catchment_cache` | 0 |
-| 28 | `service_financials` | 0 |
-| 29 | `service_history` | 0 |
-| 30 | `service_tenures` | 0 |
-| 31 | `services` | 18,223 |
-| 32 | `training_completions` | 768 |
-| 33 | `training_completions_ingest_run` | 1 |
-| | **TOTAL** | **1,491,348** |
+| 2 | `abs_sa2_country_of_birth_top_n` | 7,102 |
+| 3 | `abs_sa2_education_employment_annual` | 267,771 |
+| 4 | `abs_sa2_erp_annual` | 88,344 |
+| 5 | `abs_sa2_language_at_home_top_n` | 7,060 |
+| 6 | `abs_sa2_socioeconomic_annual` | 161,964 |
+| 7 | `abs_sa2_unemployment_quarterly` | 142,496 |
+| 8 | `audit_log` | 164 |
+| 9 | `brands` | 349 |
+| 10 | `entities` | 7,143 |
+| 11 | `entity_financials` | 0 |
+| 12 | `entity_snapshots` | 0 |
+| 13 | `evidence` | 10,263 |
+| 14 | `group_snapshots` | 0 |
+| 15 | `groups` | 6,507 |
+| 16 | `intelligence_notes` | 0 |
+| 17 | `jsa_ivi_remoteness_monthly` | 348 |
+| 18 | `jsa_ivi_state_monthly` | 4,338 |
+| 19 | `jsa_sa4_remoteness_concordance` | 88 |
+| 20 | `layer3_sa2_metric_banding` | 52,027 |
+| 21 | `link_candidates` | 823 |
+| 22 | `metric_definitions` | 6 |
+| 23 | `model_assumptions` | 13 |
+| 24 | `nqs_history` | 807,526 |
+| 25 | `people` | 0 |
+| 26 | `person_roles` | 0 |
+| 27 | `portfolios` | 4,187 |
+| 28 | `properties` | 0 |
+| 29 | `regulatory_events` | 0 |
+| 30 | `sa2_cohort` | 2,473 |
+| 31 | `service_catchment_cache` | 18,203 |
+| 32 | `service_financials` | 0 |
+| 33 | `service_history` | 0 |
+| 34 | `service_tenures` | 0 |
+| 35 | `services` | 18,223 |
+| 36 | `training_completions` | 768 |
+| 37 | `training_completions_ingest_run` | 1 |
+| | **TOTAL** | **1,642,487** |
 
 ## 2. Per-table schema, indexes, last-update
 
@@ -67,9 +71,29 @@ Indexes:
 
 - `year` range: 2011 → 2024 (14 distinct)
 
+### `abs_sa2_country_of_birth_top_n`
+
+Rows: **7,102**
+
+Columns:
+
+| # | Name | Type | NotNull | Default | PK |
+|---:|---|---|:-:|---|:-:|
+| 0 | `sa2_code` | TEXT | 1 |  | 1 |
+| 1 | `census_year` | INTEGER | 1 |  | 2 |
+| 2 | `rank` | INTEGER | 1 |  | 3 |
+| 3 | `country_name` | TEXT | 1 |  | 0 |
+| 4 | `count` | INTEGER | 0 |  | 0 |
+| 5 | `share_pct` | REAL | 0 |  | 0 |
+
+Indexes:
+
+- `sqlite_autoindex_abs_sa2_country_of_birth_top_n_1` UNIQUE (pk) on (sa2_code, census_year, rank)
+
+
 ### `abs_sa2_education_employment_annual`
 
-Rows: **203,527**
+Rows: **267,771**
 
 Columns:
 
@@ -86,7 +110,7 @@ Indexes:
 - `idx_abs_sa2_ee_metric` (c) on (metric_name)
 - `sqlite_autoindex_abs_sa2_education_employment_annual_1` UNIQUE (pk) on (sa2_code, year, metric_name)
 
-- `year` range: 2011 → 2023 (8 distinct)
+- `year` range: 2011 → 2024 (9 distinct)
 
 ### `abs_sa2_erp_annual`
 
@@ -108,6 +132,26 @@ Indexes:
 - `sqlite_autoindex_abs_sa2_erp_annual_1` UNIQUE (pk) on (sa2_code, year, age_group)
 
 - `year` range: 2011 → 2024 (9 distinct)
+
+### `abs_sa2_language_at_home_top_n`
+
+Rows: **7,060**
+
+Columns:
+
+| # | Name | Type | NotNull | Default | PK |
+|---:|---|---|:-:|---|:-:|
+| 0 | `sa2_code` | TEXT | 1 |  | 1 |
+| 1 | `census_year` | INTEGER | 1 |  | 2 |
+| 2 | `rank` | INTEGER | 1 |  | 3 |
+| 3 | `language` | TEXT | 1 |  | 0 |
+| 4 | `count` | INTEGER | 0 |  | 0 |
+| 5 | `share_pct` | REAL | 0 |  | 0 |
+
+Indexes:
+
+- `sqlite_autoindex_abs_sa2_language_at_home_top_n_1` UNIQUE (pk) on (sa2_code, census_year, rank)
+
 
 ### `abs_sa2_socioeconomic_annual`
 
@@ -152,7 +196,7 @@ Indexes:
 
 ### `audit_log`
 
-Rows: **134**
+Rows: **164**
 
 Columns:
 
@@ -478,6 +522,35 @@ Indexes:
 - `sqlite_autoindex_jsa_sa4_remoteness_concordance_1` UNIQUE (pk) on (sa4_code)
 
 
+### `layer3_sa2_metric_banding`
+
+Rows: **52,027**
+
+Columns:
+
+| # | Name | Type | NotNull | Default | PK |
+|---:|---|---|:-:|---|:-:|
+| 0 | `sa2_code` | TEXT | 1 |  | 1 |
+| 1 | `metric` | TEXT | 1 |  | 2 |
+| 2 | `year` | INTEGER | 1 |  | 3 |
+| 3 | `period_label` | TEXT | 0 |  | 0 |
+| 4 | `cohort_def` | TEXT | 1 |  | 4 |
+| 5 | `cohort_key` | TEXT | 0 |  | 0 |
+| 6 | `cohort_n` | INTEGER | 0 |  | 0 |
+| 7 | `raw_value` | REAL | 0 |  | 0 |
+| 8 | `percentile` | REAL | 0 |  | 0 |
+| 9 | `decile` | INTEGER | 0 |  | 0 |
+| 10 | `band` | TEXT | 0 |  | 0 |
+
+Indexes:
+
+- `idx_l3_band` (c) on (band)
+- `idx_l3_metric` (c) on (metric)
+- `idx_l3_sa2` (c) on (sa2_code)
+- `sqlite_autoindex_layer3_sa2_metric_banding_1` UNIQUE (pk) on (sa2_code, metric, year, cohort_def)
+
+- `year` range: 2021 → 2025 (4 distinct)
+
 ### `link_candidates`
 
 Rows: **823**
@@ -729,9 +802,33 @@ Indexes:
 
 - `created_at` range: None → None
 
+### `sa2_cohort`
+
+Rows: **2,473**
+
+Columns:
+
+| # | Name | Type | NotNull | Default | PK |
+|---:|---|---|:-:|---|:-:|
+| 0 | `sa2_code` | TEXT | 1 |  | 1 |
+| 1 | `sa2_name` | TEXT | 0 |  | 0 |
+| 2 | `state_code` | TEXT | 0 |  | 0 |
+| 3 | `state_name` | TEXT | 0 |  | 0 |
+| 4 | `ra_code` | TEXT | 0 |  | 0 |
+| 5 | `ra_name` | TEXT | 0 |  | 0 |
+| 6 | `ra_band` | INTEGER | 0 |  | 0 |
+
+Indexes:
+
+- `idx_sa2_cohort_ra_band` (c) on (ra_band)
+- `idx_sa2_cohort_ra` (c) on (ra_code)
+- `idx_sa2_cohort_state` (c) on (state_code)
+- `sqlite_autoindex_sa2_cohort_1` UNIQUE (pk) on (sa2_code)
+
+
 ### `service_catchment_cache`
 
-Rows: **0**
+Rows: **18,203**
 
 Columns:
 
@@ -754,14 +851,21 @@ Columns:
 | 14 | `as_of_date` | TEXT | 0 |  | 0 |
 | 15 | `created_at` | TEXT | 0 | datetime('now') | 0 |
 | 16 | `updated_at` | TEXT | 0 | datetime('now') | 0 |
+| 17 | `adjusted_demand` | REAL | 0 |  | 0 |
+| 18 | `demand_share_state` | REAL | 0 |  | 0 |
+| 19 | `demand_supply` | REAL | 0 |  | 0 |
+| 20 | `child_to_place` | REAL | 0 |  | 0 |
+| 21 | `calibrated_rate` | REAL | 0 |  | 0 |
+| 22 | `rule_text` | TEXT | 0 |  | 0 |
+| 23 | `calibration_run_at` | TEXT | 0 |  | 0 |
 
 Indexes:
 
 - `ix_service_catchment_band` (c) on (supply_band)
 - `ix_service_catchment_sa2` (c) on (sa2_code)
 
-- `created_at` range: None → None
-- `updated_at` range: None → None
+- `created_at` range: 2026-05-04 04:01:36 → 2026-05-04 04:01:37
+- `updated_at` range: 2026-05-04 04:01:36 → 2026-05-04 04:01:37
 
 ### `service_financials`
 
@@ -947,21 +1051,26 @@ Tables exposing an SA2 column. NULLs and distinct-SA2 cardinality both shown.
 | Table | SA2 column | Distinct SA2s | NULL rows | Total |
 |---|---|---:|---:|---:|
 | `abs_sa2_births_annual` | `sa2_code` | 2,450 | 0 | 34,300 |
-| `abs_sa2_education_employment_annual` | `sa2_code` | 2,448 | 0 | 203,527 |
+| `abs_sa2_country_of_birth_top_n` | `sa2_code` | 2,386 | 0 | 7,102 |
+| `abs_sa2_education_employment_annual` | `sa2_code` | 2,452 | 0 | 267,771 |
 | `abs_sa2_erp_annual` | `sa2_code` | 2,454 | 0 | 88,344 |
+| `abs_sa2_language_at_home_top_n` | `sa2_code` | 2,374 | 0 | 7,060 |
 | `abs_sa2_socioeconomic_annual` | `sa2_code` | 2,454 | 0 | 161,964 |
 | `abs_sa2_unemployment_quarterly` | `sa2_code` | 2,336 | 0 | 142,496 |
-| `service_catchment_cache` | `sa2_code` | 0 | 0 | 0 |
-| `services` | `sa2_code` | 1,422 | 20 | 18,223 |
+| `layer3_sa2_metric_banding` | `sa2_code` | 2,454 | 0 | 52,027 |
+| `sa2_cohort` | `sa2_code` | 2,473 | 0 | 2,473 |
+| `service_catchment_cache` | `sa2_code` | 2,294 | 0 | 18,203 |
+| `services` | `sa2_code` | 2,294 | 20 | 18,223 |
 
 ### 3b. Year coverage by table
 
 | Table | Year col | Min | Max | Distinct |
 |---|---|---:|---:|---:|
 | `abs_sa2_births_annual` | `year` | 2011 | 2024 | 14 |
-| `abs_sa2_education_employment_annual` | `year` | 2011 | 2023 | 8 |
+| `abs_sa2_education_employment_annual` | `year` | 2011 | 2024 | 9 |
 | `abs_sa2_erp_annual` | `year` | 2011 | 2024 | 9 |
 | `abs_sa2_socioeconomic_annual` | `year` | 2011 | 2025 | 11 |
+| `layer3_sa2_metric_banding` | `year` | 2021 | 2025 | 4 |
 | `training_completions` | `year` | 2019 | 2024 | 6 |
 
 ### 3c. `services` table — Step 1b focus
@@ -1097,11 +1206,28 @@ By `state` (all services):
 | `kintell.db.backup_pre_step5b_prime_20260427_204131` | 495.0 | 2026-04-27T20:40:17 |
 | `kintell.db.backup_pre_step1b_20260427_213320` | 523.9 | 2026-04-27T21:33:22 |
 | `kintell.db.backup_pre_step8_20260427_215012` | 524.0 | 2026-04-27T21:50:14 |
-| **TOTAL** | **3,703.6** | |
+| `kintell.db.backup_pre_sa2_cohort_20260428_120804` | 526.5 | 2026-04-27T21:50:14 |
+| `kintell.db.backup_pre_layer3_20260428_122241` | 526.8 | 2026-04-28T12:08:05 |
+| `kintell.db.backup_pre_step1c_20260428_165521` | 531.5 | 2026-04-28T16:55:24 |
+| `kintell.db.backup_pre_4_3_5_20260430_101700` | 531.6 | 2026-04-28T16:55:25 |
+| `kintell.db.backup_pre_4_3_5b_20260430_110004` | 531.6 | 2026-04-30T10:17:01 |
+| `kintell.db.backup_pre_2_5_1_20260430_114306` | 531.6 | 2026-04-30T11:00:04 |
+| `kintell.db.backup_pre_2_5_1_20260430_115717` | 538.6 | 2026-04-30T11:43:07 |
+| `kintell.db.backup_pre_2_5_2_20260430_144707` | 538.6 | 2026-04-30T11:57:17 |
+| `kintell.db.backup_pre_2_5_1_20260504_125129` | 541.3 | 2026-05-04T12:32:15 |
+| `kintell.db.backup_pre_layer3_20260504_134117` | 541.3 | 2026-05-04T12:51:30 |
+| `kintell.db.backup_pre_2_5_1_20260504_140136` | 541.3 | 2026-05-04T14:01:28 |
+| `kintell.db.backup_pre_layer3_20260504_142054` | 541.3 | 2026-05-04T14:01:37 |
+| `kintell.db.backup_pre_2_5_2_20260504_142735` | 541.3 | 2026-05-04T14:20:55 |
+| `kintell.db.backup_pre_layer3_20260509_234301` | 546.0 | 2026-05-09T23:41:00 |
+| `kintell.db.backup_pre_2_5_2_20260509_234302` | 546.0 | 2026-05-09T23:43:02 |
+| `kintell.db.backup_pre_layer3_20260510_005250` | 554.4 | 2026-05-10T00:51:48 |
+| `kintell.db.backup_pre_2_5_2_20260510_005320` | 554.8 | 2026-05-10T00:52:51 |
+| **TOTAL** | **12,868.1** | |
 
 ## 6. `audit_log` summary
 
-Total rows: **134**
+Total rows: **164**
 Columns: `audit_id`, `actor`, `action`, `subject_type`, `subject_id`, `before_json`, `after_json`, `reason`, `occurred_at`
 
 ### 6a. Counts by `action`
@@ -1109,23 +1235,43 @@ Columns: `audit_id`, `actor`, `action`, `subject_type`, `subject_id`, `before_js
 | action | Count |
 |---|---:|
 | `accept_merge` | 110 |
+| `layer3_banding_v1` | 5 |
+| `service_catchment_cache_populate_v1` | 4 |
+| `layer3_catchment_banding_v1` | 4 |
 | `rename_group` | 3 |
 | `data_seed` | 2 |
+| `service_catchment_cache_rename_column_v1` | 1 |
+| `service_catchment_cache_extend_v1` | 1 |
 | `self_group_backfill_v1` | 1 |
 | `seed_model_assumptions` | 1 |
 | `schema_migration_v0_5` | 1 |
 | `schema_migration_v0_4` | 1 |
 | `schema_migration_training_completions` | 1 |
 | `salm_sa2_ingest_v1` | 1 |
+| `sa2_polygon_overwrite_v1` | 1 |
 | `sa2_polygon_backfill_v1` | 1 |
 | `sa2_erp_ingest_v1` | 1 |
+| `sa2_cohort_build_v1` | 1 |
 | `sa2_backfill_v1` | 1 |
 | `reverse_accept` | 1 |
 | `nqs_ingest_q4_2025` | 1 |
 | `nqaits_ingest_v1` | 1 |
+| `language_at_home_top_n_ingest_v1` | 1 |
+| `language_at_home_top_n_create_v1` | 1 |
 | `jsa_ivi_ingest_v1` | 1 |
 | `ingest_ncver_completions` | 1 |
+| `erp_parent_cohort_25_44_share_ingest_v1` | 1 |
 | `data_migration` | 1 |
+| `country_of_birth_top_n_ingest_v1` | 1 |
+| `country_of_birth_top_n_create_v1` | 1 |
+| `census_women_35_44_with_child_share_ingest_v1` | 1 |
+| `census_women_25_34_with_child_share_ingest_v1` | 1 |
+| `census_single_parent_family_share_ingest_v1` | 1 |
+| `census_partnered_25_44_share_ingest_v1` | 1 |
+| `census_overseas_born_share_ingest_v1` | 1 |
+| `census_nes_share_ingest_v3` | 1 |
+| `census_nes_share_ingest_v2` | 1 |
+| `census_atsi_share_ingest_v1` | 1 |
 | `add_model_assumption` | 1 |
 | `abs_sa2_socioeconomic_ingest_v1` | 1 |
 | `abs_sa2_education_employment_ingest_v1` | 1 |
@@ -1269,6 +1415,36 @@ Columns: `audit_id`, `actor`, `action`, `subject_type`, `subject_id`, `before_js
 | 132 | layer2_step5b_prime_apply | abs_sa2_education_employment_ingest_v1 | abs_sa2_education_employment_annual | 0 | {"rows": 0} | {"rows": 203527, "payload": {"rows": 203527, "rows_ee": 160376, "rows_t33_derived": 43151, "disti... | Phase 2.5 Layer 2 Step 5b-prime: SA2 education + employment time series. 16 metrics from ABS Data... | 2026-04-27T10:41:52.526274 |
 | 133 | layer2_step1b_apply | sa2_polygon_backfill_v1 | services | 0 | {"payload": {"candidates": 869, "null_sa2": 887, "unrecoverable_no_latlng": 18, "with_sa2": 17336... | {"payload": {"assigned": 867, "coverage": 0.998902, "hit_rate": 0.997699, "method": "sjoin within... | Layer 2 Step 1b: SA2 polygon point-in-polygon backfill. Assigned 867/869 candidates (99.77%). Mis... | 2026-04-27 11:33:23 |
 | 134 | layer2_step8_apply | abs_sa2_births_ingest_v1 | abs_sa2_births_annual | 0 | {"payload": {"table": "abs_sa2_births_annual", "table_existed_pre": false}, "rows": 0} | {"payload": {"distinct_sa2": 2450, "method": "openpyxl iter_rows; year-col + sub-header 'Births' ... | Layer 2 Step 8: SA2 births annual ingest. 34,300 records (34,300 with numeric values, 0 confident... | 2026-04-27 11:50:14 |
+| 135 | sa2_cohort_apply | sa2_cohort_build_v1 | sa2_cohort | 0 | {"rows": 0} | {"rows": 2473} | Build sa2_cohort lookup via SA2 centroid -> RA polygon spatial join; sources ASGS_2021_Main_Struc... | 2026-04-28 02:08:05 |
+| 136 | layer3_apply | layer3_banding_v1 | layer3_sa2_metric_banding | 0 | {"rows": 0} | {"rows": 23946} | Layer 3 banding: percentile/decile/band per (metric x SA2 x latest-year x cohort). 23946 rows. 10... | 2026-04-28 02:22:42 |
+| 137 | layer2_step1c_apply | sa2_polygon_overwrite_v1 | services | 0 | {"payload": {"active_services": 18223, "cross_state_mismatches": 1435, "with_latlng": 17882, "wit... | {"payload": {"assigned": 17839, "candidates_attempted": 17882, "cross_state_mismatches_post": 9, ... | Layer 2 Step 1c: SA2 polygon OVERWRITE rebuild. Re-derived sa2_code for 17,882 active services wi... | 2026-04-28 06:55:25 |
+| 138 | layer4_3_5_apply | service_catchment_cache_extend_v1 | service_catchment_cache | 0 | {"columns": ["service_id", "sa2_code", "sa2_name", "u5_pop", "median_income", "seifa_irsd", "unem... | {"columns": ["service_id", "sa2_code", "sa2_name", "u5_pop", "median_income", "seifa_irsd", "unem... | Layer 4.3 sub-pass 4.3.5: schema extension on service_catchment_cache. Added 4 catchment ratio co... | 2026-04-30 00:17:01 |
+| 139 | layer4_3_5b_apply | service_catchment_cache_rename_column_v1 | service_catchment_cache | 0 | {"columns": ["service_id", "sa2_code", "sa2_name", "u5_pop", "median_income", "seifa_irsd", "unem... | {"columns": ["service_id", "sa2_code", "sa2_name", "u5_pop", "median_income", "seifa_irsd", "unem... | Layer 4.3 sub-pass 4.3.5b: rename column capture_rate -> demand_share_state on service_catchment_... | 2026-04-30 01:00:04 |
+| 140 | layer2_5_apply | service_catchment_cache_populate_v1 | service_catchment_cache | 0 | {"prior_rows": 0} | {"inserted_rows": 18203, "backup": "kintell.db.backup_pre_2_5_1_20260430_114306", "attendance_fac... | Layer 2.5 sub-pass 2.5.1: full populate of service_catchment_cache. Per-SA2 calibrated rate + rul... | 2026-04-30 01:43:07 |
+| 141 | layer2_5_apply | service_catchment_cache_populate_v1 | service_catchment_cache | 0 | {"prior_rows": 18203} | {"inserted_rows": 18203, "backup": "kintell.db.backup_pre_2_5_1_20260430_115717", "attendance_fac... | Layer 2.5 sub-pass 2.5.1: full populate of service_catchment_cache. Per-SA2 calibrated rate + rul... | 2026-04-30 01:57:17 |
+| 142 | layer3_x_catchment_apply | layer3_catchment_banding_v1 | layer3_sa2_metric_banding | 0 | {"prior_rows_for_metrics": 0} | {"inserted_rows": 9035, "metrics": ["sa2_supply_ratio", "sa2_child_to_place", "sa2_adjusted_deman... | Layer 2.5 sub-pass 2.5.2: Layer 3.x catchment metric banding. Bands 4 catchment metrics from serv... | 2026-04-30 04:47:08 |
+| 143 | layer4_4_step_a2_apply | census_nes_share_ingest_v2 | abs_sa2_education_employment_annual | 0 | {"existing_rows_for_metric": 0, "max_audit_id": 142, "target_table_rows": 203527} | {"rows_inserted": 7272, "sa2_count": 2445, "years": [2011, 2016, 2021], "national_2011_share": 0.... | A2 NES share ingest (v2) from 2021 TSP T10A+T10B; closes nes_share_pct dormancy in calibrate_part... | 2026-05-04 02:32:15 |
+| 144 | layer2_5_apply | service_catchment_cache_populate_v1 | service_catchment_cache | 0 | {"prior_rows": 18203} | {"inserted_rows": 18203, "backup": "kintell.db.backup_pre_2_5_1_20260504_125129", "attendance_fac... | Layer 2.5 sub-pass 2.5.1: full populate of service_catchment_cache. Per-SA2 calibrated rate + rul... | 2026-05-04 02:51:30 |
+| 145 | layer3_apply | layer3_banding_v1 | layer3_sa2_metric_banding | 0 | {"rows": 0} | {"rows": 26363} | Layer 3 banding: percentile/decile/band per (metric x SA2 x latest-year x cohort). 26363 rows. 11... | 2026-05-04 03:41:18 |
+| 146 | layer4_4_step_a2_apply | census_nes_share_ingest_v3 | abs_sa2_education_employment_annual | 0 | {"existing_rows_for_metric": 7272, "max_audit_id": 145, "target_table_rows": 210799} | {"rows_inserted": 7272, "sa2_count": 2445, "years": [2011, 2016, 2021], "national_2011_pct": 18.1... | A2 NES share ingest (v3) — UNIT FIX. Stores percentage (0-100) matching census_*_pct convention. ... | 2026-05-04 04:01:28 |
+| 147 | layer2_5_apply | service_catchment_cache_populate_v1 | service_catchment_cache | 0 | {"prior_rows": 18203} | {"inserted_rows": 18203, "backup": "kintell.db.backup_pre_2_5_1_20260504_140136", "attendance_fac... | Layer 2.5 sub-pass 2.5.1: full populate of service_catchment_cache. Per-SA2 calibrated rate + rul... | 2026-05-04 04:01:37 |
+| 148 | layer3_apply | layer3_banding_v1 | layer3_sa2_metric_banding | 0 | {"rows": 0} | {"rows": 26363} | Layer 3 banding: percentile/decile/band per (metric x SA2 x latest-year x cohort). 26363 rows. 11... | 2026-05-04 04:20:55 |
+| 149 | layer3_x_catchment_apply | layer3_catchment_banding_v1 | layer3_sa2_metric_banding | 0 | {"prior_rows_for_metrics": 0} | {"inserted_rows": 9035, "metrics": ["sa2_supply_ratio", "sa2_child_to_place", "sa2_adjusted_deman... | Layer 2.5 sub-pass 2.5.2: Layer 3.x catchment metric banding. Bands 4 catchment metrics from serv... | 2026-05-04 04:27:36 |
+| 150 | layer4_4_step_a10_apply | country_of_birth_top_n_create_v1 | schema | 0 | {"existed": false} | {"created_table": "abs_sa2_country_of_birth_top_n"} | A10 schema mutation: create table for top-3 country-of-birth display context (D-A2). New table no... | 2026-05-09 13:41:00 |
+| 151 | layer4_4_step_a10_apply | census_atsi_share_ingest_v1 | abs_sa2_education_employment_annual | 0 | {"existing_rows_for_metric": 0} | {"rows_inserted": 7272, "sa2_count": 2445, "years": [2011, 2016, 2021], "national_2011_pct": 2.54... | A10 ATSI share ingest (v1). Stores percentage (0-100) matching census_*_pct convention. Formula: ... | 2026-05-09 13:41:00 |
+| 152 | layer4_4_step_a10_apply | census_overseas_born_share_ingest_v1 | abs_sa2_education_employment_annual | 0 | {"existing_rows_for_metric": 0} | {"rows_inserted": 7272, "sa2_count": 2445, "years": [2011, 2016, 2021], "national_2011_pct": 24.5... | A10 overseas-born share ingest (v1). Stores percentage (0-100). Formula: (Tot - Aust - Country_bi... | 2026-05-09 13:41:00 |
+| 153 | layer4_4_step_a10_apply | census_single_parent_family_share_ingest_v1 | abs_sa2_education_employment_annual | 0 | {"existing_rows_for_metric": 0} | {"rows_inserted": 7104, "sa2_count": 2387, "years": [2011, 2016, 2021], "national_2011_pct": 15.6... | A10 single-parent-family share ingest (v1). Stores percentage (0-100). Formula: Tot_FH_One_PFam /... | 2026-05-09 13:41:00 |
+| 154 | layer4_4_step_a10_apply | country_of_birth_top_n_ingest_v1 | abs_sa2_country_of_birth_top_n | 0 | {"existing_rows": 0, "table_created_this_run": true} | {"rows_inserted": 7102, "sa2_count": 2386, "census_year": 2021, "top_n": 3, "backup": "data\\pre_... | A10 country-of-birth top-3 ingest (v1, 2021 only). Display-only context table accompanying census... | 2026-05-09 13:41:00 |
+| 155 | layer3_apply | layer3_banding_v1 | layer3_sa2_metric_banding | 0 | {"rows": 0} | {"rows": 33571} | Layer 3 banding: percentile/decile/band per (metric x SA2 x latest-year x cohort). 33571 rows. 14... | 2026-05-09 13:43:02 |
+| 156 | layer3_x_catchment_apply | layer3_catchment_banding_v1 | layer3_sa2_metric_banding | 0 | {"prior_rows_for_metrics": 0} | {"inserted_rows": 9035, "metrics": ["sa2_supply_ratio", "sa2_child_to_place", "sa2_adjusted_deman... | Layer 2.5 sub-pass 2.5.2: Layer 3.x catchment metric banding. Bands 4 catchment metrics from serv... | 2026-05-09 13:43:03 |
+| 157 | layer4_4_step_a10b_languages_apply | language_at_home_top_n_create_v1 | schema | 0 | {"existed": false} | {"created_table": "abs_sa2_language_at_home_top_n"} | A10/C8 follow-up: create table for top-3 language-at-home display context. Parallel to abs_sa2_co... | 2026-05-09 14:08:27 |
+| 158 | layer4_4_step_a10b_languages_apply | language_at_home_top_n_ingest_v1 | abs_sa2_language_at_home_top_n | 0 | {"existing_rows": 0, "table_created_this_run": true} | {"rows_inserted": 7060, "sa2_count": 2374, "census_year": 2021, "top_n": 3, "backup": "data\\pre_... | A10/C8 follow-up: top-3 languages spoken at home per SA2 (2021 only). Display-only context table ... | 2026-05-09 14:08:27 |
+| 159 | layer4_4_step_a3_streamc_apply | erp_parent_cohort_25_44_share_ingest_v1 | abs_sa2_education_employment_annual | 0 | {"existing_rows_for_metric": 0} | {"rows_inserted": 14120, "sa2_count": 2363, "years": [2019, 2020, 2021, 2022, 2023, 2024], "natio... | A3 parent-cohort 25-44 share ingest (v1). Stores percentage (0-100). Formula: sum(persons 25_29..... | 2026-05-09 14:51:47 |
+| 160 | layer4_4_step_a3_streamc_apply | census_partnered_25_44_share_ingest_v1 | abs_sa2_education_employment_annual | 0 | {"existing_rows_for_metric": 0} | {"rows_inserted": 7063, "sa2_count": 2379, "years": [2011, 2016, 2021], "national_pct_by_year": {... | Stream C partnered 25-44 share ingest (v1). Stores percentage (0-100). Formula: sum(Mar_RegM_P + ... | 2026-05-09 14:51:48 |
+| 161 | layer4_4_step_a3_streamc_apply | census_women_35_44_with_child_share_ingest_v1 | abs_sa2_education_employment_annual | 0 | {"existing_rows_for_metric": 0} | {"rows_inserted": 7072, "sa2_count": 2380, "years": [2011, 2016, 2021], "national_pct_by_year": {... | Stream C women-35-44 with at least one child share ingest (v1). Stores percentage (0-100). Formul... | 2026-05-09 14:51:48 |
+| 162 | layer4_4_step_a3_streamc_apply | census_women_25_34_with_child_share_ingest_v1 | abs_sa2_education_employment_annual | 0 | {"existing_rows_for_metric": 0} | {"rows_inserted": 7069, "sa2_count": 2375, "years": [2011, 2016, 2021], "national_pct_by_year": {... | Stream C women-25-34 with at least one child share ingest (v1). Stores percentage (0-100). Formul... | 2026-05-09 14:51:48 |
+| 163 | layer3_apply | layer3_banding_v1 | layer3_sa2_metric_banding | 0 | {"rows": 0} | {"rows": 42992} | Layer 3 banding: percentile/decile/band per (metric x SA2 x latest-year x cohort). 42992 rows. 18... | 2026-05-09 14:52:51 |
+| 164 | layer3_x_catchment_apply | layer3_catchment_banding_v1 | layer3_sa2_metric_banding | 0 | {"prior_rows_for_metrics": 0} | {"inserted_rows": 9035, "metrics": ["sa2_supply_ratio", "sa2_child_to_place", "sa2_adjusted_deman... | Layer 2.5 sub-pass 2.5.2: Layer 3.x catchment metric banding. Bands 4 catchment metrics from serv... | 2026-05-09 14:53:21 |
 
 ---
 

@@ -1,3 +1,38 @@
+## 2026-05-10 PM — Layer 4.4 A3 + Stream C bundle ship
+
+**Session type:** Probe → design → ratify → ingest → banding → render → smoke-test → tier-2 doc refresh. End-to-end V1.5 close in one session.
+
+**Context entering session.** A10 + C8 Demographic Mix bundle had shipped this morning (audit_id 158). The roadmap (`CENTRE_PAGE_V1_5_ROADMAP.md`) flagged A3 + Stream C as the next priority — bundled because both share the 2021 TSP zip + the existing ABS ERP workbook. Patrick green-lit autonomous execution past the design ratification gate.
+
+**Work shipped this session.**
+
+**1. Probe (DEC-65).** New probe `recon/probes/probe_a3_streamc_columns.py` confirmed:
+- T05 marital column shape: `C{yr}_{age}_{Mar_RegM,Mar_DFM,N_mar,Tot}_{M,F,P}` across 16 age bands × 3 sexes × 3 census years. No Sep/Div/Wid in TSP short-header — complement of "partnered" is NSDW combined, not just never-married. T05A/B/C split by year.
+- T07 fertility column shape: `C{yr}_AP_{age}_NCB_{0..6mor,NS,Tot}` (women only — AP = aged persons female). 15 age bands × 9 NCB cuts × 3 census years. T07A/B/C split.
+- ERP `Population and People Database.xlsx` Table 1: Persons 25-29..40-44 sit at cols 89-92 (one column per 5-year band). Total persons at col 3 (NOT col 121 as the original Layer-2-step-6 diag mis-guessed; col 121 is fertility rate decimal). Locked in DEC-81 #6.
+
+**2. Design doc + scope ratification.** `recon/a3_streamc_design.md` drafted with D-B1 through D-B5. Patrick ratified with one amendment: 35-44 fertility cohort "feels old" for childcare relevance — added a parallel 25-34 cohort as the active-childcare-timing signal. Sub-panel grows from 4 to 8 Lite rows; total Catchment Position card now 13 rows. Density tradeoff acknowledged.
+
+**3. Ingest (`layer4_4_step_a3_streamc_apply.py`).** Single bundled script ingesting 4 metrics into `abs_sa2_education_employment_annual`:
+- `erp_parent_cohort_25_44_share_pct` — 14,120 rows, annual 2019-2024
+- `census_partnered_25_44_share_pct` — 7,063 rows, Census 3-point
+- `census_women_35_44_with_child_share_pct` — 7,072 rows, Census 3-point
+- `census_women_25_34_with_child_share_pct` — 7,069 rows, Census 3-point
+
+Pre-mutation `recon/db_inventory.md` snapshot per STD-30. Single backup `data/pre_layer4_4_step_a3_streamc_20260510_005147.db` (548.1 MB). audit_id 159-162 written. Dry-run caught the col-121 bug before any write — re-run with col 3 produced sane national totals (28.20% / 65.56% / 78.43% / 41.19%).
+
+**4. B-pass banding (`patch_b2_layer3_add_a3_streamc.py`).** 4 entries appended to `layer3_apply.py` METRICS list, all `state_x_remoteness` cohort. `layer3_apply.py --apply` lands ~9,420 banded rows; `layer3_x_catchment_metric_banding.py --apply` rebuilds catchment metrics per OI-35 workaround. audit_id 163 + 164.
+
+**5. C-pass render.** 4 surgical edits to `centre_page.py` v22 (LAYER3_METRIC_META, LAYER3_METRIC_INTENT_COPY, LAYER3_METRIC_TRAJECTORY_SOURCE, POSITION_CARD_ORDER each gain 4 entries) + 1 surgical edit to `docs/centre.html` v3.30 (`demoMetrics` array gains 4 keys). No new render helpers — existing `_renderLiteRow` + `_renderLiteDelta` handle both annual (parent-cohort 6-point) and 3-point (Census) trajectories transparently.
+
+**6. Smoke-test capture.** `docs/a10_c8_review.html` rebuilt covering all 4 verifying SA2s; payload spot-check confirms all 13 catchment-position rows render with bands, deciles, and trajectories. Bondi Junction-Waverly NSW shows the urban late-fertility profile (parent-cohort 39%, partnered 62%, w35-44 60.9%, w25-34 just 11.3%) — clean separation from Outback NT (32%, 47%, 84.5%, 72.1%).
+
+**7. DEC-81 minted.** Locks 6 things: (1) the 4-metric V1 scope; (2) sharp 25-44 partnered window matching parent cohort; (3) two fertility cohorts not one — 25-34 active vs 35-44 completed; (4) NS-handling: numerator + denominator both exclude `NCB_NS`; (5) NSDW caveat for partnered (T05 short-header limitation); (6) ERP `total_persons` at col 3.
+
+**State at session end.** A3 + Stream C closed end-to-end. Demographic mix sub-panel locked at 8 rows. V1.5 path remaining ~2.1 sess (A4 schools next). audit_log 158 → 164.
+
+---
+
 ## 2026-04-29 — Layer 4.3 design closure
 
 **Session type:** Decision closure + doc-set update. No code, no DB mutation.

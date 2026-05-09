@@ -1097,6 +1097,43 @@ Consequences: Banding registry (`layer3_apply.py` METRICS list), centre-page reg
 
 ---
 
+## DEC-81 — Stream C V1 scope: parent-cohort 25-44 + partnered 25-44 + women-with-child fertility cuts (35-44 + 25-34)
+Status: Active
+Date: 2026-05-10 (locked at A3 + Stream C close)
+
+Context: A3 (Parent-cohort 25-44 SA2 series) and Stream C (childbearing-age + marital-status depth, OI-NEW-12) were bundled into a single V1.5 ingest pass on 2026-05-10 because both share the 2021 TSP zip + the existing ABS ERP workbook. The probe (`recon/probes/probe_a3_streamc_columns.py`) confirmed T05 marital categories are limited to `Mar_RegM` (registered) + `Mar_DFM` (de facto) + `N_mar` (never married) + `Tot` — no separated/divorced/widowed in the short-header — and T07 fertility is shaped as `C{yr}_AP_{age}_NCB_{0..6mor,NS,Tot}` (women only). The ERP workbook's `Persons - 25-29..40-44 years (no.)` columns sit at indices 89-92 with `total_persons` at col 3 (NOT col 121, which is the fertility rate decimal — the original Layer-2-step-6 diag mis-guessed col 121; this DEC locks col 3 explicitly for any future ERP age-band ingest).
+
+Decision:
+
+1. **Four metrics ship in V1**, all stored as percentage 0-100 per DEC-78, all banded `state_x_remoteness` per DEC-67 (NES precedent), all neutral framing per DEC-75 — no calibration nudge in V1, parallel to the A10 metrics (calibration scoping is a follow-up after banding distributions are reviewed).
+
+   | Metric (canonical) | metric_name in long-format | Source | Trajectory |
+   |---|---|---|---|
+   | `sa2_parent_cohort_25_44_share` | `erp_parent_cohort_25_44_share_pct` | ABS ERP cols 89..92 / col 3 | annual, 6 points 2019-2024 (workbook's SA2-level coverage starts 2019 per A1 finding) |
+   | `sa2_partnered_25_44_share` | `census_partnered_25_44_share_pct` | TSP T05 (RegM_P + DFM_P over 25_29..40_44) / Tot_P | Census 3-point |
+   | `sa2_women_35_44_with_child_share` | `census_women_35_44_with_child_share_pct` | TSP T07, women 35_39 + 40_44, (Tot − NCB_0 − NCB_NS) / (Tot − NCB_NS) | Census 3-point |
+   | `sa2_women_25_34_with_child_share` | `census_women_25_34_with_child_share_pct` | TSP T07, women 25_29 + 30_34, same formula | Census 3-point |
+
+2. **Sharp 25-44 window for partnered.** The partnered-share window matches the parent-cohort window (rather than the broader Census 15+ headline ~50% national). Rationale: the three rows tell a coherent story when they share the same age frame ("of the 25-44s in this catchment, X% are in partnerships"). Patrick ratified the sharp cut.
+
+3. **Two fertility cohorts, not one.** The original D-B1 proposal shipped only the 35-44 "completed-fertility proxy" cut. Patrick's amendment: 35-44 alone "feels old" for childcare relevance — a woman in 35-44 with a child today may have the child already past the 0-5 ECEC window. The under-cohort 25-34 with at least one child indexes more directly to active ECEC parenting and is therefore additionally interesting institutional context. Both cuts ship; the 35-44 cut remains as a completed-fertility community-profile signal, the 25-34 cut as the active-timing signal. National 2021 references: 35-44 ~78%, 25-34 ~41%. Patrick acknowledged the density tradeoff (sub-panel grows from 4 to 8 rows; total Catchment Position card 9 → 13 rows) and accepted it.
+
+4. **NS-handling convention for fertility.** Numerator AND denominator both exclude `NCB_NS`. Mirrors the NES + ATSI + single-parent NS-as-other convention but stricter — NS in fertility ranges from 3-5% nationally. Documented in the ingest script docstring.
+
+5. **NSDW caveat for partnered.** TSP T05 short-header carries only RegM + DFM + N_mar + Tot. The complement of "partnered" in this metric is "never married + separated + divorced + widowed combined", not just "never married". Documented in the metric reason field. Full T05 detail (Sep / Div / Wid breakdown) requires the GCP DataPack and is deferred to V2 if ever requested.
+
+6. **ERP `total_persons` at col 3 (definitively).** The Layer-2-step-6 v2 docstring corrected col 121 → col 3 but the column-map JSON still carried 121. Future ERP age-band ingests must use col 3 for total_persons. Documented in `layer4_4_step_a3_streamc_apply.py` with explicit constant comment.
+
+Consequences:
+
+- Stream C (OI-NEW-12) closes at this DEC for V1 purposes. V2 expansion targets banked: full marital breakdown (Sep/Div/Wid), mean children-ever-born (decimals), and broader 15+ marital cuts.
+- Calibration scoping for the 4 new metrics + the existing 4 A10 metrics deferred to a single calibration pass once banding distributions are surveyed (`recon/calibration_review_post_a10_a3.md` candidate).
+- Fertility metrics are female-only by construction (T07 = women only). For visualisation on a unisex card, label clarity is essential; "Share of women aged X to Y with at least one child" is the canonical phrasing per Patrick.
+- The Catchment Position card now hosts 13 rows (5 credit + 8 demographic). DEC-75 visual-weight discipline keeps total card height modest because Lite rows are ~⅓ the height of Full rows. Revisit only if Patrick flags density during operator-review of the rendered page.
+- The `_renderLiteDelta` helper handles the parent-cohort 6-point annual trajectory (badge reads "+/- Xpp from 2019 to 2024") and the Census 3-point trajectories transparently — no new render helpers needed for this bundle.
+
+---
+
 ## DEC-80 — Census top-N display tables; TSP-table-mapping verification discipline
 Status: Active
 Date: 2026-05-10 (locked at A10 + C8 close)

@@ -1,6 +1,6 @@
 # Centre Page V1.5 Roadmap
 
-*Last updated: 2026-05-10 (A10 + C8 Demographic Mix bundle CLOSED end-to-end; TSP table-mapping correction locked as DEC-80). The on-disk version supersedes the project-knowledge monolith if they disagree.*
+*Last updated: 2026-05-10 PM (A3 + Stream C bundle CLOSED end-to-end; DEC-81 locks Stream C V1 scope at 4 metrics: parent-cohort + partnered + 2 fertility cohorts). The on-disk version supersedes the project-knowledge monolith if they disagree.*
 
 This roadmap is the canonical V1.5 work queue for the centre page. PROJECT_STATUS.md and ROADMAP.md reference this doc for V1.5 detail.
 
@@ -24,11 +24,12 @@ The next-session priority (A10 + C8 Demographic Mix bundle) is unchanged.
 | Phase | Items | Effort | Status |
 |---|---|---|---|
 | First piece | OI-36 (NES render-side + delta badge) | shipped 2026-05-05 | **CLOSED `430009a`** |
-| Demographic Mix bundle | A10 + C8 (T06 ATSI + T08 COB + T14 family + T10 language top-N) | shipped 2026-05-10 | **CLOSED — see §A10 + §C8** |
-| Phase A core | A3 + A4 + A5 + A6 | ~1.4 sess | open |
-| Phase B core | B1 + B3 + B4 + B5 | ~0.9 sess | open |
+| Demographic Mix bundle | A10 + C8 (T06 ATSI + T08 COB + T14 family + T10 language top-N) | shipped 2026-05-10 AM | **CLOSED — see §A10 + §C8** |
+| A3 + Stream C bundle | A3 (parent cohort 25-44) + T05 partnered 25-44 + T07 women-with-child 35-44 + T07 women-with-child 25-34 | shipped 2026-05-10 PM | **CLOSED — see §A3 + §C-A3-StreamC** |
+| Phase A core remaining | A4 + A5 + A6 | ~1.0 sess | open |
+| Phase B core | B1 + B3 + B4 | ~0.7 sess | open |
 | Phase C core | C2 (other B-pass promotions) + C6 | ~0.4 sess | open |
-| **V1.5 core remaining** | | **~2.7 sess** | |
+| **V1.5 core remaining** | | **~2.1 sess** | |
 
 ---
 
@@ -40,8 +41,8 @@ The next-session priority (A10 + C8 Demographic Mix bundle) is unchanged.
 ### A2 — Census NES share
 **CLOSED 2026-05-04** (commits `fdc85bd` + `49ce9f1` + `bb21f66`). Stored as percentage (0-100); wire boundary divides by 100 before passing to calibration.
 
-### A3 — Parent-cohort 25-44 SA2 series
-**Open. ~0.4 sess.** ABS ERP age slice for 25-44 alongside existing 0-4. Affects calibration via parent cohort weighting; affects Population card via new "parent cohort" row.
+### A3 — Parent-cohort 25-44 SA2 series ✅
+**CLOSED 2026-05-10 PM.** Bundled with Stream C (T05 partnered + T07 fertility) into a single `layer4_4_step_a3_streamc_apply.py` ingest pass — see §A3-Stream-C below. Parent-cohort metric `erp_parent_cohort_25_44_share_pct` lands as a Lite row in the Demographic mix sub-panel (NOT the Population card per D-B3 — the demographic-mix theming is the natural home given the A10 framing). 14,120 rows, annual cadence 2019-2024 per ABS ERP SA2-level coverage. National 2021: 28.20%.
 
 ### A4 — Schools at SA2 (preschool counts already in place)
 **Open. ~0.5 sess.** ACARA SA2-level enrolment counts. Currently only `ee_preschool_*_count` series are in the table.
@@ -64,6 +65,22 @@ All three banded percentages stored 0–100 per DEC-78. Banding cohort: `state_x
 
 ATSI display framing resolved: raw % with neutral "Aboriginal and Torres Strait Islander share" copy (consistent with NES neutral-framing precedent).
 
+### A3-Stream-C — Parent-cohort + marital + fertility (Stream C V1 close) ✅
+**CLOSED 2026-05-10 PM (DEC-81).** Four metrics in one ingest pass:
+
+- `erp_parent_cohort_25_44_share_pct` — ABS ERP, annual 2019-2024 (6-point trajectory)
+- `census_partnered_25_44_share_pct` — TSP T05 (Mar_RegM_P + Mar_DFM_P) over 25-44, Census 3-point
+- `census_women_35_44_with_child_share_pct` — TSP T07, women 35-44 with NCB ≥ 1, Census 3-point. Display label: "Share of women aged 35 to 44 with at least one child"
+- `census_women_25_34_with_child_share_pct` — TSP T07, women 25-34, Census 3-point. Display label: "Share of women aged 25 to 34 with at least one child"
+
+All 4 stored 0-100 per DEC-78. Banded `state_x_remoteness` per DEC-67. Neutral-framing Lite rows; calibration deferred (Patrick V2 follow-up). National 2021 totals all in expected bands (28.2 / 65.6 / 78.4 / 41.2). Sub-panel grows from 4 to 8 Lite rows; Catchment Position card now 13 rows total. Density tradeoff acknowledged + accepted.
+
+Key probe finding: ERP `total_persons` is at col **3** (not col 121 as the original Layer-2-step-6 diag mis-guessed). Locked in DEC-81.
+
+NS-handling: numerator + denominator both exclude `NCB_NS` (stricter than NES NS-as-other convention; T07 NS is non-trivial at 3-5% nationally).
+
+Stream C V1 close also retires OI-NEW-12 (childbearing-age + marital-status depth — V1 portion). V2 banked: full marital breakdown (Sep / Div / Wid via GCP DataPack), mean children-ever-born decimals, broader 15+ marital cuts.
+
 ### Future ingests (banked)
 - A7 — SEEK / advertised wages (workforce supply enrichment)
 - A8 — Daily-rate centre-page integration (depends on daily-rate metric stability)
@@ -84,8 +101,8 @@ ATSI display framing resolved: raw % with neutral "Aboriginal and Torres Strait 
 ### B4 — Subtype-aware metric banding
 **Depends on A5.** Catchment ratios per subtype need separate banding rows.
 
-### B5 — `sa2_parent_cohort_25_44_share` banding
-**Depends on A3.** Parent cohort share by SA2.
+### B5 — `sa2_parent_cohort_25_44_share` banding ✅
+**CLOSED 2026-05-10 PM** (with A3 + Stream C ingest in `patch_b2_layer3_add_a3_streamc.py`). 4 banding entries appended (parent-cohort + partnered + 2 fertility cohorts). All `state_x_remoteness` cohort. ~9,420 banded rows added to `layer3_sa2_metric_banding`.
 
 ---
 
@@ -104,19 +121,26 @@ ATSI display framing resolved: raw % with neutral "Aboriginal and Torres Strait 
 **Depends on A7.** SEEK + advertised wages new rows.
 
 ### C8 — Demographic Mix sub-panel ✅
-**CLOSED 2026-05-10.** Implemented as a sub-panel inside Catchment Position card, NOT a separate card (per DEC-80 #4 + DEC-11 additive overlay). The C2 NES patcher author (2026-05-04) had already anticipated this placement.
+**CLOSED 2026-05-10 (extended 2026-05-10 PM with A3 + Stream C).** Implemented as a sub-panel inside Catchment Position card, NOT a separate card (per DEC-80 #4 + DEC-11 additive overlay). The C2 NES patcher author (2026-05-04) had already anticipated this placement.
 
-Render structure (`renderCatchmentPositionCard()` in `centre.html` v3.29):
+Render structure (`renderCatchmentPositionCard()` in `centre.html` v3.30):
 - Credit-signal block: supply ratio, demand vs supply, child-to-place, adjusted demand, demand share state
 - Dashed-divider with "Demographic mix" sub-panel header
-- Lite rows: NES → ATSI → overseas-born → single-parent family share
+- Lite rows (8 total after A3 + Stream C):
+  - NES → ATSI → overseas-born → single-parent family share (A10 ship)
+  - parent-cohort 25-44 share → partnered 25-44 share → women 35-44 with at least one child → women 25-34 with at least one child (A3 + Stream C ship)
 - Top-N context lines via shared `_renderTopNContext` helper:
   - Below NES → "Top languages at home (2021)" (T10A+T10B)
   - Below overseas-born → "Top countries of birth (2021)" (T08)
 
 Backend: `_build_community_profile(conn, sa2_code)` populates `centre.community_profile.{country_of_birth_top_n, language_at_home_top_n}` lists on the payload.
 
-Sparkline glyph on Lite rows considered + rejected mid-session (too busy at that visual budget). Delta badge remains canonical for Lite-row trajectory representation. Captured as a feedback memory.
+Sparkline glyph on Lite rows considered + rejected at A10 ship (too busy at that visual budget). Delta badge remains canonical for Lite-row trajectory representation. Captured as a feedback memory.
+
+### C-A3-StreamC — A3 + Stream C render extension ✅
+**CLOSED 2026-05-10 PM.** Surgical render extension: `centre_page.py` v22 (LAYER3_METRIC_META + INTENT_COPY + TRAJECTORY_SOURCE + POSITION_CARD_ORDER each gain 4 entries) and `centre.html` v3.29 → v3.30 (`demoMetrics` array gains 4 keys after sa2_single_parent_family_share). No new render helpers — existing `_renderLiteRow` + `_renderLiteDelta` handle annual (parent-cohort 6-point 2019-2024) and Census 3-point trajectories transparently via `p.value_format` + `p.trajectory`.
+
+Smoke-test capture rebuilt at `docs/a10_c8_review.html` covering all 13 catchment-position rows for the 4 verifying SA2s.
 
 ---
 
@@ -131,18 +155,9 @@ Sparkline glyph on Lite rows considered + rejected mid-session (too busy at that
 
 ## Recommended next session start
 
-**Begin A3 — Parent-cohort 25-44 SA2 series, bundled with Stream C extensions (T05 marital status, T07 fertility/children-ever-born).** Order:
+**Begin A4 — Schools at SA2 (ACARA enrolment counts).** ~0.5 sess. ACARA publishes per-school enrolment data; needs SA2 spatial-join via the existing `services_sa2_lookup` pattern but at the school level. Probe trail: confirm ACARA-source file presence + schema + SA2 backfill discipline. Outputs: 1-2 new metrics (school enrolment count + possibly school count) into `abs_sa2_education_employment_annual`. After A4 lands, B3 (schools-derived metric banding) follows in the same session if scope allows.
 
-1. Probe T05 + T07 column shapes (already partially banked from A10 probe — both validated as living in same TSP zip)
-2. Stream C scope decision (DEC candidate) — which marital + fertility cuts ship as Lite rows in Catchment Position sub-panel vs context-only?
-3. ABS ERP age slice for 25-44 alongside existing 0-4 (A3 core) — affects calibration via parent cohort weighting; affects Population card via new "parent cohort" row
-4. B-pass banding entry for sa2_parent_cohort_25_44_share + any new marital/fertility metrics
-5. C-pass: extend Demographic mix sub-panel with Stream C rows where banded; new context lines if appropriate
-6. End-of-session doc refresh
-
-Total estimated: ~0.7 sess (A3 ~0.4 + Stream C extension ~0.3, amortised by shared TSP-zip ingest pass).
-
-After A3 + Stream C lands, evaluate A4 (schools at SA2) next.
+After A4, evaluate A5 (subtype-correct denominators) vs A6 (SALM extension) — A5 is more impactful (refines the credit-direct supply ratio per LDC/FDC/OSHC subtype) but A6 is faster (promotes LFP triplet from Lite to Full).
 
 ---
 
