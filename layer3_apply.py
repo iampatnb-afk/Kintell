@@ -153,6 +153,30 @@ METRICS = [
         "year_column": "year",
         "cohort_def": "state_x_remoteness",
     },
+    {
+        "canonical": "sa2_atsi_share",
+        "source_table": "abs_sa2_education_employment_annual",
+        "value_column": "value",
+        "filter_clause": "metric_name = 'census_atsi_share_pct'",
+        "year_column": "year",
+        "cohort_def": "state_x_remoteness",
+    },
+    {
+        "canonical": "sa2_overseas_born_share",
+        "source_table": "abs_sa2_education_employment_annual",
+        "value_column": "value",
+        "filter_clause": "metric_name = 'census_overseas_born_share_pct'",
+        "year_column": "year",
+        "cohort_def": "state_x_remoteness",
+    },
+    {
+        "canonical": "sa2_single_parent_family_share",
+        "source_table": "abs_sa2_education_employment_annual",
+        "value_column": "value",
+        "filter_clause": "metric_name = 'census_single_parent_family_share_pct'",
+        "year_column": "year",
+        "cohort_def": "state_x_remoteness",
+    },
 ]
 
 
