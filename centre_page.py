@@ -674,6 +674,47 @@ LAYER3_METRIC_META = {
             "high": "high cultural-linguistic diversity",
         },
     },
+    # Layer 4.4 A10 — Demographic Mix bundle (3 Lite rows). Neutral framing
+    # consistent with NES precedent; calibration deferred per design D-A1.
+    "sa2_atsi_share": {
+        "display": "Aboriginal and Torres Strait Islander share",
+        "card": "catchment_position",
+        "value_format": "percent",
+        "direction": "high_is_positive",  # neutral framing
+        "row_weight": "lite",
+        "source": "ABS Census 2021 T06 (census_atsi_share_pct)",
+        "band_copy": {
+            "low":  "low Aboriginal and Torres Strait Islander population share",
+            "mid":  "moderate Aboriginal and Torres Strait Islander population share",
+            "high": "high Aboriginal and Torres Strait Islander population share",
+        },
+    },
+    "sa2_overseas_born_share": {
+        "display": "Overseas-born share",
+        "card": "catchment_position",
+        "value_format": "percent",
+        "direction": "high_is_positive",  # neutral framing
+        "row_weight": "lite",
+        "source": "ABS Census 2021 T08 (census_overseas_born_share_pct)",
+        "band_copy": {
+            "low":  "predominantly Australian-born",
+            "mid":  "moderate share born overseas",
+            "high": "high share born overseas",
+        },
+    },
+    "sa2_single_parent_family_share": {
+        "display": "Single-parent family share",
+        "card": "catchment_position",
+        "value_format": "percent",
+        "direction": "high_is_positive",  # neutral framing
+        "row_weight": "lite",
+        "source": "ABS Census 2021 T14 (census_single_parent_family_share_pct)",
+        "band_copy": {
+            "low":  "low one-parent-family share among family households",
+            "mid":  "moderate one-parent-family share among family households",
+            "high": "high one-parent-family share among family households",
+        },
+    },
 }
 
 # Display order within each card (drives section order in the UI).
@@ -686,7 +727,12 @@ POSITION_CARD_ORDER = {
         "sa2_child_to_place",
         "sa2_adjusted_demand",
         "sa2_demand_share_state",
+        # ── Demographic mix sub-panel (renderer inserts a divider above
+        # sa2_nes_share; payload-assembly side just lists rows in order).
         "sa2_nes_share",
+        "sa2_atsi_share",
+        "sa2_overseas_born_share",
+        "sa2_single_parent_family_share",
     ],
     "population": [
         "sa2_under5_count",
@@ -879,6 +925,20 @@ LAYER3_METRIC_INTENT_COPY = {
         "a proxy for cultural-linguistic diversity. Historically, ECEC "
         "engagement is lower in high-NES catchments due to language barriers "
         "and cultural preferences for family-based care.",
+    "sa2_atsi_share":
+        "Aboriginal and Torres Strait Islander population share — sourced "
+        "directly from ABS Census Indigenous status. Higher shares indicate "
+        "communities where culturally responsive ECEC programs and family-led "
+        "care models are more material to engagement.",
+    "sa2_overseas_born_share":
+        "Share of residents born overseas — a proxy for immigrant-density "
+        "distinct from the language signal in NES. Recent-arrival communities "
+        "often display lower formal-ECEC participation in early years; "
+        "established migrant communities trend the opposite way.",
+    "sa2_single_parent_family_share":
+        "Share of family households that are single-parent — a structural "
+        "signal of CCS-eligible utilisation pressure, full-time-care intensity, "
+        "and reduced flexibility for family-based alternatives.",
 }
 
 
@@ -1017,6 +1077,27 @@ LAYER3_METRIC_TRAJECTORY_SOURCE = {
         "value_col":     "value",
         "period_col":    "year",
         "filter_clause": "metric_name = 'census_nes_share_pct'",
+        "kind":          "annual",
+    },
+    "sa2_atsi_share": {
+        "table":         "abs_sa2_education_employment_annual",
+        "value_col":     "value",
+        "period_col":    "year",
+        "filter_clause": "metric_name = 'census_atsi_share_pct'",
+        "kind":          "annual",
+    },
+    "sa2_overseas_born_share": {
+        "table":         "abs_sa2_education_employment_annual",
+        "value_col":     "value",
+        "period_col":    "year",
+        "filter_clause": "metric_name = 'census_overseas_born_share_pct'",
+        "kind":          "annual",
+    },
+    "sa2_single_parent_family_share": {
+        "table":         "abs_sa2_education_employment_annual",
+        "value_col":     "value",
+        "period_col":    "year",
+        "filter_clause": "metric_name = 'census_single_parent_family_share_pct'",
         "kind":          "annual",
     },
 }
@@ -2046,6 +2127,9 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
         # --- WORKFORCE SUPPLY CONTEXT (DEC-76, sub-pass 4.3.9) ---
         workforce_supply = _build_workforce_supply(conn, r.get("state"))
 
+        # --- COMMUNITY PROFILE (Layer 4.4 A10/C8) ---
+        community_profile = _build_community_profile(conn, r.get("sa2_code"))
+
         # --- ASSEMBLE ---
         payload = {
             "schema_version": "centre_payload_v6",
@@ -2056,6 +2140,7 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
             "catchment": catchment,
             "position": position,
             "workforce_supply": workforce_supply,
+            "community_profile": community_profile,
             "qa_scores": qa_scores,
             "tenure": tenure,
             "commentary": _commentary_lines(header, nqs, places, tenure, subtype),
@@ -2224,6 +2309,61 @@ def _ivi_row(conn, metric_key: str, anzsco_code: str, display_label: str, state_
     base["trajectory"] = data["trajectory"]
     base["_table_used"] = data["table_used"]
     return base
+
+
+def _build_community_profile(conn, sa2_code: Optional[str]) -> dict:
+    """Layer 4.4 A10/C8 — top-3 country-of-birth + top-3 language-at-home
+    context for the centre's SA2.
+
+    Reads from `abs_sa2_country_of_birth_top_n` and
+    `abs_sa2_language_at_home_top_n` (2021 census only). Returns:
+      { "country_of_birth_top_n":  [ {rank, country,  count, share_pct}, ... ],
+        "language_at_home_top_n":  [ {rank, language, count, share_pct}, ... ] }.
+    Empty lists when a table is missing or the SA2 has no rows (P-2 silent
+    absence). Display-only context per design D-A2.
+    """
+    out = {"country_of_birth_top_n": [], "language_at_home_top_n": []}
+    if not sa2_code:
+        return out
+    try:
+        cob_rows = conn.execute(
+            "SELECT rank, country_name, count, share_pct "
+            "FROM abs_sa2_country_of_birth_top_n "
+            "WHERE sa2_code = ? AND census_year = 2021 "
+            "ORDER BY rank ASC",
+            (str(sa2_code),),
+        ).fetchall()
+        out["country_of_birth_top_n"] = [
+            {
+                "rank": int(r[0]),
+                "country": r[1],
+                "count": int(r[2]) if r[2] is not None else None,
+                "share_pct": float(r[3]) if r[3] is not None else None,
+            }
+            for r in cob_rows
+        ]
+    except sqlite3.OperationalError:
+        pass
+    try:
+        lang_rows = conn.execute(
+            "SELECT rank, language, count, share_pct "
+            "FROM abs_sa2_language_at_home_top_n "
+            "WHERE sa2_code = ? AND census_year = 2021 "
+            "ORDER BY rank ASC",
+            (str(sa2_code),),
+        ).fetchall()
+        out["language_at_home_top_n"] = [
+            {
+                "rank": int(r[0]),
+                "language": r[1],
+                "count": int(r[2]) if r[2] is not None else None,
+                "share_pct": float(r[3]) if r[3] is not None else None,
+            }
+            for r in lang_rows
+        ]
+    except sqlite3.OperationalError:
+        pass
+    return out
 
 
 def _build_workforce_supply(conn, state_value: Optional[str]) -> dict:

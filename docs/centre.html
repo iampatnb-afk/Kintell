@@ -2419,30 +2419,120 @@ function _pageHasFullTrajectory(centre) {
 // no peer cohort).
 function renderCatchmentPositionCard(centre) {
   const pos = (centre.position && centre.position.catchment_position) || {};
-  const order = [
+  // Layer 4.4 A10/C8 — Catchment Position card now hosts the Demographic
+  // Mix sub-panel below the credit-signal block. Sub-panel divider
+  // separates the two visual groups; top-3 country-of-birth context
+  // line renders below sa2_overseas_born_share.
+  const creditMetrics = [
     "sa2_supply_ratio",
     "sa2_demand_supply",
     "sa2_child_to_place",
     "sa2_adjusted_demand",
     "sa2_demand_share_state",
-    "sa2_nes_share",
   ];
+  const demoMetrics = [
+    "sa2_nes_share",
+    "sa2_atsi_share",
+    "sa2_overseas_born_share",
+    "sa2_single_parent_family_share",
+  ];
+  const order = [...creditMetrics, ...demoMetrics];
   const hasAny = order.some(k => {
     const e = pos[k];
     return e && !["unavailable", "deferred"].includes(e.confidence);
   });
+  const demoHasAny = demoMetrics.some(k => {
+    const e = pos[k];
+    return e && !["unavailable", "deferred"].includes(e.confidence);
+  });
+
+  const renderDemoRow = (k) => {
+    const row = renderPositionRow(k, pos[k]);
+    if (k === "sa2_nes_share") {
+      return row + _renderTopNLanguagesAtHome(centre);
+    }
+    if (k === "sa2_overseas_born_share") {
+      return row + _renderTopNCountriesOfBirth(centre);
+    }
+    return row;
+  };
+
+  const demoBlock = demoHasAny
+    ? `<div class="demographic-mix-divider" style="
+         margin: 18px 0 10px;
+         padding-top: 14px;
+         border-top: 1px dashed var(--border);
+       ">
+         <div style="font-size:12.5px;font-weight:600;color:var(--text);letter-spacing:0.02em;">
+           Demographic mix
+           <span class="note" style="font-weight:400;font-size:11px;margin-left:8px;">
+             SA2 peer position &mdash; community context
+           </span>
+         </div>
+       </div>
+       ${demoMetrics.map(renderDemoRow).join("")}`
+    : "";
 
   return `
     <section class="op-section">
       <h3>Catchment position <span class="note">SA2 peer position — credit signal</span></h3>
       ${hasAny
-        ? order.map(k => renderPositionRow(k, pos[k])).join("")
+        ? creditMetrics.map(k => renderPositionRow(k, pos[k])).join("") + demoBlock
         : `<div class="placeholder">Catchment-position metrics
-            <span class="will-show">Will show: supply ratio, demand vs supply, children per place, adjusted demand, share of state demand — banded against same-state and same-remoteness peer cohorts.</span>
+            <span class="will-show">Will show: supply ratio, demand vs supply, children per place, adjusted demand, share of state demand, plus a Demographic mix sub-panel (NES, ATSI, overseas-born, single-parent-family) — all banded against same-state and same-remoteness peer cohorts.</span>
           </div>`
       }
     </section>
   `;
+}
+
+// Layer 4.4 A10/C8 — top-3 country-of-birth context line. Reads from
+// centre.community_profile (populated by _build_community_profile in
+// centre_page.py). Display-only context; no banding, no calibration
+// influence per design D-A2. Silent absence (P-2) when payload is empty.
+function _renderTopNCountriesOfBirth(centre) {
+  const cp = centre && centre.community_profile;
+  const list = cp && cp.country_of_birth_top_n;
+  return _renderTopNContext(
+    list,
+    "Top countries of birth (2021)",
+    "country"
+  );
+}
+
+// Layer 4.4 A10/C8 follow-up — top-3 language-at-home context line,
+// shown directly below the NES row. Same display contract as the
+// country-of-birth line above.
+function _renderTopNLanguagesAtHome(centre) {
+  const cp = centre && centre.community_profile;
+  const list = cp && cp.language_at_home_top_n;
+  return _renderTopNContext(
+    list,
+    "Top languages at home (2021)",
+    "language"
+  );
+}
+
+// Shared renderer for top-N context lines (country of birth + language
+// at home). Mid-grey panel with dashed left border; reads `key` field
+// off each list entry.
+function _renderTopNContext(list, label, key) {
+  if (!Array.isArray(list) || !list.length) return "";
+  const items = list
+    .filter(r => r && typeof r.share_pct === "number")
+    .map(r => `${htmlEscape(String(r[key] || ""))} ${r.share_pct.toFixed(1)}%`)
+    .join(" &middot; ");
+  if (!items) return "";
+  return `<div class="topn-context" style="
+            font-size:11.5px;
+            color:var(--text-dim);
+            padding:6px 0 4px 12px;
+            margin:-6px 0 10px 4px;
+            border-left:2px solid var(--border);
+          ">
+    <span style="font-weight:600;letter-spacing:0.02em;color:var(--text);">${htmlEscape(label)}:</span>
+    ${items}
+  </div>`;
 }
 
 function renderPopulationCard(centre) {

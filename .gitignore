@@ -22,3 +22,6 @@ docs/operator.html.v?_backup_*
 *.v*_backup_*
 *.pre_*
 *.pre_*.py
+
+# A10 + C8 review-capture artifact (regeneratable from build_a10_c8_review_capture.py)
+docs/a10_c8_review.html
