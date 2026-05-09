@@ -1085,11 +1085,40 @@ Consequences: Industry-absolute bands now operate as a first-class lens on top o
 
 ---
 
-## DEC-78 — RESERVED (NES storage convention)
-Status: Reserved
-Date: 2026-05-04 (banked)
+## DEC-78 — Census percentage storage convention (long-format value column)
+Status: Active
+Date: 2026-05-04 (banked); promoted to Active 2026-05-10 (A10 ingest)
 
-Reserved for the NES storage convention candidate banked 2026-05-04: percentage stored 0–100 in `abs_sa2_education_employment_annual.value`; wire boundary divides by 100 before passing to `calibrate_participation_rate`. To be promoted from candidate to Active when next NES-related work touches the storage layer. ID is preserved per the global-stable-ID discipline.
+Context: Banked 2026-05-04 during the A2 NES v2→v3 unit fix, when `census_nes_share_pct` was discovered to be stored as a fraction (0–1) inconsistent with the existing `census_lfp_*_pct` family stored as percentage (0–100). v3 normalised storage to 0–100. The 2026-05-10 A10 Demographic Mix ingest (ATSI + overseas-born + single-parent family share) shipped three additional Census-derived `_pct` metrics through the same storage path, making the convention load-bearing across multiple ingests rather than a one-off NES handling.
+
+Decision: All Census-derived percentage metrics in `abs_sa2_education_employment_annual.value` are stored as **percentage (0–100)**, not fraction (0–1). Naming convention: `census_<topic>_share_pct` for share metrics, `census_<topic>_pct` for proportion metrics. Where calibration consumes the value (currently NES via `calibrate_participation_rate`'s fraction thresholds), the wire layer (`populate_service_catchment_cache.py` for NES) divides by 100 at read time. The long-format target table is the canonical sink; new top-N or list-shaped data goes to dedicated tables instead (see DEC-80).
+
+Consequences: Banding registry (`layer3_apply.py` METRICS list), centre-page registration (`LAYER3_METRIC_META[*].value_format = "percent"`), and renderer all assume 0–100 for `_pct` metrics. Any future Census-derived metric joining this table must follow this convention — ingest converts to percentage explicitly with a unit-test sanity bound (e.g., national weighted total within ABS-published ±2pp band), and `value_format` registration aligns with `percent` rather than `percent_share` (which is reserved for already-fraction inputs from elsewhere).
+
+---
+
+## DEC-80 — Census top-N display tables; TSP-table-mapping verification discipline
+Status: Active
+Date: 2026-05-10 (locked at A10 + C8 close)
+
+Context: The A10 Demographic Mix bundle (Layer 4.4, 2026-05-10) added three SA2-level demographic metrics from Census TSP tables (T06 Indigenous status; T08 country of birth; T14 family composition) plus two **list-shaped** display contexts that the existing long-format `abs_sa2_education_employment_annual` table cannot accept: top-3 country of birth (T08) and top-3 language at home (T10A+T10B). The roadmap entering A10 had named the source tables as T07/T08/T19 — probe revealed T07 is fertility (children-ever-born × age) and T19 is tenure type / landlord, with the actual subjects sitting at T06 and T14. Both issues are recurring patterns worth locking as discipline rather than one-off fixes.
+
+Decision:
+
+1. **Top-N display tables convention.** Census list-shaped data (top-N countries, top-N languages, future top-N occupations / industries / etc.) lands in dedicated small tables, not the long-format `abs_sa2_education_employment_annual`. Naming: `abs_sa2_<topic>_top_n`. Schema: `(sa2_code TEXT, census_year INTEGER, rank INTEGER, <label_column> TEXT, count INTEGER, share_pct REAL, PRIMARY KEY (sa2_code, census_year, rank))`. Display-only — these tables do not feed banding (`layer3_sa2_metric_banding`) or calibration (`calibrate_participation_rate`). Rendering reads via a `_build_community_profile(conn, sa2_code)` helper that returns `{"<topic>_top_n": [...]}` lists on the centre payload's `community_profile` field. Currently shipping: `abs_sa2_country_of_birth_top_n` (D-A2), `abs_sa2_language_at_home_top_n` (A10/C8 follow-up). Default top-N = 3; tunable per ingest.
+
+2. **TSP-table-number verification at probe time.** ABS Census TSP tables are numbered sequentially across data items, not by topic; numbering does NOT match GCP (General Community Profile) or other ABS products. Before any ingest pulls a TSP table by number, the probe must inspect the column headers and confirm the subject. A two-line probe is sufficient: read the first CSV row, print the second header column. If the column header doesn't match the expected subject keyword (e.g., "Indig" for Indigenous status, "Eng_only" for language at home, "Aust" for country of birth), halt and re-probe.
+
+3. **Census Demographic Mix bundle scope (A10).** Three banded SA2-level percentage metrics ship together: ATSI share (T06), overseas-born share (T08, NS-excluded numerator), single-parent family share among family households (T14). Plus two display-only top-N tables (T08 countries, T10A+T10B languages). All four shipped 2026-05-10; backups `data/pre_layer4_4_step_a10_*.db` and `data/pre_layer4_4_step_a10b_*.db`; audit_id 150 → 158. Calibration influence deferred — the four bandable metrics (NES + 3 Demographic Mix) are neutral-framed Lite rows on the Catchment Position card sub-panel, with `direction="high_is_positive"` purely declarative (no calibration nudge applied). Calibration scoping is a follow-up once banding distributions are reviewed.
+
+4. **Sub-panel inside Catchment Position card, not a new card.** The Demographic Mix sub-panel renders inside the existing Catchment Position card via a divider line + sub-panel header. Per DEC-11 (additive overlay) — extend existing surfaces before adding new ones. Anticipated by the C2 NES patcher author 2026-05-04. New `renderCommunityProfileCard()` was rejected on UI-coherence grounds (would force NES to move card mid-flight; proliferates renderer functions).
+
+Consequences:
+
+- Top-N tables proliferate ad-hoc as new Census list-shaped contexts join: each one is a small table, a new entry in `_build_community_profile`, and a new `_renderTopNContext` call site in the Lite-row interleave (`renderCatchmentPositionCard`'s `renderDemoRow`). The shared `_renderTopNContext(list, label, key)` helper in `centre.html` is the canonical render pattern.
+- `abs_sa2_country_of_birth_top_n` and `abs_sa2_language_at_home_top_n` (2021-only) need to be re-ingested when the 2026 Census data lands (mid-2027). Add `census_year` parameter to schema future-proofs but doesn't auto-update.
+- The TSP-mapping probe step is added to STD-37 candidate ("search project knowledge before probing") as a sub-rule when the probe is a Census ingest. Bank when STD-37 mints.
+- Stream C (childbearing-age + marital-status depth, OI-NEW-12) is now well-positioned: T05 marital status and T07 fertility are both in the same TSP zip, both validated by this session's probe but deferred to A3 ingest pass.
 
 ---
 

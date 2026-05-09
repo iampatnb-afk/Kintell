@@ -628,3 +628,58 @@ Two big lessons:
 Bundling discipline this session was reasonable — same-file edits collapsed into single patchers, DB writes never bundled (each got its own backup + audit_log row), cross-concern changes split. The 3-commit pattern in Phase 1 of doc-refresh (A2-v3-unit-fix, B2, C2-NES-data) was clean.
 
 The session was longer than ideal. ~7 substantive commits + 4 doc commits is a heavy day. Next session should aim for 2-3 commits + clean doc refresh.
+
+---
+
+## 2026-05-10 — A10 + C8 Demographic Mix bundle (end-to-end)
+
+**Session type:** Layer 4.4 ingest + Layer 4.2 register + render + design doc + DEC mint. DB-mutating (5 schema/data mutations across two ingest scripts, 9 audit_log rows). Probe-first per DEC-65.
+
+**Context entering session.** OI-19 Layer 4.4 V1.5 ingests bundle had A10 + C8 elevated to next-session priority on 2026-05-05. Roadmap named source TSP tables as T07/T08/T19. DEC-78 was reserved (NES storage convention). Worktree-vs-main-repo problem flagged early (worktree on a stale branch missing CLAUDE.md, kintell.db, the TSP zip, and current code) and resolved by working from the main repo path via absolute paths.
+
+**Probe finding banked early.** Inspection of column headers in `2021_TSP_SA2_for_AUS_short-header.zip` showed two of three roadmap table numbers were wrong:
+- T06 (`C{yr}_Tot_Indig_P` etc.) is Indigenous status, NOT T07.
+- T07 is fertility (`AP_*_NCB_*` = Age × Number of Children Born), not ATSI.
+- T14 (`SH_FH_CF_*_One_PFam` etc.) is family composition, NOT T19.
+- T19 is tenure type / landlord (`REA / ST_HA / Co_ho_pr` columns).
+- T08 = country of birth confirmed correct.
+- Bonus: T05 marital status + T07 fertility validated for Stream C future ingest pass.
+
+Surfaced to Patrick mid-probe; corrected mapping locked into the design doc + DEC-80 §2 (TSP-table-number verification discipline as a permanent guardrail).
+
+**Design doc.** `recon/a10_c8_design.md` — corrected mapping + 4 ratifiable decisions (D-A1 metrics + naming + cohort, D-A2 top-N display tables, D-A3 sub-panel placement, D-A4 verification SA2s). All four ratified mid-session.
+
+**Work shipped this session.**
+
+1. **`layer4_4_step_a10_apply.py`** — Reads T06A/B/C, T08A+B, T14A/B/C from the TSP zip. Three percentage metrics (ATSI, overseas-born, single-parent family) ingested into `abs_sa2_education_employment_annual` (long-format) per DEC-78. New table `abs_sa2_country_of_birth_top_n` created and populated with top-3 countries per SA2 for 2021. Audit_id 150 → 154. Backup: `data/pre_layer4_4_step_a10_20260509_234058.db` (541.4 MB).
+
+2. **B-pass banding** — `patch_b2_layer3_add_demographic_mix.py` + `layer3_apply.py --apply` + OI-35 workaround (`layer3_x_catchment_metric_banding.py --apply`). 33,571 banding rows produced (3 new metrics × ~7,200 each = ~21,600 new banded rows); 9,035 catchment-banding rows restored. Audit_id 155 + 156.
+
+3. **`layer4_4_step_a10b_languages_apply.py`** (mid-session follow-up after Patrick asked about language-at-home). New table `abs_sa2_language_at_home_top_n`, 7,060 rows from T10A+T10B (top-3 languages per SA2 for 2021, excluding English-only / language-not-stated / aggregate buckets). Audit_id 157 (schema create) + 158 (ingest). Backup: `data/pre_layer4_4_step_a10b_20260510_000826.db` (547.7 MB).
+
+4. **`centre_page.py`** — 6 surgical edits via Edit tool (no patcher artefact). LAYER3_METRIC_META + LAYER3_METRIC_INTENT_COPY + LAYER3_METRIC_TRAJECTORY_SOURCE each gained 3 entries. POSITION_CARD_ORDER["catchment_position"] extended. New function `_build_community_profile(conn, sa2_code)` reads both top-N tables and returns a `community_profile` dict on the centre payload.
+
+5. **`docs/centre.html` v3.28 → v3.29.** `renderCatchmentPositionCard()` rewritten with credit-signal block + dashed divider + "Demographic mix" sub-panel header + 4 Lite rows. `renderDemoRow` interleave inserts top-N context lines below NES (languages) and overseas-born (countries). Shared `_renderTopNContext(list, label, key)` helper. Sparkline glyph for Lite rows added then removed mid-session (Patrick rejected as "too busy"; saved as `feedback_lite_row_density.md` memory). CSS variable name fix: `--text-dim` (not `--muted`).
+
+6. **`build_a10_c8_review_capture.py`** — offline static-HTML capture script. Inlines payloads + fetch-interceptor stub so Patrick reviews the rendered page without `review_server.py`. Two iterations to fix the response-shape (api() helper expects `{ok: true, centre: payload}` wrapper). Output `docs/a10_c8_review.html` gitignored as a one-shot artifact.
+
+7. **DEC-78 promoted Reserved → Active** (Census 0–100 storage convention now load-bearing across NES + 3 demographic-mix metrics).
+
+8. **DEC-80 minted** — Census top-N display tables convention + TSP-table-number verification discipline + Demographic Mix scope lock + sub-panel-not-new-card ratification.
+
+9. **End-of-session doc refresh.** PROJECT_STATUS, CENTRE_PAGE_V1_5_ROADMAP, OPEN_ITEMS, this PHASE_LOG entry, monolith regen.
+
+**Verification.** National 2021 totals: ATSI 3.20% (ABS published ~3.2%) ✓, overseas-born 27.71% (ABS ~27.6%) ✓, single-parent family 15.79% (ABS ~16%) ✓. Four verification SA2s — 211011251 (Bayswater Vic), 118011341 (Bondi Junction-Waverly NSW), 506031124 (Bentley-Wilson WA), 702041063 (Outback NT high-ATSI). High-ATSI test 702041063: ATSI 91.1%, OS-born 1.8%, single-parent 31.4%, top language at home Australian Indigenous languages 89.2% — validates UOL_Aus_In_La inclusion.
+
+**Open questions resolved.**
+- ATSI display framing → raw % with neutral "Aboriginal and Torres Strait Islander share" copy.
+- T08 top-N storage → separate small table `abs_sa2_country_of_birth_top_n` per DEC-80 §1.
+- C8 panel placement → sub-panel inside Catchment Position card per DEC-80 §4 + DEC-11.
+- Sparkline glyph on Lite rows → tried and rejected mid-session as too busy. Banked as feedback memory.
+
+**Items banked but not in scope this session.**
+- Promoting demographic-mix metrics to Full row weight (would need denser source data than 3 Census points; pathway is the same as A6 LFP promotion via SALM monthly).
+- Calibration nudges for ATSI / overseas-born / single-parent (waiting on banding-distribution review; tracked as a future scoping pass).
+- Stream C T05 marital + T07 fertility ingest (validated and banked into A3 next-session bundle).
+
+**Commits.** 3 commits per DEC-22 collapse: data layer (ingest + banding + languages top-N), render layer (centre_page.py + centre.html + design doc + review-capture script), end-of-session doc refresh (Tier-2 + DEC-78 promote + DEC-80 mint + monolith).

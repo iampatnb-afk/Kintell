@@ -1,8 +1,31 @@
 # Project Status
 
-*Last updated: 2026-05-09 (commercial repositioning + planning + handover doc set). The on-disk version supersedes the project-knowledge monolith if they disagree.*
+*Last updated: 2026-05-10 (A10 + C8 Demographic Mix bundle shipped end-to-end). The on-disk version supersedes the project-knowledge monolith if they disagree.*
 
-## Headline (2026-05-09)
+## Headline (2026-05-10)
+
+**A10 + C8 Demographic Mix bundle shipped end-to-end.** Three new SA2-level Census-derived metrics (ATSI share, overseas-born share, single-parent-family share) plus two new top-N display tables (top-3 country of birth; top-3 language at home) plus a "Demographic mix" sub-panel inside the Catchment Position card. Audit_id 150 → 158 (5 schema/ingest mutations across two scripts). Table-mapping correction banked: roadmap had T07/T08/T19 — actual subjects are T06 (ATSI), T08 (country of birth), T14 (family composition); T07 is fertility and T19 is tenure/landlord. Probe-before-code (DEC-65) caught it before any wrong data shipped. DEC-78 (Census 0–100 storage convention) promoted from Reserved → Active; DEC-80 minted to lock the top-N table convention + TSP-table-number verification discipline + Demographic Mix scope.
+
+**Sparkline-on-Lite-rows considered and rejected** mid-session — too busy at that visual budget per Patrick. Delta badge remains canonical for Lite-row trajectory representation.
+
+**This session's deliverables (all on disk):**
+- `layer4_4_step_a10_apply.py` (3 metrics + COB top-N ingest, audit 150–154)
+- `layer4_4_step_a10b_languages_apply.py` (language top-N ingest, audit 157–158)
+- `patch_b2_layer3_add_demographic_mix.py` (3 banding entries appended to `layer3_apply.py` METRICS)
+- 6 surgical edits to `centre_page.py` (LAYER3_METRIC_META, LAYER3_METRIC_INTENT_COPY, LAYER3_METRIC_TRAJECTORY_SOURCE, POSITION_CARD_ORDER, `_build_community_profile`, payload assembly)
+- `docs/centre.html` v3.28 → v3.29: sub-panel divider, top-N COB + language renderers via shared `_renderTopNContext` helper
+- `recon/a10_c8_design.md` (probe-first design doc with TSP table-mapping correction)
+- `build_a10_c8_review_capture.py` (offline static HTML capture; `docs/a10_c8_review.html` not committed)
+- DEC-78 promoted, DEC-80 minted in canonical DECISIONS.md
+- `~/.claude/projects/.../memory/feedback_lite_row_density.md` — feedback memory locking the no-sparkline-on-Lite-rows preference
+
+**DB state.** 2 fresh backups (`data/pre_layer4_4_step_a10_20260509_234058.db` 541.4 MB, `data/pre_layer4_4_step_a10b_20260510_000826.db` 547.7 MB). New table `abs_sa2_country_of_birth_top_n` (7,102 rows). New table `abs_sa2_language_at_home_top_n` (7,060 rows). New rows in `abs_sa2_education_employment_annual`: 7,272 ATSI + 7,272 OS-born + 7,104 single-parent = 21,648 long-format rows. New banding rows for the 3 metrics in `layer3_sa2_metric_banding` (~7,200 rows × 3 = ~21,600 banded rows). audit_log 149 → 158 (9 new rows: 5 ingest/banding + 1 layer3_apply + 1 OI-35 catchment rebanding + 2 language top-N).
+
+**Verification.** National 2021 totals all within ABS-published bands: ATSI 3.20% (ABS ~3.2%), overseas-born 27.71% (ABS ~27.6%), single-parent-family 15.79% (ABS ~16%). Four verification SA2s (Bayswater Vic, Bondi Junction-Waverly NSW, Bentley-Wilson WA, Outback NT 702041063) all rendering correctly. Outback NT validates the high-ATSI test case at 91.1% ATSI share, 89.2% Australian Indigenous languages at home.
+
+---
+
+## Headline (2026-05-09 — preserved for traceability)
 
 **Project repositioned. Patrick Bell owns the IP. Brand: Novara Intelligence (working).** This session was a planning-only pass — no code changes, no DB mutations. Commercial repositioning locked as DEC-79. Audience expands from Remara-credit-team to broader institutional decision-support market participants (lenders, investors, operators FP+NFP, valuers, property funds, debt providers, advisors). Five new work streams locked into the V1 plan (PRODUCT_VISION.md): A) Educator visa / overseas educator supply, B) NFP perspectives integrated, C) Childbearing-age + marital-status depth, D) PropCo Property Intelligence (V1 premium tier — not V2), E) SA2 Border Exposure V1 proxy. V1 ship target redefined to **~Sept 2026** (3-4 months), incorporating the original V1.0 centre-page tool (already shipped) plus V1.5 ingests + Catchment page + Group page + the five new streams + Excel export framework + brand identity rename pass.
 
@@ -80,13 +103,15 @@ Always-show variant (P1). P-2 silent absence for <2 numeric points / unreadable 
 
 **V1 path remaining: ~0 sessions.** No mandatory work.
 
-**V1.5 next-session priority (operator-elevated 2026-05-05):** **A10 + C8 — Demographic Mix bundle (~1.0 sess).** Three Census TSP tables (T07 ATSI, T08 country of birth, T19 single-parent households) all from the same TSP zip already on disk + new Community Profile narrative panel. Closes the Demographic Mix scope question raised during NES integration.
+**V1.5 next-session priority:** **A3 — Parent-cohort 25-44 SA2 series (~0.4 sess)** — also touches Stream C (childbearing-age + marital-status depth, OI-NEW-12) which extends T05 (marital status) and T07 (children-ever-born by age) — both validated by this session's A10 probe and bankable into the same TSP-zip ingest pass.
 
-**V1.5 path remaining (~2.7 sess):**
-- **A10 + C8** (~1.0 sess) — Demographic Mix bundle (next-session priority)
-- **A3, A4, A5, A6** (~1.4 sess) — Phase A core remaining
-- **B1, B3, B4, B5** (~0.9 sess) — Phase B core
-- **C2-other + C6** (~0.4 sess) — Phase C core remaining
+**V1.5 path remaining (~1.7 sess):**
+- **A3** (~0.4 sess + Stream C T05/T07 bundle ~+0.3 sess) — Parent cohort + marital + fertility
+- **A4** (~0.5 sess) — Schools at SA2 (ACARA enrolment counts)
+- **A5** (~0.3 sess) — Subtype-correct denominators (LDC/FDC/OSHC distinct catchment populations)
+- **A6** (~0.2 sess) — SALM extension (promotes LFP triplet from Lite to Full)
+- **B1, B3, B4, B5** (~0.9 sess) — Phase B core (depend on A4/A5/A3)
+- **C2-other + C6** (~0.4 sess) — Phase C core remaining (depend on B-pass)
 
 See **CENTRE_PAGE_V1_5_ROADMAP.md** for the canonical V1.5 dependency-ordered queue and **ROADMAP.md** for the parent dependency view.
 

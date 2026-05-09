@@ -1,6 +1,6 @@
 # Open Items
 
-*Last updated: 2026-05-09 (commercial repositioning per DEC-79; new OIs added for Streams A-E, brand rename, doc moves, gitignore fixes, and cross-cutting risks). The on-disk version supersedes the project-knowledge monolith if they disagree.*
+*Last updated: 2026-05-10 (A10 + C8 Demographic Mix bundle CLOSED; OI-19 sub-bundle reduced; DEC-80 minted). The on-disk version supersedes the project-knowledge monolith if they disagree.*
 
 OI ID is global. Closed items kept for traceability. Severity tags: CRITICAL / Medium / Low / Cosmetic / Tracking.
 
@@ -166,17 +166,16 @@ V1 readiness artefacts (not certification — that's V2). Includes:
 
 ## OPEN — EXISTING (carried)
 
-### OI-19 — Layer 4.4 V1.5 ingests bundle (NEXT-SESSION PRIORITY) ⭐
-*Origin: 2026-04-28. Status: open; partially shipped. **Demographic Mix bundle (A10) elevated to next-session priority 2026-05-05.***
+### OI-19 — Layer 4.4 V1.5 ingests bundle (PARTIAL CLOSE)
+*Origin: 2026-04-28. Status: partially shipped.*
 
 Original scope: NES + parent-cohort 25-44 + schools + SALM-extension + (optionally) SEEK/advertised wages. Bundled to amortise ABS workbook reading + concordance work.
 
-**Closed 2026-05-04:** A2 (NES) end-to-end. **Closed 2026-05-05:** OI-36 (NES render + Lite delta badge).
+**Closed 2026-05-04:** A2 (NES) end-to-end. **Closed 2026-05-05:** OI-36 (NES render + Lite delta badge). **Closed 2026-05-10:** A10 + C8 Demographic Mix bundle (T06 ATSI + T08 COB + T14 family + T10 language top-N + sub-panel render) — see DEC-80.
 
-**Remaining bundle, with Demographic Mix elevated:**
+**Remaining bundle:**
 
-- **A10 + C8 — Demographic Mix bundle (next session, ~1.0 sess).** Three Census TSP tables (T07 ATSI, T08 country of birth, T19 single-parent households) all from the same TSP zip already on disk + new Community Profile narrative panel. **EXPANDED 2026-05-05** from T08-only to full bundle per operator review.
-- A3 (parent-cohort 25-44, ~0.4 sess)
+- **A3 (next, ~0.4 sess) + Stream C extension (~0.3 sess)** — parent-cohort 25-44 + T05 marital + T07 fertility (both validated by A10 probe; same TSP zip)
 - A4 (schools at SA2, ~0.5 sess)
 - A5 (subtype-correct denominators, ~0.3 sess)
 - A6 (SALM-extension, ~0.2 sess)
@@ -279,7 +278,11 @@ No new DB backups 2026-05-05 (renderer-only work). Status carries from 2026-05-0
 
 ---
 
-## CLOSED THIS SESSION (2026-05-05)
+## CLOSED THIS SESSION (2026-05-10)
+
+- **A10 + C8 Demographic Mix bundle** — three new banded Census-derived metrics (ATSI, overseas-born, single-parent family) plus two top-N display tables (country of birth + language at home) plus a "Demographic mix" sub-panel inside the Catchment Position card. Probe surfaced TSP table-numbering correction (T06/T08/T14, not T07/T08/T19). Audit_id 150 → 158. National 2021 totals all within ABS-published bands. DEC-78 promoted from Reserved to Active; DEC-80 minted to lock the top-N table convention + TSP verification discipline. See `recon/a10_c8_design.md`.
+
+## CLOSED 2026-05-05
 
 - **OI-36** — `centre.html` / `centre_page.py` hardcode catchment-position rows; new metrics don't auto-render. **Closed in commit `430009a`** (centre.html v3.25 → v3.28 + centre_page.py v20 → v21). Surgical patch to render order arrays in both files. Bonus delta badge on all Lite rows reading first-to-last Census-point change ("+9.5pp from 2011 to 2021" for Bayswater NES; "+$291/week from 2011 to 2021" for Bayswater median household income). Unit-aware per `value_format` (percent / percent_share → 'pp'; currency_weekly → '$/week'; currency_annual → '$'; ratio_x → '×'; else plain numeric). Generic helper applies to all Lite metrics — NES, LFP triplet, median household income.
 

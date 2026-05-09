@@ -1,6 +1,6 @@
 # Centre Page V1.5 Roadmap
 
-*Last updated: 2026-05-09 (commercial repositioning per DEC-79; this doc remains canonical for centre-page V1.5 ingest queue). The on-disk version supersedes the project-knowledge monolith if they disagree.*
+*Last updated: 2026-05-10 (A10 + C8 Demographic Mix bundle CLOSED end-to-end; TSP table-mapping correction locked as DEC-80). The on-disk version supersedes the project-knowledge monolith if they disagree.*
 
 This roadmap is the canonical V1.5 work queue for the centre page. PROJECT_STATUS.md and ROADMAP.md reference this doc for V1.5 detail.
 
@@ -23,12 +23,12 @@ The next-session priority (A10 + C8 Demographic Mix bundle) is unchanged.
 
 | Phase | Items | Effort | Status |
 |---|---|---|---|
-| **First piece (just shipped)** | OI-36 (NES render-side + delta badge) | shipped 2026-05-05 | **CLOSED `430009a`** |
+| First piece | OI-36 (NES render-side + delta badge) | shipped 2026-05-05 | **CLOSED `430009a`** |
+| Demographic Mix bundle | A10 + C8 (T06 ATSI + T08 COB + T14 family + T10 language top-N) | shipped 2026-05-10 | **CLOSED — see §A10 + §C8** |
 | Phase A core | A3 + A4 + A5 + A6 | ~1.4 sess | open |
 | Phase B core | B1 + B3 + B4 + B5 | ~0.9 sess | open |
 | Phase C core | C2 (other B-pass promotions) + C6 | ~0.4 sess | open |
 | **V1.5 core remaining** | | **~2.7 sess** | |
-| Phase 2 (next-session priority) | A10 + C8 — Demographic Mix bundle (T07 + T08 + T19) | ~1.0 sess | banked, **elevated** |
 
 ---
 
@@ -52,19 +52,17 @@ The next-session priority (A10 + C8 Demographic Mix bundle) is unchanged.
 ### A6 — SALM extension
 **Open. ~0.2 sess.** Promote LFP triplet from Lite to Full once SALM monthly cadence is wired in. Replaces the 3 Census points with continuous monthly series.
 
-### A10 — Demographic Mix bundle (NEXT-SESSION PRIORITY) ⭐
-**Open. ~0.5 sess. EXPANDED 2026-05-05.**
+### A10 — Demographic Mix bundle ✅
+**CLOSED 2026-05-10.** Three Census TSP tables ingested, plus two display-only top-N tables. Probe at session start surfaced that the roadmap's table-number assignment was wrong (T07 is fertility / children-ever-born × age; T19 is tenure type / landlord). Locked-in mapping (DEC-80):
 
-Originally scoped as T08 country of birth only. Per operator review of NES render and second-round demographic doc, scope expanded to bundle three Census TSP tables that all live in `2021_TSP_SA2_for_AUS_short-header.zip` (already on disk from A2):
+- **T06** — Indigenous status → `census_atsi_share_pct` ✅
+- **T08** — Country of birth → `census_overseas_born_share_pct` ✅ + `abs_sa2_country_of_birth_top_n` (top-3, 2021)
+- **T14** — Family composition → `census_single_parent_family_share_pct` ✅
+- **T10A+T10B** — Language at home (follow-up bundled mid-session) → `abs_sa2_language_at_home_top_n` (top-3, 2021)
 
-- **T07** — Indigenous status (ATSI population at SA2 level)
-- **T08** — Country of birth (top-N parser, 5 most common per SA2)
-- **T19** — Family composition (single-parent household share)
+All three banded percentages stored 0–100 per DEC-78. Banding cohort: `state_x_remoteness` (mirrors NES). Calibration deferred — neutral-framing Lite rows. National 2021 totals: ATSI 3.20%, OS-born 27.71%, single-parent 15.79% — all within ABS-published bands.
 
-Same TSP zip + same processing pattern as A2 v3 = low marginal cost over single-table A10. Storage in `abs_sa2_education_employment_annual` long-format table per existing convention.
-
-**Open question for A10 ingest pass:**
-- ATSI display framing: raw % vs ratio to national? Sensitivity is real; lean towards plain % with neutral copy ("Aboriginal and Torres Strait Islander population share") consistent with NES neutral-framing precedent.
+ATSI display framing resolved: raw % with neutral "Aboriginal and Torres Strait Islander share" copy (consistent with NES neutral-framing precedent).
 
 ### Future ingests (banked)
 - A7 — SEEK / advertised wages (workforce supply enrichment)
@@ -105,18 +103,20 @@ Same TSP zip + same processing pattern as A2 v3 = low marginal cost over single-
 ### C6 — Workforce supply enrichments rendering
 **Depends on A7.** SEEK + advertised wages new rows.
 
-### C8 — Demographic Mix narrative panel (NEXT-SESSION PRIORITY) ⭐
-**Open. ~0.5 sess. EXPANDED 2026-05-05.**
+### C8 — Demographic Mix sub-panel ✅
+**CLOSED 2026-05-10.** Implemented as a sub-panel inside Catchment Position card, NOT a separate card (per DEC-80 #4 + DEC-11 additive overlay). The C2 NES patcher author (2026-05-04) had already anticipated this placement.
 
-Single panel below Population card. Combines NES (already rendering) + new A10 bundle (ATSI + country of birth + single-parent households) into one demographic-context section. Neutral framing throughout per the NES precedent.
+Render structure (`renderCatchmentPositionCard()` in `centre.html` v3.29):
+- Credit-signal block: supply ratio, demand vs supply, child-to-place, adjusted demand, demand share state
+- Dashed-divider with "Demographic mix" sub-panel header
+- Lite rows: NES → ATSI → overseas-born → single-parent family share
+- Top-N context lines via shared `_renderTopNContext` helper:
+  - Below NES → "Top languages at home (2021)" (T10A+T10B)
+  - Below overseas-born → "Top countries of birth (2021)" (T08)
 
-Phases:
-1. Backend: register 3 new metrics in `LAYER3_METRIC_META` (card='community_profile' or similar)
-2. Frontend: new `renderCommunityProfileCard()` function modelled on `renderCatchmentPositionCard()` post-OI-36
-3. Top-3 country of birth handling (special-case: not a single value, a list with shares)
+Backend: `_build_community_profile(conn, sa2_code)` populates `centre.community_profile.{country_of_birth_top_n, language_at_home_top_n}` lists on the payload.
 
-**Open question for C8 panel:**
-- Card placement — between Catchment Position and Population? Inside Population? Separate card below Workforce? Decide at scoping time per render-best-practice.
+Sparkline glyph on Lite rows considered + rejected mid-session (too busy at that visual budget). Delta badge remains canonical for Lite-row trajectory representation. Captured as a feedback memory.
 
 ---
 
@@ -131,16 +131,18 @@ Phases:
 
 ## Recommended next session start
 
-**Begin A10 + C8 (Demographic Mix bundle).** Order:
+**Begin A3 — Parent-cohort 25-44 SA2 series, bundled with Stream C extensions (T05 marital status, T07 fertility/children-ever-born).** Order:
 
-1. Phase A: A10 ingest pass — three TSP tables in one ingest (~0.5 sess)
-2. Phase B: register 3 new banding entries (~0.1 sess each)
-3. Phase C: C8 panel build (~0.5 sess)
-4. End-of-session doc refresh
+1. Probe T05 + T07 column shapes (already partially banked from A10 probe — both validated as living in same TSP zip)
+2. Stream C scope decision (DEC candidate) — which marital + fertility cuts ship as Lite rows in Catchment Position sub-panel vs context-only?
+3. ABS ERP age slice for 25-44 alongside existing 0-4 (A3 core) — affects calibration via parent cohort weighting; affects Population card via new "parent cohort" row
+4. B-pass banding entry for sa2_parent_cohort_25_44_share + any new marital/fertility metrics
+5. C-pass: extend Demographic mix sub-panel with Stream C rows where banded; new context lines if appropriate
+6. End-of-session doc refresh
 
-Total estimated: ~1.0-1.2 sess depending on country-of-birth display polish.
+Total estimated: ~0.7 sess (A3 ~0.4 + Stream C extension ~0.3, amortised by shared TSP-zip ingest pass).
 
-After A10/C8 lands, evaluate next priority among A3/A4/A5/A6.
+After A3 + Stream C lands, evaluate A4 (schools at SA2) next.
 
 ---
 
