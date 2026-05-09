@@ -12,10 +12,13 @@ fix_*.py
 patch_*.py
 install_*.py
 check_*.py
+recon/patchers_*/
 *_backup.py
 *_export.txt
 test.txt
 operator_page.py.v7_backup
 docs/operator.html.v?_backup_*
 docs/operator.html.v?_backup_*
-*.v?_backup_*
+*.v*_backup_*
+*.pre_*
+*.pre_*.py

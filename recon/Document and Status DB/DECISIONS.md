@@ -1082,3 +1082,59 @@ Decision: Three catchment metrics opt in to industry-absolute banding via `indus
 Renderer: `_renderIndustryBand` reads `p.industry_band` (band key, drives cautionary/positive pill colour via `cautionKeys` / `positiveKeys`), `p.industry_band_label` (visible text inside the pill), `p.industry_band_note` (descriptor next to the pill). Silent absence per P-2 when metric not opted in or raw_value is null. Band keys are stable identifiers — relabel the visible text without changing the key, otherwise the pill colour treatment breaks.
 
 Consequences: Industry-absolute bands now operate as a first-class lens on top of the per-cohort decile lens. Future ratio metrics can opt in by adding to `INDUSTRY_BAND_THRESHOLDS` and setting `industry_thresholds: True`. Any future label work must respect the supply-vs-demand discipline established by v20: visible labels describe what the ratio measures, not what it implies for downstream financials. OI-26 (post-launch review of demand_supply thresholds in saturated catchments) remains active under this DEC.
+
+---
+
+## DEC-78 — RESERVED (NES storage convention)
+Status: Reserved
+Date: 2026-05-04 (banked)
+
+Reserved for the NES storage convention candidate banked 2026-05-04: percentage stored 0–100 in `abs_sa2_education_employment_annual.value`; wire boundary divides by 100 before passing to `calibrate_participation_rate`. To be promoted from candidate to Active when next NES-related work touches the storage layer. ID is preserved per the global-stable-ID discipline.
+
+---
+
+## DEC-79 — Commercial repositioning: Novara Intelligence; Patrick Bell IP; childcare asset & portfolio intelligence
+Status: Active
+Date: 2026-05-09
+
+Context: The platform began as an internal email-and-news tool informing Remara Capital Group staff about new service approvals (legacy still visible in `module5_digest.py`, `module6_news.py`, `da_leads.json`, `leads_enriched.json`). Through Phase 1.7 → Phase 2 → Phase 2.5 it evolved into a per-centre credit-decision-support system framed around Remara's underwriting needs, with Remara's Strategic Insights V1.3/V4.2, Credit Policy Short Form 14Jan25, Credit Policy For-Discussion-and-Draft, and Childcare Credit Committee Briefing Paper used as the domain anchor for thresholds, band copy, and DEC-77 industry thresholds. As of 2026-05-09 the project is repositioned: Patrick Bell owns the IP, the product is independent of Remara, and the audience expands to the broader Australian childcare market participant base. Reference incumbents (GapMaps, Qikmaps) charge ~$1,500/user/month; the institutional decision-support frame is the strategic moat.
+
+Decision:
+
+1. **Ownership.** Kintell/Novara is Patrick Bell's IP. Remara Capital Group is a domain-knowledge reference (their published documents informed early framing) but is not a stakeholder in the product. Remara-proprietary documents must not ship with the product; their language must not appear in user-facing copy.
+
+2. **Audience.** Lenders, institutional investors, large operators (for-profit AND not-for-profit), valuation firms, property funds, debt providers, advisory professionals. Not credit-team-only. The product serves all participants in the childcare asset & portfolio decision space.
+
+3. **Positioning.** Childcare asset & portfolio intelligence + institutional decision-support system. NOT a mapping tool. NOT a childcare CRM. Mapping is supporting context, not primary UI (DEC-71 stands; mapping additions in V2 are subordinate to structured intelligence).
+
+4. **Brand.** Working name **Novara Intelligence**. Successor to "Kintell" (rejected — namespace collision with another AI business) and the "Remara" working name (used as the directory header due to project origin; rejected — collides with Remara Capital Group's trading name). Filesystem and DB names retain `kintell` / `remara` prefixes for now to avoid churn (the working directory `C:\Users\Patrick Bell\remara-agent\`, the database `data/kintell.db`, key Python modules). A brand identity rename pass is queued as housekeeping (OI-NEW-6).
+
+5. **Pricing.** Two tiers initially: entry / replacement (cannibalising GapMaps, Qikmaps users) and institutional (premium PropCo / portfolio intelligence). Reference incumbents at ~$1,500/user/month.
+
+6. **Build philosophy.** Institutional decision infrastructure from day one. ISO 27001 / SOC 2 readiness artefacts in V1; certification deferred to V2. Privacy governance baseline. Auditability and explainability are first-class properties of every metric and signal — no opaque scoring, no subjective rankings, no moralised language. All metrics objective, ABS-derived where possible, calibration nudges only (per STD-34). Avoid feature sprawl; extend existing structures rather than fragmenting the product.
+
+7. **Operational split.** Patrick drives strategy, UI coherence, industry-specific depth, data depth, and commercial risk management. Claude drives technical architecture, schema design, code, build sequencing, and doc discipline. Patrick's input on coding architecture is intentionally limited.
+
+8. **PropCo layer in V1.** The evidence-based property ownership intelligence module (Stream D — see PRODUCT_VISION.md) moves from V2 to V1 because the no-title-search design is cheap to build, defensible, and a strong commercial opener. Premium-tier feature.
+
+9. **V1 ship target: 3–4 months from 2026-05-09 (i.e. ~Sept 2026).** V2 fast-follow.
+
+10. **Excel export framework as V1 deliverable.** Institutions need portable intelligence, not just dashboards. Repeatable workbook structures, transaction-ready outputs (DEC candidate, to be locked when Excel work is scoped).
+
+Consequences:
+
+- All future framing in docs and user-facing copy uses "Novara Intelligence" as the brand. Filesystem stays unchanged for now.
+- Remara-specific framings in legacy code (e.g. "credit reader" in DEC-72 band copy, "Credit Committee Brief" framing in DEC-77 source attribution) remain as historical context but are NOT extended into new surfaces. New framing is generic to market participants.
+- The `module5_digest.py` / `module6_news.py` email pipeline is no longer first-class product surface. It can stay (works) but is not extended.
+- Excel-export framework becomes a first-class V1 deliverable.
+- Five new work streams locked into the roadmap (PRODUCT_VISION.md):
+  - **Stream A** — Educator visa / overseas educator supply (Workforce extension)
+  - **Stream B** — NFP perspectives integrated into existing structure (no separate NFP module)
+  - **Stream C** — Childbearing-age cohort + marital-status depth (extends A3 + T19)
+  - **Stream D** — PropCo Property Intelligence Module (now V1 per #8 above)
+  - **Stream E** — SA2 Border Exposure V1 proxy
+- Cross-cutting risks tracked: 2026 Census Aug 2026 → SA2 boundary refresh project Q3 2027; workforce funding cliff Nov 2026 (Worker Retention Payment ends, FWC permanent ~27% wage uplift takes hold); Strengthening Regulation Bill 2025 → CCS revocation as live early-warning credit indicator.
+- Tier-1 docs at `recon/Document and Status DB/` (ARCHITECTURE, PRINCIPLES, GLOSSARY, DATA_INVENTORY, CONSOLIDATION_LOG) and Tier-2 docs missing from repo root (DECISIONS, STANDARDS) to be moved to repo root for visibility (OI-NEW-7 housekeeping).
+- A new `CLAUDE.md` lands at repo root (this session) so every future Claude Code session has orientation.
+- A new `PRODUCT_VISION.md` lands at repo root (this session) capturing the strategic frame and the five new streams.
+- Discontinuities to expect: any legacy doc, comment, or copy still framed around "Remara credit team" should be read as historical, not authoritative for future work.

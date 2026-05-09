@@ -1,8 +1,21 @@
 # Centre Page V1.5 Roadmap
 
-*Last updated: 2026-05-05 (OI-36 close + Demographic Mix scope expansion). The on-disk version supersedes the project-knowledge monolith if they disagree.*
+*Last updated: 2026-05-09 (commercial repositioning per DEC-79; this doc remains canonical for centre-page V1.5 ingest queue). The on-disk version supersedes the project-knowledge monolith if they disagree.*
 
 This roadmap is the canonical V1.5 work queue for the centre page. PROJECT_STATUS.md and ROADMAP.md reference this doc for V1.5 detail.
+
+## Note 2026-05-09 — broader V1 horizon redefined
+
+**Per DEC-79, the term "V1" has been redefined.** Up to 2026-05-05 "V1" meant the original centre-page credit-decision tool (shipped at HEAD `bcdf84c`). With DEC-79, V1 now means the broader Novara Intelligence institutional decision-support release targeting ~Sept 2026. The V1.5 ingests in this doc are still the next-priority centre-page ingest queue, but they sit *inside* the bigger V1 alongside Catchment page, Group page, five new streams (PropCo property intelligence, SA2 border exposure, educator visa supply, NFP overlays, childbearing/marital depth), Excel export framework, and brand identity rename.
+
+**Where this doc fits in the bigger V1 plan:**
+- See `PRODUCT_VISION.md` for strategic frame and the five new streams (A through E)
+- See `ROADMAP.md` §2 for the bigger V1 horizon and sequencing
+- This doc remains the **dependency-ordered queue for centre-page V1.5 ingests** (A10 + C8 next; A3-A6 and B/C-pass to follow)
+- **Stream C (OI-NEW-12)** — Childbearing-age + marital-status depth — extends A3 + T19 in this doc and adds Census TSP T05 marital status. Bundle into A3 ingest pass to amortise TSP workbook reading.
+- **Stream B (OI-NEW-11)** — NFP perspectives overlay — derived signals on Community Profile panel rows once T07/T08/T19 (A10) and SEIFA-NES-ATSI-single-parent-workforce constraints all in.
+
+The next-session priority (A10 + C8 Demographic Mix bundle) is unchanged.
 
 ---
 

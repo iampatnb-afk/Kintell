@@ -1,10 +1,31 @@
 # Project Status
 
-*Last updated: 2026-05-05 (end of OI-36 session). The on-disk version supersedes the project-knowledge monolith if they disagree.*
+*Last updated: 2026-05-09 (commercial repositioning + planning + handover doc set). The on-disk version supersedes the project-knowledge monolith if they disagree.*
 
-## Headline
+## Headline (2026-05-09)
 
-**V1 is at HEAD `bcdf84c`. V1.5 first piece (OI-36) is at `430009a`.** This session closed OI-36 cleanly: NES row now visible in Catchment Position card across all 3 verification SA2s, plus a generic delta badge on all Lite rows surfacing first-to-last Census-point change ("+9.5pp from 2011 to 2021" on Bayswater NES; "+$291/week from 2011 to 2021" on Bayswater median household income). Three commits this session: doc-set catch-up (`9d49be9`), OI-36 close (`430009a`), and end-of-session doc refresh (this commit landing).
+**Project repositioned. Patrick Bell owns the IP. Brand: Novara Intelligence (working).** This session was a planning-only pass — no code changes, no DB mutations. Commercial repositioning locked as DEC-79. Audience expands from Remara-credit-team to broader institutional decision-support market participants (lenders, investors, operators FP+NFP, valuers, property funds, debt providers, advisors). Five new work streams locked into the V1 plan (PRODUCT_VISION.md): A) Educator visa / overseas educator supply, B) NFP perspectives integrated, C) Childbearing-age + marital-status depth, D) PropCo Property Intelligence (V1 premium tier — not V2), E) SA2 Border Exposure V1 proxy. V1 ship target redefined to **~Sept 2026** (3-4 months), incorporating the original V1.0 centre-page tool (already shipped) plus V1.5 ingests + Catchment page + Group page + the five new streams + Excel export framework + brand identity rename pass.
+
+**This session's deliverables (all landed on disk):**
+- DEC-79 appended to canonical DECISIONS.md
+- New `CLAUDE.md` at repo root (orientation for every future Claude Code session)
+- New `PRODUCT_VISION.md` at repo root (strategic frame, audience, 5 streams, V1/V2/V3 horizon)
+- ROADMAP.md updated for new V1 horizon and stream sequencing
+- OPEN_ITEMS.md updated with OI-NEW-1 through OI-NEW-18 (provenance corrections, risks, brand rename, doc moves, 5 streams, new surfaces, Excel export, institutional readiness)
+- 9 memory entries in `~/.claude/projects/.../memory/` (user role, collaboration style, project context, project state, project Remara relationship, no-bash-paths feedback, doc-discipline feedback, extend-don't-sprawl feedback, doc-locations reference)
+- `.gitignore` updated for OI-13 (single-? pattern fix) + OI-NEW-9 (recon/patchers_*) + `*.pre_*` patterns
+
+**Operational change locked:** Patrick drives strategy / UI / industry depth / data depth / commercial risk. Claude drives technical architecture / schema / code / build sequencing / doc discipline. Patrick's input on coding architecture is intentionally limited.
+
+**Cross-cutting risks now tracked:** 2026 Census Aug 2026 (SA2 boundary refresh Q3 2027), workforce funding cliff Nov 2026, Strengthening Regulation Bill 2025 (CCS revocation as live credit indicator), Starting Blocks Algolia drift, ABS Community Profiles retirement, "70% break-even" anchor provenance.
+
+---
+
+## Headline (2026-05-05 — preserved for traceability)
+
+**V1.0 is at HEAD `bcdf84c`. V1.5 first piece (OI-36) is at `430009a`.** This session closed OI-36 cleanly: NES row now visible in Catchment Position card across all 3 verification SA2s, plus a generic delta badge on all Lite rows surfacing first-to-last Census-point change ("+9.5pp from 2011 to 2021" on Bayswater NES; "+$291/week from 2011 to 2021" on Bayswater median household income). Three commits this session: doc-set catch-up (`9d49be9`), OI-36 close (`430009a`), and end-of-session doc refresh (this commit landing).
+
+*Note 2026-05-09: "V1" in this 2026-05-05 entry refers to the original V1.0 centre-page credit-decision tool. Per DEC-79 the term V1 has been redefined to the broader Novara Intelligence release targeting ~Sept 2026.*
 
 ## Centre page — current state
 
