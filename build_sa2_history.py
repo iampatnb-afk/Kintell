@@ -1,9 +1,27 @@
 """
-build_sa2_history.py v2 (2026-05-03)
+build_sa2_history.py v3 (2026-05-10)
 ====================================
 
 Extracts per-SA2 quarterly supply history from NQAITS data.
 Outputs: data/sa2_history.json
+
+V3 — Polygon-first SA2 attribution (OI-NEW-21)
+----------------------------------------------
+v2 attributed each NQAITS service row to an SA2 via postcode-only lookup
+through `postcode_to_sa2_concordance.csv`. That mechanism is structurally
+one-postcode -> one-SA2, while reality is many-to-many. Failure modes seen:
+  - Cross-state name collisions (PC 6102 -> QLD "Bentley Park" not WA "Bentley")
+  - Postcode covers multiple SA2s and concordance picks one
+  - Postcode missing from concordance entirely (e.g. PC 0822 NT)
+
+Result: 1,267 of ~2,400 SA2s covered; 1,043 services-anchored SA2s missing
+from output; 39.2% of services attributed to wrong SA2 or dropped silently.
+
+v3 switches primary attribution to polygon-derived `services.sa2_code`
+(DEC-70 Step 1c polygon backfill, 99.89% coverage). NQAITS rows are joined
+via Service Approval Number to the live `services` table; postcode-concordance
+remains as fallback for closed/de-registered services and pre-Q12022 quarters
+where Service Approval Number doesn't yet appear in NQAITS.
 
 V2 — LDC-first multi-subtype support
 ------------------------------------
@@ -60,6 +78,7 @@ Run: python build_sa2_history.py   (~15-25 minutes for v2)
 """
 
 import json
+import sqlite3
 import traceback
 import warnings
 from pathlib import Path
@@ -74,6 +93,7 @@ ABS_POP     = ABS_DIR / "Population and People Database.xlsx"
 ABS_INCOME  = ABS_DIR / "Income Database.xlsx"
 CONCORDANCE = ABS_DIR / "postcode_to_sa2_concordance.csv"
 OUT_FILE    = DATA_DIR / "sa2_history.json"
+DB_FILE     = DATA_DIR / "kintell.db"
 
 POP_COL    = "Persons - 0-4 years (no.)"
 INCOME_COL = "Median equivalised total household income (weekly) ($)"
@@ -208,6 +228,37 @@ def load_concordance():
     return mapping
 
 
+def load_polygon_sa2_lookup():
+    """Read services table; return dict[service_approval_number -> (sa2_code, sa2_name)].
+
+    Polygon-derived SA2 attribution per DEC-70 (Step 1c polygon backfill, 99.89%
+    coverage). Used by process_sheet_sa2 in preference to postcode-concordance
+    lookup, which has known failure modes (cross-state name collisions, multi-SA2
+    postcodes, missing postcodes — see v3 docstring header).
+
+    Falls back to postcode-concordance for NQAITS rows whose Service Approval
+    Number isn't in the live services table (closed/de-registered centres) or
+    for pre-Q12022 quarters where the column doesn't yet appear in NQAITS.
+    """
+    if not DB_FILE.exists():
+        print(f"  WARNING: {DB_FILE} not found; polygon SA2 lookup empty")
+        return {}
+    con = sqlite3.connect(str(DB_FILE))
+    cur = con.cursor()
+    cur.execute(
+        "SELECT service_approval_number, sa2_code, sa2_name "
+        "FROM services WHERE sa2_code IS NOT NULL AND sa2_code != ''"
+    )
+    rows = cur.fetchall()
+    con.close()
+    lookup = {}
+    for san, code, name in rows:
+        if san:
+            lookup[san.strip()] = (code.strip(), (name or "").strip())
+    print(f"  Polygon SA2 lookup: {len(lookup):,} services (DEC-70)")
+    return lookup
+
+
 # ---------------------------------------------------------------------------
 # v2 subtype filter
 # ---------------------------------------------------------------------------
@@ -240,7 +291,7 @@ def filter_df_by_subtype(df, subtype):
 # Per-sheet processor (refactored to take subtype parameter)
 # ---------------------------------------------------------------------------
 
-def process_sheet_sa2(df, concordance, q, subtype):
+def process_sheet_sa2(df, concordance, polygon_lookup, q, subtype):
     """Process one NQAITS sheet for one subtype.
 
     Returns dict[sa2_code -> {sa2_name, places, services, service_map}].
@@ -271,7 +322,14 @@ def process_sheet_sa2(df, concordance, q, subtype):
         pc = str(row.get(pc_col, "") or "").strip().zfill(4)
         if not pc or pc == "0000":
             continue
-        sa2_info = concordance.get(pc)
+        # Polygon-derived SA2 first (DEC-70). Concordance is fallback for
+        # closed services or pre-Q12022 NQAITS rows missing SAN.
+        appr_num_for_sa2 = ""
+        if appr_col:
+            appr_num_for_sa2 = str(row.get(appr_col, "") or "").strip()
+        sa2_info = polygon_lookup.get(appr_num_for_sa2) if appr_num_for_sa2 else None
+        if not sa2_info:
+            sa2_info = concordance.get(pc)
         if not sa2_info:
             continue
         sa2_code, sa2_name = sa2_info
@@ -372,6 +430,8 @@ def build():
     if not concordance:
         return
 
+    polygon_lookup = load_polygon_sa2_lookup()
+
     pop_ts    = load_abs_sa2_timeseries(ABS_POP, POP_COL)
     income_ts = load_abs_sa2_timeseries(ABS_INCOME, INCOME_COL)
 
@@ -398,7 +458,7 @@ def build():
 
             # Process each subtype separately, collect into per-subtype dicts.
             per_subtype_sa2_data = {
-                st: process_sheet_sa2(df, concordance, q, st) for st in SUBTYPES
+                st: process_sheet_sa2(df, concordance, polygon_lookup, q, st) for st in SUBTYPES
             }
 
             # Union of SA2s with data in any subtype this quarter.
