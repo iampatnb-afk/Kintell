@@ -1,5 +1,7 @@
 """
 centre_page.py — Phase 2 backend helper for centre.html
+Version: v24 (2026-05-12) — DEC-84 Centre v2 payload schema v7. Additive overlay (DEC-11): v6 keys preserved unchanged; v7 adds 4 top-level keys (`dec83`, `executive`, `matrix`, `drawer`) populated by 3 new builders + 1 substrate fetcher. New functions: `_build_dec83_state(conn, service_id)` reads DEC-83 substrate (large_provider, regulatory_snapshot, conditions, enforcement, vacancy, fees, capture_meta) defensively per-table; `_build_executive(r, position, dec83_state)` produces Layer 2 (5 signal tiles + max-2 flags + composed headline per DEC-84 #2 + #3); `_build_matrix(r, position, workforce_supply, community_profile, dec83_state)` produces Layer 5 row list (~52 rows V1, 9 categories per DEC-84 #5) using `_matrix_rows_from_position` flattener + per-category builders for new DEC-83-only categories (Pricing / Quality / Operator / Operations); `_build_drawer(...)` produces Layer 6 special drawer content keyed by drawer key (DEC-83-specific only; position-derived drawers derived by renderer from existing position entries). Legacy v6 renderer at `/centres/{id}` (centre.html v3.31) continues to work unchanged. New /centre_v2/{id} renderer (centre_v2.html, future) consumes v7 keys. Imports `timedelta` for 24mo enforcement-event window.
+
 Version: v21 (2026-05-05) — OI-36 close: sa2_nes_share added to POSITION_CARD_ORDER["catchment_position"] for Python-side consistency with centre.html's render order. Data-side registration was already complete at v20 (LAYER3_METRIC_META + INTENT_COPY + TRAJECTORY_SOURCE in commit 3ddcf18); the metric was being emitted by _layer3_position but not rendered because centre.html L2349 hardcoded its own order array excluding NES. Surgical scope. Refactor to drive JS render order from the POSITION_CARD_ORDER payload (eliminating the JS-side array entirely) banked as separate housekeeping OI. Companion centre.html v3.26 in same commit.
 
 Version: v20 (2026-05-03) — OI-32 polish round 3 (operator review of v19 INDUSTRY label semantics + about_data first-line overreach). Two changes on sa2_demand_supply: (a) INDUSTRY_BAND_THRESHOLDS parallel-framed across all 4 bands in supply-vs-demand language only — "below break-even" / "near break-even" replaced with "supply heavy" / "supply leaning" / "approaching balance" / "demand leading" because break-even is a profitability conclusion that the demand/supply ratio alone cannot support (depends on price, cost base, ramp curve, mix). The thresholds (0.40 / 0.55 / 0.85) still derive from break-even/target occupancy maths but the LABEL no longer asserts the conclusion. (b) about_data first line tightened from "the occupancy ramp-up expectation for a centre here" to "a key input to occupancy ramp expectations" — same category-error fix at the descriptive level. Companion centre.html v3.23 -> v3.24 (cohort histogram explainer + SEIFA mini decile strip).
@@ -179,7 +181,7 @@ Read-only. No DB mutations.
 import json
 import re
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -2100,6 +2102,1203 @@ def _layer3_position(con: sqlite3.Connection, sa2_code: Optional[str], service_s
     return out
 
 
+# ─────────────────────────────────────────────────────────────────────
+# DEC-84 — Centre v2 builders (payload schema v7)
+# ─────────────────────────────────────────────────────────────────────
+# Three top-level builders surface the v2 6-layer architecture into the
+# payload alongside the existing v6 keys (which stay live until v2 cut-
+# over via /centre_v2/{id} verifies). v7 = v6 + dec83 + executive +
+# matrix + drawer. Existing v6 keys unchanged; new keys ADDITIVE per
+# DEC-11. Renderer can consume v6 (legacy /centres/{id}) or v7 (new
+# /centre_v2/{id}) without payload-shape branching.
+#
+# DEC-83 substrate fetcher feeds Layer 1 enrichments + Layer 2 flags +
+# Layer 5 Pricing/Quality/Operations/Operator categories + Layer 6
+# special drawer content. Defensive: every query try/except OperationalError
+# so v24 ships safely on DBs missing one or more DEC-83 tables.
+
+# Drawer-key namespacing per DEC-84 #6:
+#   "metric:<metric_name>"      -> generic drawer; renderer derives content
+#                                  from position.<card>.<metric_name>
+#   "dec83:<topic>"             -> special drawer; payload carries full
+#                                  content here (daily_rate / conditions /
+#                                  enforcement / operator_group / nqs /
+#                                  vacancy / top_n_cob / top_n_lang)
+
+
+def _build_dec83_state(conn, service_id: int) -> dict:
+    """DEC-83 substrate for a single service. Returns a dict with keys:
+      large_provider, regulatory_snapshot, conditions, enforcement,
+      vacancy, fees, capture_meta. Empty/None when data absent.
+
+    Each substrate piece is read defensively (try/except OperationalError)
+    so missing tables don't break payload assembly. Caller may also receive
+    None values inside a present-key dict when the service has no data on
+    that table even though the table exists.
+    """
+    out: dict = {
+        "large_provider":       None,
+        "regulatory_snapshot":  None,
+        "conditions":           {"service_count": 0, "provider_count": 0, "active_count": 0, "rows": []},
+        "enforcement":          {"total_count": 0, "recent_24mo_count": 0, "rows": []},
+        "vacancy":              {"by_age_band": [], "latest_observed_at": None, "all_no_vacancies_published": None},
+        "fees":                 {"by_age_band_session": [], "latest_as_of_date": None},
+        "capture_meta":         None,
+    }
+
+    # 1. Large provider chain (services.large_provider_id -> large_provider)
+    try:
+        lp_row = conn.execute("""
+            SELECT lp.large_provider_id, lp.name, lp.slug,
+                   lp.first_observed_at, lp.last_observed_at,
+                   (SELECT COUNT(*) FROM large_provider_provider_link
+                     WHERE large_provider_id = lp.large_provider_id) AS provider_count,
+                   (SELECT COUNT(*) FROM services
+                     WHERE large_provider_id = lp.large_provider_id
+                       AND is_active = 1) AS service_count
+              FROM services s
+              JOIN large_provider lp ON s.large_provider_id = lp.large_provider_id
+             WHERE s.service_id = ?
+        """, (service_id,)).fetchone()
+        if lp_row is not None:
+            d = _row_to_dict(lp_row)
+            out["large_provider"] = {
+                "large_provider_id": d.get("large_provider_id"),
+                "name":              d.get("name"),
+                "slug":              d.get("slug"),
+                "first_observed_at": d.get("first_observed_at"),
+                "last_observed_at":  d.get("last_observed_at"),
+                "provider_count":    int(d.get("provider_count") or 0),
+                "service_count":     int(d.get("service_count") or 0),
+            }
+    except sqlite3.OperationalError:
+        pass
+
+    # 2. Latest regulatory snapshot
+    try:
+        snap_row = conn.execute("""
+            SELECT *
+              FROM service_regulatory_snapshot
+             WHERE service_id = ?
+             ORDER BY snapshot_date DESC, snapshot_id DESC
+             LIMIT 1
+        """, (service_id,)).fetchone()
+        if snap_row is not None:
+            d = _row_to_dict(snap_row)
+            # Hours rollup: derive a single-line summary like "Mon–Fri 7:00am–6:00pm"
+            # or "Mon–Fri 7:00am–6:00pm; Sat 8:00am–1:00pm" if Saturday differs.
+            hours_summary = _hours_summary(d)
+            out["regulatory_snapshot"] = {
+                "snapshot_date":         d.get("snapshot_date"),
+                "ccs_data_received":     _to_bool(d.get("ccs_data_received")),
+                "ccs_revoked_by_ea":     _to_bool(d.get("ccs_revoked_by_ea")),
+                "is_closed":             _to_bool(d.get("is_closed")),
+                "temporarily_closed":    _to_bool(d.get("temporarily_closed")),
+                "last_regulatory_visit": d.get("last_regulatory_visit"),
+                "enforcement_count":     d.get("enforcement_count"),
+                "nqs_prev_overall":      d.get("nqs_starting_blocks_prev_overall"),
+                "nqs_prev_issued":       d.get("nqs_starting_blocks_prev_issued"),
+                "provider_status":       d.get("provider_status"),
+                "provider_approval_date": d.get("provider_approval_date"),
+                "provider_ccs_revoked_by_ea": _to_bool(d.get("provider_ccs_revoked_by_ea")),
+                "provider_trade_name":   d.get("provider_trade_name"),
+                "hours_summary":         hours_summary,
+                "hours_by_day": {
+                    day: {"open": d.get(f"hours_{day}_open"), "close": d.get(f"hours_{day}_close")}
+                    for day in ("monday", "tuesday", "wednesday", "thursday",
+                                "friday", "saturday", "sunday")
+                },
+                "website_url":           d.get("website_url"),
+                "phone":                 d.get("phone"),
+                "email":                 d.get("email"),
+            }
+    except sqlite3.OperationalError:
+        pass
+
+    # 3. Conditions (service-level + provider-level via provider_approval_number)
+    try:
+        # Service-level conditions
+        svc_cond_rows = conn.execute("""
+            SELECT condition_id, condition_text, level, source,
+                   first_observed_at, last_observed_at, still_active
+              FROM service_condition
+             WHERE service_id = ? AND level = 'service'
+             ORDER BY first_observed_at DESC
+        """, (service_id,)).fetchall()
+        # Provider-level conditions: join via services.provider_approval_number
+        prv_cond_rows = conn.execute("""
+            SELECT sc.condition_id, sc.condition_text, sc.level, sc.source,
+                   sc.first_observed_at, sc.last_observed_at, sc.still_active
+              FROM service_condition sc
+              JOIN services s2 ON s2.service_id = sc.service_id
+              JOIN services s1 ON s1.service_id = ?
+             WHERE sc.level = 'provider'
+               AND s2.provider_approval_number = s1.provider_approval_number
+             GROUP BY sc.condition_id, sc.level, sc.source
+        """, (service_id,)).fetchall()
+        all_rows = [_row_to_dict(r) for r in svc_cond_rows] + [_row_to_dict(r) for r in prv_cond_rows]
+        active_count = sum(1 for r in all_rows if r.get("still_active"))
+        svc_count = len(svc_cond_rows)
+        prv_count = len(prv_cond_rows)
+        out["conditions"] = {
+            "service_count":  svc_count,
+            "provider_count": prv_count,
+            "active_count":   active_count,
+            "rows":           all_rows,
+        }
+    except sqlite3.OperationalError:
+        pass
+
+    # 4. Enforcement events from regulatory_events (subject_type='service', subject_id=service_id)
+    try:
+        ev_rows = conn.execute("""
+            SELECT event_id, event_type, event_date, detail, severity, regulator, source_url
+              FROM regulatory_events
+             WHERE subject_type = 'service' AND subject_id = ?
+             ORDER BY event_date DESC
+        """, (service_id,)).fetchall()
+        all_evs = [_row_to_dict(r) for r in ev_rows]
+        # Recent-24mo count from event_date string (YYYY-MM-DD or similar)
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=730)).date().isoformat()
+        recent = sum(1 for e in all_evs if (e.get("event_date") or "") >= cutoff)
+        out["enforcement"] = {
+            "total_count":        len(all_evs),
+            "recent_24mo_count":  recent,
+            "rows":               all_evs,
+        }
+    except (sqlite3.OperationalError, NameError):
+        # NameError catches missing timedelta import as a defensive measure
+        pass
+
+    # 5. Latest vacancy snapshot per age_band
+    try:
+        vac_rows = conn.execute("""
+            SELECT v.age_band, v.observed_at, v.vacancy_status, v.vacancy_detail_json
+              FROM service_vacancy v
+              JOIN (
+                  SELECT age_band, MAX(observed_at) AS max_obs
+                    FROM service_vacancy
+                   WHERE service_id = ?
+                   GROUP BY age_band
+              ) latest
+                ON v.age_band = latest.age_band
+               AND v.observed_at = latest.max_obs
+             WHERE v.service_id = ?
+             ORDER BY v.age_band
+        """, (service_id, service_id)).fetchall()
+        rows = [_row_to_dict(r) for r in vac_rows]
+        latest = max((r.get("observed_at") or "" for r in rows), default=None) or None
+        # All published "no_vacancies_published"? (Layer 2 informational flag trigger)
+        statuses = [r.get("vacancy_status") for r in rows]
+        all_none = bool(rows) and all(s == "no_vacancies_published" for s in statuses if s)
+        out["vacancy"] = {
+            "by_age_band":                   rows,
+            "latest_observed_at":            latest,
+            "all_no_vacancies_published":    all_none if rows else None,
+        }
+    except sqlite3.OperationalError:
+        pass
+
+    # 6. Fee rows: latest year median per (age_band, session_type)
+    try:
+        # Find latest as_of_date year for this service
+        latest_year_row = conn.execute("""
+            SELECT MAX(as_of_date) AS max_dt
+              FROM service_fee
+             WHERE service_id = ?
+        """, (service_id,)).fetchone()
+        latest_dt = latest_year_row[0] if latest_year_row else None
+        if latest_dt:
+            latest_year = (latest_dt or "")[:4]
+            fee_rows = conn.execute("""
+                SELECT age_band, session_type,
+                       AVG(fee_aud) AS median_fee_aud,
+                       COUNT(*) AS n_obs,
+                       MAX(as_of_date) AS most_recent
+                  FROM service_fee
+                 WHERE service_id = ?
+                   AND substr(as_of_date, 1, 4) = ?
+                 GROUP BY age_band, session_type
+                 ORDER BY age_band, session_type
+            """, (service_id, latest_year)).fetchall()
+            out["fees"] = {
+                "by_age_band_session": [
+                    {
+                        "age_band":     r["age_band"],
+                        "session_type": r["session_type"],
+                        "median_fee":   round(float(r["median_fee_aud"]), 2) if r["median_fee_aud"] is not None else None,
+                        "n_obs":        int(r["n_obs"] or 0),
+                        "most_recent":  r["most_recent"],
+                    }
+                    for r in fee_rows
+                ],
+                "latest_as_of_date": latest_dt,
+                "year":              latest_year,
+            }
+    except sqlite3.OperationalError:
+        pass
+
+    # 7. External capture meta (latest fetch timestamp, source)
+    try:
+        cap_row = conn.execute("""
+            SELECT source, fetched_at, http_status, payload_sha256, extractor_version
+              FROM service_external_capture
+             WHERE service_id = ?
+             ORDER BY fetched_at DESC
+             LIMIT 1
+        """, (service_id,)).fetchone()
+        if cap_row is not None:
+            out["capture_meta"] = _row_to_dict(cap_row)
+    except sqlite3.OperationalError:
+        pass
+
+    return out
+
+
+def _hours_summary(snap: dict) -> Optional[str]:
+    """Compose a one-line operating-hours summary from the 14 hours_* cols
+    of a regulatory snapshot dict. Returns 'Mon–Fri 7:00am–6:00pm' shape
+    when weekday hours are uniform; falls back to 'See details' if mixed.
+    Returns None when no hours data at all."""
+    days = ("monday", "tuesday", "wednesday", "thursday", "friday")
+    weekend = ("saturday", "sunday")
+
+    def _fmt(t: Optional[str]) -> Optional[str]:
+        if not t:
+            return None
+        # Accept "07:00" / "7:00" / "07:00:00"; render as "7:00am" / "6:00pm"
+        s = str(t).strip()
+        try:
+            h, m = s.split(":")[:2]
+            hi = int(h)
+            mi = int(m)
+            am = hi < 12
+            hh = hi % 12 or 12
+            return f"{hh}:{mi:02d}{'am' if am else 'pm'}"
+        except (ValueError, IndexError):
+            return s
+
+    weekday_pairs = []
+    for d in days:
+        o = snap.get(f"hours_{d}_open")
+        c = snap.get(f"hours_{d}_close")
+        if o and c:
+            weekday_pairs.append((_fmt(o), _fmt(c)))
+    weekend_pairs = []
+    for d in weekend:
+        o = snap.get(f"hours_{d}_open")
+        c = snap.get(f"hours_{d}_close")
+        if o and c:
+            weekend_pairs.append((d, _fmt(o), _fmt(c)))
+
+    if not weekday_pairs and not weekend_pairs:
+        return None
+
+    parts = []
+    if weekday_pairs:
+        if all(p == weekday_pairs[0] for p in weekday_pairs):
+            o, c = weekday_pairs[0]
+            parts.append(f"Mon–Fri {o}–{c}")
+        else:
+            parts.append("Mon–Fri (varies)")
+    for d, o, c in weekend_pairs:
+        parts.append(f"{d.capitalize()[:3]} {o}–{c}")
+    return "; ".join(parts) if parts else None
+
+
+def _to_bool(v) -> Optional[bool]:
+    """Coerce SQLite 0/1/None/'true'/'false' to Python bool/None."""
+    if v is None:
+        return None
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        return bool(v)
+    s = str(v).strip().lower()
+    if s in ("1", "true", "t", "yes", "y"):
+        return True
+    if s in ("0", "false", "f", "no", "n", ""):
+        return False
+    return None
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Layer 2 — Executive interpretation (DEC-84 #2 + #3)
+# ─────────────────────────────────────────────────────────────────────
+
+
+def _build_executive(r: dict, position: dict, dec83_state: dict) -> dict:
+    """Returns Layer 2 payload: 5 signal tiles + flag bar (max 2 + spillover)
+    + composed headline. Each signal tile has a links_to pointer to the
+    relevant Layer 5 matrix category for click-through. Flag triggers per
+    DEC-84 #3 severity hierarchy.
+    """
+    catchment = position.get("catchment_position", {}) or {}
+    pop = position.get("population", {}) or {}
+    lab = position.get("labour_market", {}) or {}
+
+    # Helper: pull display + band + decile + raw_value summary from a position entry
+    def _summarise(card_dict, metric_key):
+        e = card_dict.get(metric_key) or {}
+        return {
+            "metric":     metric_key,
+            "raw_value":  e.get("raw_value"),
+            "decile":     e.get("decile"),
+            "band":       e.get("band"),
+            "industry_band":       e.get("industry_band"),
+            "industry_band_label": e.get("industry_band_label"),
+            "confidence": e.get("confidence"),
+        }
+
+    # ── 5 signal tiles ───────────────────────────────────────────────
+    demand_src = _summarise(catchment, "sa2_adjusted_demand")
+    supply_src = _summarise(catchment, "sa2_supply_ratio")
+    nqs_overall = (r.get("overall_nqs_rating") or "").strip() or None
+    nqs_prev = ((dec83_state.get("regulatory_snapshot") or {}).get("nqs_prev_overall") or "").strip() or None
+    lfp_f = _summarise(lab, "sa2_lfp_females")
+    nes = _summarise(catchment, "sa2_nes_share")
+
+    signals = [
+        {
+            "id":      "demand",
+            "label":   "Demand",
+            "summary": _signal_summary_demand(demand_src),
+            "links_to": "matrix:demand",
+            "source":  demand_src,
+        },
+        {
+            "id":      "supply",
+            "label":   "Supply",
+            "summary": _signal_summary_supply(supply_src),
+            "links_to": "matrix:supply",
+            "source":  supply_src,
+        },
+        {
+            "id":      "workforce",
+            "label":   "Workforce",
+            "summary": _signal_summary_workforce(lfp_f),
+            "links_to": "matrix:workforce",
+            "source":  lfp_f,
+        },
+        {
+            "id":      "quality",
+            "label":   "Quality",
+            "summary": _signal_summary_quality(nqs_overall, nqs_prev),
+            "links_to": "matrix:quality",
+            "source":  {"nqs_overall": nqs_overall, "nqs_prev": nqs_prev},
+        },
+        {
+            "id":      "community",
+            "label":   "Community",
+            "summary": _signal_summary_community(nes, catchment, dec83_state),
+            "links_to": "matrix:community",
+            "source":  nes,
+        },
+    ]
+
+    # ── Flag bar ─────────────────────────────────────────────────────
+    flags = _compute_flags(dec83_state, nqs_overall)
+
+    # ── Headline composer (rule-based) ──────────────────────────────
+    headline = _compose_headline(supply_src, demand_src, nqs_overall, nes, dec83_state)
+
+    return {
+        "headline": headline,
+        "signals":  signals,
+        "flags":    flags,  # may include _spillover key when >2 triggered
+    }
+
+
+def _signal_summary_demand(s):
+    band = s.get("industry_band_label") or s.get("band") or "—"
+    dec = s.get("decile")
+    if s.get("confidence") in (None, "unavailable", "deferred") or dec is None:
+        return "Pending data"
+    return f"{band.capitalize()} · decile {dec}"
+
+
+def _signal_summary_supply(s):
+    band = s.get("industry_band_label") or s.get("band") or "—"
+    dec = s.get("decile")
+    if s.get("confidence") in (None, "unavailable", "deferred") or dec is None:
+        return "Pending data"
+    return f"{band.capitalize()} · decile {dec}"
+
+
+def _signal_summary_workforce(s):
+    if s.get("confidence") in (None, "unavailable", "deferred") or s.get("decile") is None:
+        return "Pending V1.5 A6/A7 wire-up"
+    band = s.get("band") or "mid"
+    return f"Female LFP {band} · decile {s.get('decile')}"
+
+
+def _signal_summary_quality(nqs_overall, nqs_prev):
+    if not nqs_overall:
+        return "Not yet rated"
+    # Suppress (prev X) when prev is null/empty, only surface when meaningfully different
+    prev_clean = (nqs_prev or "").strip()
+    if prev_clean and prev_clean.upper() not in ("NONE", "NULL", "—") and prev_clean != nqs_overall:
+        return f"{nqs_overall} (prev {prev_clean})"
+    return nqs_overall
+
+
+def _signal_summary_community(nes_src, catchment, dec83_state):
+    # Quick descriptive flavour; rule-based, no scoring.
+    nes_v = nes_src.get("raw_value") if isinstance(nes_src, dict) else None
+    nes_dec = nes_src.get("decile") if isinstance(nes_src, dict) else None
+    atsi = (catchment.get("sa2_atsi_share") or {}).get("raw_value")
+    if nes_v is None:
+        return "Pending demographic ingest"
+    parts = []
+    if isinstance(nes_v, (int, float)):
+        if nes_v >= 50:
+            parts.append("high NES")
+        elif nes_v >= 25:
+            parts.append("moderate NES")
+        else:
+            parts.append("low NES")
+    if isinstance(atsi, (int, float)) and atsi >= 10:
+        parts.append("high ATSI")
+    if nes_dec and nes_dec >= 8:
+        parts.append("culturally diverse")
+    return " / ".join(parts) if parts else "Standard catchment mix"
+
+
+def _compute_flags(dec83_state: dict, nqs_overall: Optional[str]) -> dict:
+    """Severity hierarchy per DEC-84 #3. Returns {visible: [...], spillover_count: N}."""
+    snap = dec83_state.get("regulatory_snapshot") or {}
+    cond = dec83_state.get("conditions") or {}
+    enf = dec83_state.get("enforcement") or {}
+    vac = dec83_state.get("vacancy") or {}
+
+    triggered = []
+
+    # RED flags
+    if snap.get("ccs_revoked_by_ea") is True:
+        triggered.append({"severity": "red", "id": "ccs_revoked", "label": "CCS revoked by EA",
+                          "links_to": "drawer:dec83:nqs"})
+    if snap.get("is_closed") is True:
+        triggered.append({"severity": "red", "id": "closed", "label": "Service closed",
+                          "links_to": "matrix:operations"})
+    if snap.get("temporarily_closed") is True:
+        triggered.append({"severity": "red", "id": "temp_closed", "label": "Temporarily closed",
+                          "links_to": "matrix:operations"})
+
+    # AMBER flags
+    if (cond.get("active_count") or 0) > 0:
+        triggered.append({"severity": "amber", "id": "active_conditions",
+                          "label": f"{cond['active_count']} active condition" + ("s" if cond["active_count"] != 1 else ""),
+                          "links_to": "drawer:dec83:conditions"})
+    if nqs_overall in ("Working Towards NQS", "Significant Improvement Required", "Provisional"):
+        triggered.append({"severity": "amber", "id": "sub_meeting_nqs",
+                          "label": f"NQS: {nqs_overall}",
+                          "links_to": "drawer:dec83:nqs"})
+    if (enf.get("recent_24mo_count") or 0) > 0:
+        triggered.append({"severity": "amber", "id": "recent_enforcement",
+                          "label": f"{enf['recent_24mo_count']} enforcement event" + ("s" if enf["recent_24mo_count"] != 1 else "") + " (24mo)",
+                          "links_to": "drawer:dec83:enforcement"})
+
+    # INFORMATIONAL flags
+    if vac.get("all_no_vacancies_published") is True:
+        triggered.append({"severity": "info", "id": "no_vacancies",
+                          "label": "No vacancies published",
+                          "links_to": "drawer:dec83:vacancy"})
+
+    # Severity ordering: red first, amber, info
+    severity_order = {"red": 0, "amber": 1, "info": 2}
+    triggered.sort(key=lambda f: severity_order.get(f["severity"], 3))
+
+    visible = triggered[:2]
+    spillover = max(0, len(triggered) - 2)
+    return {"visible": visible, "spillover_count": spillover, "all_triggered": triggered}
+
+
+def _compose_headline(supply_src, demand_src, nqs_overall, nes_src, dec83_state) -> str:
+    """Rule-based composition: '[supply band] · [demand band] · [demographic flavour] · [quality posture]'."""
+    parts = []
+    s_band = supply_src.get("industry_band_label") or supply_src.get("band")
+    if s_band:
+        parts.append(f"{s_band.capitalize()} supply")
+    d_band = demand_src.get("industry_band_label") or demand_src.get("band")
+    if d_band:
+        parts.append(f"{d_band.capitalize()} demand")
+    nes_v = nes_src.get("raw_value") if isinstance(nes_src, dict) else None
+    if isinstance(nes_v, (int, float)):
+        flavour = "high-NES catchment" if nes_v >= 40 else ("moderate-NES catchment" if nes_v >= 20 else "low-NES catchment")
+        parts.append(flavour)
+    if nqs_overall:
+        parts.append(nqs_overall)
+    return " / ".join(parts) if parts else "—"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Layer 5 — Institutional signal matrix (DEC-84 #5)
+# ─────────────────────────────────────────────────────────────────────
+
+
+def _build_matrix(r: dict, position: dict, workforce_supply: dict,
+                  community_profile: dict, dec83_state: dict) -> list:
+    """Layer 5 matrix as a list of row dicts. ~52 rows V1, 9 categories
+    in display order (Demand / Supply / Pricing & Fees / Quality / Workforce
+    / Community / Education / Operator-Group / Operations / Population /
+    Labour Market). Each row carries the 8-column matrix structure per
+    DEC-84 #5. Sorting V1 = fixed display order matching POSITION_CARD_ORDER
+    + new entries appended per category.
+    """
+    rows: list = []
+    catchment = position.get("catchment_position", {}) or {}
+    pop = position.get("population", {}) or {}
+    lab = position.get("labour_market", {}) or {}
+    edu = position.get("education_infrastructure", {}) or {}
+
+    # ── DEMAND (3) ───────────────────────────────────────────────────
+    rows.extend(_matrix_rows_from_position(catchment, [
+        "sa2_adjusted_demand", "sa2_demand_supply", "sa2_demand_share_state",
+    ], "demand"))
+
+    # ── SUPPLY (2 + DEC-83 vacancy posture) ──────────────────────────
+    rows.extend(_matrix_rows_from_position(catchment, [
+        "sa2_supply_ratio", "sa2_child_to_place",
+    ], "supply"))
+    # V1.5 stub for subtype-correct supply ratio (A5)
+    rows.append(_matrix_stub_row("sa2_supply_ratio_per_subtype", "supply",
+        "Supply ratio per subtype", "Pending V1.5 A5"))
+    # DEC-83 vacancy posture row
+    rows.append(_matrix_dec83_vacancy_row(dec83_state))
+
+    # ── PRICING & FEES (NEW DEC-83) ─────────────────────────────────
+    # 5 rows for LDC/FDC/Preschool: full_day per age band; OSHC swaps to
+    # before/after_school × school-age. Half-day / hourly / before-after
+    # for non-OSHC live in drawer only per DEC-84 #9.
+    rows.extend(_matrix_pricing_rows(r, dec83_state))
+
+    # ── QUALITY (NEW DEC-83) ────────────────────────────────────────
+    rows.extend(_matrix_quality_rows(r, dec83_state))
+
+    # ── WORKFORCE (4 rows; mostly deferred wire-up) ─────────────────
+    rows.extend(_matrix_workforce_rows(workforce_supply))
+    # V1.5 stub for B1 JSA banding
+    rows.append(_matrix_stub_row("sa2_jsa_vacancy_rate", "workforce",
+        "SA2 JSA vacancy rate", "Pending V1.5 B1"))
+
+    # ── COMMUNITY (8 demographic + top-N preview) ───────────────────
+    rows.extend(_matrix_rows_from_position(catchment, [
+        "sa2_nes_share", "sa2_atsi_share", "sa2_overseas_born_share",
+        "sa2_single_parent_family_share", "sa2_parent_cohort_25_44_share",
+        "sa2_partnered_25_44_share", "sa2_women_35_44_with_child_share",
+        "sa2_women_25_34_with_child_share",
+    ], "community", community_preview=community_profile))
+    # Median household income lives in community (affordability lens)
+    rows.extend(_matrix_rows_from_position(lab, ["sa2_median_household_income"], "community"))
+
+    # ── EDUCATION (3 V1 + 5 banked sector breakdowns) ───────────────
+    rows.extend(_matrix_rows_from_position(edu, [
+        "sa2_school_count_total",
+        "sa2_school_enrolment_total",
+        "sa2_school_enrolment_govt_share",
+    ], "education"))
+    # 5 banked ACARA sector breakdowns — surface as Pending V1.5 stubs
+    # until they're rendered in the matrix; the data IS in the DB but
+    # POSITION_CARD_ORDER doesn't include them so they don't appear in
+    # `position.education_infrastructure`. V1.5 follow-up to expose.
+    for stub_metric, stub_label in [
+        ("sa2_school_count_govt", "Govt school share by count"),
+        ("sa2_school_count_catholic", "Catholic school share by count"),
+        ("sa2_school_count_independent", "Independent school share by count"),
+        ("sa2_school_enrolment_catholic_share", "Catholic enrolment share"),
+        ("sa2_school_enrolment_independent_share", "Independent enrolment share"),
+    ]:
+        rows.append(_matrix_stub_row(stub_metric, "education", stub_label,
+                                     "Pending V1.5 (banked from A4)"))
+
+    # ── OPERATOR / GROUP IDENTITY (NEW DEC-83) ──────────────────────
+    rows.extend(_matrix_operator_rows(r, dec83_state))
+
+    # ── OPERATIONS (NEW DEC-83) ─────────────────────────────────────
+    rows.extend(_matrix_operations_rows(r, dec83_state))
+
+    # ── POPULATION (3 charted + 1 deferred) ─────────────────────────
+    rows.extend(_matrix_rows_from_position(pop, [
+        "sa2_under5_count", "sa2_total_population", "sa2_births_count",
+        "sa2_under5_growth_5y",
+    ], "population"))
+
+    # ── LABOUR MARKET (8 minus median_household_income which moved to community) ──
+    rows.extend(_matrix_rows_from_position(lab, [
+        "sa2_unemployment_rate", "sa2_median_employee_income",
+        "sa2_median_total_income", "sa2_lfp_persons", "sa2_lfp_females",
+        "sa2_lfp_males", "jsa_vacancy_rate",
+    ], "labour_market"))
+
+    return rows
+
+
+def _matrix_rows_from_position(card_dict: dict, metric_keys: list, category: str,
+                                community_preview: Optional[dict] = None) -> list:
+    """Flatten a list of position metric entries into matrix rows under a
+    given category. community_preview (when provided) injects top-N preview
+    text into the Commentary column for nes_share / overseas_born_share.
+    """
+    out = []
+    for mk in metric_keys:
+        e = card_dict.get(mk)
+        if not e:
+            continue
+        # Sparkline = compressed last-N points from trajectory
+        traj = e.get("trajectory") or []
+        sparkline = traj[-12:] if len(traj) > 12 else traj  # last 12 points
+        # Commentary preview: first sentence of intent_copy + community preview if applicable
+        commentary = _truncate_sentence(e.get("intent_copy"))
+        if community_preview:
+            if mk == "sa2_nes_share":
+                preview = _format_top_n(community_preview.get("language_at_home_top_n"), "Top languages")
+                if preview:
+                    commentary = f"{commentary} {preview}".strip() if commentary else preview
+            elif mk == "sa2_overseas_born_share":
+                preview = _format_top_n(community_preview.get("country_of_birth_top_n"), "Top countries")
+                if preview:
+                    commentary = f"{commentary} {preview}".strip() if commentary else preview
+        confidence = e.get("confidence")
+        v15_pending = None
+        if confidence == "deferred":
+            v15_pending = "Pending data wire-up"
+        out.append({
+            "category":         category,
+            "metric":           mk,
+            "display":          e.get("display"),
+            "current_value":    e.get("raw_value"),
+            "value_format":     e.get("value_format"),
+            "period":           e.get("period_label") or (str(e.get("year")) if e.get("year") else None),
+            "sparkline":        sparkline,
+            "decile":           e.get("decile"),
+            "cohort_n":         e.get("cohort_n"),
+            "band":             e.get("band"),
+            "industry_band":    e.get("industry_band_label") or e.get("band"),
+            "signal":           e.get("industry_band_label") or e.get("band") or "—",
+            "commentary":       commentary,
+            "drawer_key":       f"metric:{mk}",
+            "obs_der_com":      _badges_for(e),
+            "v15_pending":      v15_pending,
+            "confidence":       confidence,
+        })
+    return out
+
+
+def _matrix_stub_row(metric: str, category: str, display: str, status_pill: str) -> dict:
+    """V1.5 pending-ingest stub row per DEC-84 #10."""
+    return {
+        "category":      category,
+        "metric":        metric,
+        "display":       display,
+        "current_value": None,
+        "value_format":  None,
+        "period":        None,
+        "sparkline":     [],
+        "decile":        None,
+        "cohort_n":      None,
+        "band":          None,
+        "industry_band": None,
+        "signal":        status_pill,
+        "commentary":    None,
+        "drawer_key":    f"metric:{metric}",
+        "obs_der_com":   [],
+        "v15_pending":   status_pill,
+        "confidence":    "deferred",
+    }
+
+
+def _matrix_dec83_vacancy_row(dec83_state: dict) -> dict:
+    vac = dec83_state.get("vacancy") or {}
+    rows = vac.get("by_age_band") or []
+    if not rows:
+        return _matrix_stub_row("dec83_vacancy_posture", "supply",
+                                "Vacancy posture (per age band)", "Pending DEC-83 ingest")
+    has = sum(1 for x in rows if (x.get("vacancy_status") or "").startswith("has_") or x.get("vacancy_status") not in (None, "no_vacancies_published"))
+    none = sum(1 for x in rows if x.get("vacancy_status") == "no_vacancies_published")
+    if vac.get("all_no_vacancies_published"):
+        signal = "All age bands: no vacancies published"
+    elif has and not none:
+        signal = "Vacancies posted across all age bands"
+    else:
+        signal = f"{has} with vacancies / {none} no vacancies posted"
+    return {
+        "category":      "supply",
+        "metric":        "dec83_vacancy_posture",
+        "display":       "Vacancy posture (per age band)",
+        "current_value": f"{has} / {len(rows)}",
+        "value_format":  "ratio_x_of_y",
+        "period":        vac.get("latest_observed_at"),
+        "sparkline":     [],
+        "decile":        None,
+        "cohort_n":      None,
+        "band":          None,
+        "industry_band": None,
+        "signal":        signal,
+        "commentary":    "Forward-looking demand-side signal: published vacancy state across age bands.",
+        "drawer_key":    "dec83:vacancy",
+        "obs_der_com":   [TAG_OBS],
+        "v15_pending":   None,
+        "confidence":    "live",
+    }
+
+
+def _matrix_pricing_rows(r: dict, dec83_state: dict) -> list:
+    fees = (dec83_state.get("fees") or {}).get("by_age_band_session") or []
+    if not fees:
+        return [_matrix_stub_row(f"dec83_fee_{ab}", "pricing",
+                                 f"Daily-rate full_day × {ab}", "Pending DEC-83 ingest")
+                for ab in ("0-12m", "13-24m", "25-35m", "36m-preschool", "school-age")]
+    sub_type = (r.get("service_sub_type") or "").upper()
+    is_oshc = "OSHC" in sub_type or "OUT" in sub_type or "OUTSIDE" in sub_type
+    out = []
+    if is_oshc:
+        # OSHC discriminator per DEC-84 #9: before/after_school × school-age
+        for session in ("before_school", "after_school"):
+            row = next((f for f in fees if f["age_band"] == "school-age" and f["session_type"] == session), None)
+            out.append(_matrix_pricing_row(row, "school-age", session))
+    else:
+        # LDC / FDC / Preschool: full_day per age band
+        for ab in ("0-12m", "13-24m", "25-35m", "36m-preschool", "school-age"):
+            row = next((f for f in fees if f["age_band"] == ab and f["session_type"] == "full_day"), None)
+            out.append(_matrix_pricing_row(row, ab, "full_day"))
+    return out
+
+
+def _matrix_pricing_row(fee_row: Optional[dict], age_band: str, session_type: str) -> dict:
+    drawer_key = f"dec83:daily_rate"
+    metric_key = f"dec83_fee_{session_type}_{age_band}"
+    display = f"Daily rate {session_type} × {age_band}"
+    if not fee_row:
+        return _matrix_stub_row(metric_key, "pricing", display, "No fee published for this combo")
+    return {
+        "category":      "pricing",
+        "metric":        metric_key,
+        "display":       display,
+        "current_value": fee_row.get("median_fee"),
+        "value_format":  "currency_daily",
+        "period":        fee_row.get("most_recent"),
+        "sparkline":     [],   # full history in drawer
+        "decile":        None, # peer cohort comparison: V1 deferred (small-n; surfaces in drawer)
+        "cohort_n":      None,
+        "band":          None,
+        "industry_band": None,
+        "signal":        f"${fee_row.get('median_fee'):.2f}/day" if fee_row.get('median_fee') is not None else "—",
+        "commentary":    f"{fee_row.get('n_obs')} observation(s) in {fee_row.get('most_recent', '')[:4] if fee_row.get('most_recent') else 'latest year'}.",
+        "drawer_key":    drawer_key,
+        "obs_der_com":   [TAG_OBS],
+        "v15_pending":   None,
+        "confidence":    "live",
+    }
+
+
+def _matrix_quality_rows(r: dict, dec83_state: dict) -> list:
+    out = []
+    snap = dec83_state.get("regulatory_snapshot") or {}
+    cond = dec83_state.get("conditions") or {}
+    enf = dec83_state.get("enforcement") or {}
+    nqs_overall = (r.get("overall_nqs_rating") or "").strip() or None
+
+    # NQS overall + prev (pill ladder, no decile/sparkline)
+    out.append({
+        "category": "quality", "metric": "dec83_nqs_overall",
+        "display": "NQS overall rating",
+        "current_value": nqs_overall, "value_format": "text",
+        "period": r.get("rating_issued_date"),
+        "sparkline": [], "decile": None, "cohort_n": None,
+        "band": None, "industry_band": None,
+        "signal": _signal_summary_quality(nqs_overall, snap.get("nqs_prev_overall")),
+        "commentary": "ACECQA quarterly assessment; trajectory in drawer.",
+        "drawer_key": "dec83:nqs", "obs_der_com": [TAG_OBS],
+        "v15_pending": None, "confidence": "live" if nqs_overall else "unavailable",
+    })
+    # Active conditions count (only render if substrate present)
+    out.append({
+        "category": "quality", "metric": "dec83_active_conditions",
+        "display": "Active conditions",
+        "current_value": cond.get("active_count") or 0,
+        "value_format": "int",
+        "period": None, "sparkline": [], "decile": None, "cohort_n": None,
+        "band": None, "industry_band": None,
+        "signal": (f"{cond.get('active_count') or 0} active" + (" (see detail)" if (cond.get('active_count') or 0) > 0 else "")),
+        "commentary": "Service-level + provider-level conditions on this approval.",
+        "drawer_key": "dec83:conditions", "obs_der_com": [TAG_OBS],
+        "v15_pending": None,
+        "confidence": "live" if cond.get("rows") is not None else "unavailable",
+    })
+    # Enforcement events 24mo
+    out.append({
+        "category": "quality", "metric": "dec83_enforcement_24mo",
+        "display": "Enforcement events (24mo)",
+        "current_value": enf.get("recent_24mo_count") or 0,
+        "value_format": "int",
+        "period": None, "sparkline": [], "decile": None, "cohort_n": None,
+        "band": None, "industry_band": None,
+        "signal": f"{enf.get('recent_24mo_count') or 0} recent / {enf.get('total_count') or 0} total",
+        "commentary": "ACECQA enforcement actions (compliance notices etc.).",
+        "drawer_key": "dec83:enforcement", "obs_der_com": [TAG_OBS],
+        "v15_pending": None,
+        "confidence": "live" if enf.get("rows") is not None else "unavailable",
+    })
+    # CCS revoked flag (only if 1)
+    if snap.get("ccs_revoked_by_ea") is True:
+        out.append({
+            "category": "quality", "metric": "dec83_ccs_revoked",
+            "display": "CCS revoked by EA",
+            "current_value": True, "value_format": "bool",
+            "period": snap.get("snapshot_date"),
+            "sparkline": [], "decile": None, "cohort_n": None,
+            "band": None, "industry_band": None,
+            "signal": "🔴 Active",
+            "commentary": "Live credit-direct flag: CCS approval revoked by Education Authority.",
+            "drawer_key": "dec83:nqs", "obs_der_com": [TAG_OBS],
+            "v15_pending": None, "confidence": "live",
+        })
+    # NQS area breakdown (V1.5 pending — nqs_history check would surface area cols)
+    out.append(_matrix_stub_row("dec83_nqs_area_breakdown", "quality",
+        "NQS 7-area breakdown", "Pending nqs_history area-col surface"))
+    # Last regulatory visit
+    out.append({
+        "category": "quality", "metric": "dec83_last_visit",
+        "display": "Last regulatory visit",
+        "current_value": snap.get("last_regulatory_visit"),
+        "value_format": "date",
+        "period": None, "sparkline": [], "decile": None, "cohort_n": None,
+        "band": None, "industry_band": None,
+        "signal": snap.get("last_regulatory_visit") or "—",
+        "commentary": "Most recent ACECQA / Regulator visit on record.",
+        "drawer_key": "dec83:nqs", "obs_der_com": [TAG_OBS],
+        "v15_pending": None,
+        "confidence": "live" if snap.get("last_regulatory_visit") else "unavailable",
+    })
+    return out
+
+
+def _matrix_workforce_rows(workforce_supply: dict) -> list:
+    """Convert the existing workforce_supply rows into matrix-format rows."""
+    out = []
+    rows = workforce_supply.get("rows") or workforce_supply.get("supply", []) or []
+    if isinstance(workforce_supply, dict) and not rows:
+        # Fall back: workforce_supply itself may be the dict-of-rows shape per current builder
+        for k in ("jsa_ivi_4211_child_carer", "jsa_ivi_2411_ect", "ecec_award_rates", "three_day_guarantee"):
+            entry = workforce_supply.get(k)
+            if entry is not None:
+                rows.append(entry)
+    for entry in rows:
+        if not isinstance(entry, dict):
+            continue
+        out.append({
+            "category":      "workforce",
+            "metric":        entry.get("metric"),
+            "display":       entry.get("display"),
+            "current_value": entry.get("raw_value") or entry.get("value"),
+            "value_format":  entry.get("value_format"),
+            "period":        entry.get("period_label") or entry.get("period"),
+            "sparkline":     (entry.get("trajectory") or [])[-12:],
+            "decile":        None,
+            "cohort_n":      None,
+            "band":          None,
+            "industry_band": None,
+            "signal":        entry.get("status_note") or entry.get("scope_stamp") or "—",
+            "commentary":    _truncate_sentence(entry.get("intent_copy")),
+            "drawer_key":    f"metric:{entry.get('metric')}",
+            "obs_der_com":   [TAG_OBS],
+            "v15_pending":   "Pending V1.5 A7 wire-up" if entry.get("confidence") == "deferred" else None,
+            "confidence":    entry.get("confidence"),
+        })
+    return out
+
+
+def _matrix_operator_rows(r: dict, dec83_state: dict) -> list:
+    out = []
+    lp = dec83_state.get("large_provider")
+    snap = dec83_state.get("regulatory_snapshot") or {}
+    if lp:
+        out.append({
+            "category":      "operator",
+            "metric":        "dec83_large_provider",
+            "display":       "Operator group affiliation",
+            "current_value": lp.get("name"),
+            "value_format":  "text",
+            "period":        lp.get("last_observed_at"),
+            "sparkline":     [], "decile": None, "cohort_n": None,
+            "band":          None, "industry_band": None,
+            "signal":        f"{lp.get('provider_count', 0)} provider{'s' if (lp.get('provider_count', 0) != 1) else ''} / {lp.get('service_count', 0)} service{'s' if (lp.get('service_count', 0) != 1) else ''}",
+            "commentary":    "Starting Blocks-published operator-group identity (DEC-83 substrate).",
+            "drawer_key":    "dec83:operator_group",
+            "obs_der_com":   [TAG_OBS],
+            "v15_pending":   None,
+            "confidence":    "live",
+        })
+    # Provider state
+    if snap:
+        prov_status = snap.get("provider_status")
+        out.append({
+            "category":      "operator",
+            "metric":        "dec83_provider_state",
+            "display":       "Provider state",
+            "current_value": prov_status,
+            "value_format":  "text",
+            "period":        snap.get("provider_approval_date"),
+            "sparkline":     [], "decile": None, "cohort_n": None,
+            "band":          None, "industry_band": None,
+            "signal":        prov_status or "—",
+            "commentary":    f"Approval date: {snap.get('provider_approval_date') or '—'}; CCS revoked: {snap.get('provider_ccs_revoked_by_ea')}.",
+            "drawer_key":    "dec83:operator_group",
+            "obs_der_com":   [TAG_OBS],
+            "v15_pending":   None,
+            "confidence":    "live" if prov_status else "unavailable",
+        })
+    return out
+
+
+def _matrix_operations_rows(r: dict, dec83_state: dict) -> list:
+    snap = dec83_state.get("regulatory_snapshot") or {}
+    out = []
+    # Operating hours summary
+    out.append({
+        "category":      "operations",
+        "metric":        "dec83_hours_summary",
+        "display":       "Operating hours",
+        "current_value": snap.get("hours_summary"),
+        "value_format":  "text",
+        "period":        snap.get("snapshot_date"),
+        "sparkline":     [], "decile": None, "cohort_n": None,
+        "band":          None, "industry_band": None,
+        "signal":        snap.get("hours_summary") or "—",
+        "commentary":    "Per-day hours in drawer.",
+        "drawer_key":    "dec83:operations",
+        "obs_der_com":   [TAG_OBS],
+        "v15_pending":   None,
+        "confidence":    "live" if snap.get("hours_summary") else "unavailable",
+    })
+    # Service status (open/temp/closed)
+    if snap.get("is_closed") is True:
+        status = "Closed"
+    elif snap.get("temporarily_closed") is True:
+        status = "Temporarily closed"
+    elif snap:
+        status = "Open"
+    else:
+        status = None
+    out.append({
+        "category":      "operations",
+        "metric":        "dec83_service_status",
+        "display":       "Service status",
+        "current_value": status,
+        "value_format":  "text",
+        "period":        snap.get("snapshot_date"),
+        "sparkline":     [], "decile": None, "cohort_n": None,
+        "band":          None, "industry_band": None,
+        "signal":        status or "—",
+        "commentary":    None,
+        "drawer_key":    "dec83:operations",
+        "obs_der_com":   [TAG_OBS],
+        "v15_pending":   None,
+        "confidence":    "live" if status else "unavailable",
+    })
+    # CCS data received
+    out.append({
+        "category":      "operations",
+        "metric":        "dec83_ccs_data_received",
+        "display":       "CCS data received",
+        "current_value": snap.get("ccs_data_received"),
+        "value_format":  "bool",
+        "period":        snap.get("snapshot_date"),
+        "sparkline":     [], "decile": None, "cohort_n": None,
+        "band":          None, "industry_band": None,
+        "signal":        "Yes" if snap.get("ccs_data_received") is True else ("No" if snap.get("ccs_data_received") is False else "—"),
+        "commentary":    None,
+        "drawer_key":    "dec83:operations",
+        "obs_der_com":   [TAG_OBS],
+        "v15_pending":   None,
+        "confidence":    "live" if snap else "unavailable",
+    })
+    return out
+
+
+def _badges_for(entry: dict) -> list:
+    """Return list of OBS/DER/COM tags applicable to this position entry."""
+    tags = [TAG_OBS]
+    if entry.get("uses_calibration") or entry.get("calibrated_rate") is not None:
+        tags.append(TAG_DER)
+    if entry.get("band_copy"):
+        tags.append(TAG_COM)
+    return tags
+
+
+def _format_top_n(top_n_list: Optional[list], label_prefix: str) -> Optional[str]:
+    """Format top-3 list for matrix Commentary preview per DEC-84 #6."""
+    if not top_n_list:
+        return None
+    items = []
+    for item in (top_n_list or [])[:3]:
+        name = item.get("country") or item.get("language")
+        if name:
+            items.append(name)
+    if not items:
+        return None
+    return f"{label_prefix}: {', '.join(items)}"
+
+
+def _truncate_sentence(text: Optional[str]) -> Optional[str]:
+    """First sentence (or first 120 chars) for matrix Commentary column."""
+    if not text:
+        return None
+    s = str(text).strip()
+    # First sentence end
+    for sep in (". ", "; "):
+        i = s.find(sep)
+        if 0 < i < 200:
+            return s[:i + 1]
+    return s if len(s) <= 120 else s[:117].rstrip() + "…"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Layer 6 — Detail side-drawer (DEC-84 #6)
+# ─────────────────────────────────────────────────────────────────────
+
+
+def _build_drawer(r: dict, position: dict, workforce_supply: dict,
+                  community_profile: dict, dec83_state: dict) -> dict:
+    """DEC-83 special drawer content keyed by drawer key. Position-derived
+    drawers (`metric:<key>`) are rendered by looking up position.<card>.<metric>
+    in the renderer; no payload duplication. Only DEC-83-specific drawers
+    surface here per DEC-84 #6.
+    """
+    out: dict = {}
+
+    # daily_rate drawer — full age × session × year grid
+    fees = (dec83_state.get("fees") or {})
+    if fees.get("by_age_band_session"):
+        out["dec83:daily_rate"] = {
+            "title":    "Daily rate detail",
+            "year":     fees.get("year"),
+            "as_of":    fees.get("latest_as_of_date"),
+            "grid":     fees.get("by_age_band_session"),  # full age×session grid latest year
+            "methodology": (
+                "Median fee in $AUD per (age band × session type) for the latest year. "
+                "Source: Starting Blocks per-service fee schedules (DEC-83 Commercial Layer V1). "
+                "Peer cohort comparison surfaces in Layer 5 matrix; full historical series available "
+                "via service_fee table for V2 trajectory render."
+            ),
+        }
+
+    # conditions drawer — full text per condition
+    cond = dec83_state.get("conditions") or {}
+    if cond.get("rows"):
+        out["dec83:conditions"] = {
+            "title":          "Conditions on approval",
+            "service_count":  cond.get("service_count", 0),
+            "provider_count": cond.get("provider_count", 0),
+            "active_count":   cond.get("active_count", 0),
+            "rows":           cond.get("rows", []),
+            "methodology": (
+                "Conditions imposed on this service or its provider's approval. "
+                "Source: Starting Blocks (DEC-83 substrate). 'Active' indicates the condition was "
+                "still observed in the latest refresh; reconciled across snapshots via condition_id."
+            ),
+        }
+
+    # enforcement drawer — chronological event log
+    enf = dec83_state.get("enforcement") or {}
+    if enf.get("rows"):
+        out["dec83:enforcement"] = {
+            "title":             "Enforcement event log",
+            "total_count":       enf.get("total_count", 0),
+            "recent_24mo_count": enf.get("recent_24mo_count", 0),
+            "events":            enf.get("rows", []),
+            "methodology": (
+                "ACECQA enforcement actions on this service. Each row shows action_type / event_date / regulator. "
+                "Source: regulatory_events table (DEC-83 reused scaffold)."
+            ),
+        }
+
+    # operator_group drawer — chain detail
+    lp = dec83_state.get("large_provider")
+    if lp:
+        out["dec83:operator_group"] = {
+            "title":             f"Operator group: {lp.get('name')}",
+            "large_provider_id": lp.get("large_provider_id"),
+            "name":              lp.get("name"),
+            "slug":              lp.get("slug"),
+            "first_observed_at": lp.get("first_observed_at"),
+            "last_observed_at":  lp.get("last_observed_at"),
+            "provider_count":    lp.get("provider_count", 0),
+            "service_count":     lp.get("service_count", 0),
+            "methodology": (
+                "Operator-group identity from Starting Blocks (DEC-83). The chain links N provider entities "
+                "to M services as one operator group. Future Group page (OI-NEW-17) provides portfolio-level lens."
+            ),
+        }
+
+    # nqs drawer — overall rating + prev + 7-area (when nqs_history populated)
+    snap = dec83_state.get("regulatory_snapshot") or {}
+    out["dec83:nqs"] = {
+        "title":             "NQS detail",
+        "overall_rating":    r.get("overall_nqs_rating"),
+        "rating_issued_date": r.get("rating_issued_date"),
+        "prev_overall":      snap.get("nqs_prev_overall"),
+        "prev_issued":       snap.get("nqs_prev_issued"),
+        "ccs_revoked_by_ea": snap.get("ccs_revoked_by_ea"),
+        "last_regulatory_visit": snap.get("last_regulatory_visit"),
+        "methodology": (
+            "NQS overall rating per ACECQA quarterly assessment. Rating ladder: Provisional → "
+            "Working Towards NQS → Meeting NQS → Exceeding NQS → Excellent. Prior rating + issue date "
+            "from Starting Blocks regulatory snapshot. 7-area breakdown surfaces from nqs_history when "
+            "area cols are populated (V1.5 follow-up)."
+        ),
+    }
+
+    # vacancy drawer — age-band breakdown + sentinel methodology
+    vac = dec83_state.get("vacancy") or {}
+    if vac.get("by_age_band"):
+        out["dec83:vacancy"] = {
+            "title":              "Vacancy posture",
+            "latest_observed_at": vac.get("latest_observed_at"),
+            "all_no_vacancies_published": vac.get("all_no_vacancies_published"),
+            "by_age_band":        vac.get("by_age_band"),
+            "methodology": (
+                "Vacancy snapshots from Starting Blocks (DEC-83). 'no_vacancies_published' is a sentinel "
+                "state — it does NOT guarantee the service is full; it indicates no published vacancy detail "
+                "at this snapshot. Longitudinal history will accrue from weekly refresh cadence (DEC-83 #6)."
+            ),
+        }
+
+    # operations drawer — full per-day hours + provider sub-block + contact
+    out["dec83:operations"] = {
+        "title":              "Operations detail",
+        "snapshot_date":      snap.get("snapshot_date"),
+        "is_closed":          snap.get("is_closed"),
+        "temporarily_closed": snap.get("temporarily_closed"),
+        "ccs_data_received":  snap.get("ccs_data_received"),
+        "hours_by_day":       snap.get("hours_by_day"),
+        "hours_summary":      snap.get("hours_summary"),
+        "website_url":        snap.get("website_url"),
+        "phone":              snap.get("phone"),
+        "email":              snap.get("email"),
+        "methodology": (
+            "Operating hours, contact, and operational status per Starting Blocks regulatory snapshot. "
+            "Hours are point-in-time at last refresh; service may publish updates between snapshots."
+        ),
+    }
+
+    # top_n_cob + top_n_lang drawers (community profile detail with methodology)
+    if community_profile and community_profile.get("country_of_birth_top_n"):
+        out["metric:sa2_overseas_born_share"] = {
+            "title":    "Country-of-birth detail",
+            "rows":     community_profile.get("country_of_birth_top_n"),
+            "methodology": "Top-3 country of birth from Census 2021 TSP T08, share of total resident population in this SA2.",
+        }
+    if community_profile and community_profile.get("language_at_home_top_n"):
+        out["metric:sa2_nes_share"] = {
+            "title":    "Language-at-home detail",
+            "rows":     community_profile.get("language_at_home_top_n"),
+            "methodology": "Top-3 language at home from Census 2021 TSP T10A+T10B, share of total population in this SA2.",
+        }
+
+    return out
+
+
 def get_centre_payload(service_id: int) -> Optional[dict]:
     """
     Top-level entry point. Returns a fully-hydrated centre payload, or
@@ -2332,9 +3531,22 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
         # --- COMMUNITY PROFILE (Layer 4.4 A10/C8) ---
         community_profile = _build_community_profile(conn, r.get("sa2_code"))
 
+        # --- DEC-83 SUBSTRATE (Centre v2 Layer 1 / 2 / 5 / 6 inputs) ---
+        # Single fetch; used by all three v2 builders below + Layer 1 enrichments.
+        dec83_state = _build_dec83_state(conn, service_id)
+
+        # --- CENTRE V2 BUILDERS (DEC-84 — payload schema v7) ---
+        # Additive overlay (DEC-11): v6 keys preserved unchanged; v7 adds
+        # dec83 / executive / matrix / drawer top-level keys. Existing
+        # /centres/{id} renderer continues to consume v6; new
+        # /centre_v2/{id} renderer (centre_v2.html, future) consumes v7.
+        executive_block = _build_executive(r, position, dec83_state)
+        matrix_block = _build_matrix(r, position, workforce_supply, community_profile, dec83_state)
+        drawer_block = _build_drawer(r, position, workforce_supply, community_profile, dec83_state)
+
         # --- ASSEMBLE ---
         payload = {
-            "schema_version": "centre_payload_v6",
+            "schema_version": "centre_payload_v7",
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "header": header,
             "nqs": nqs,
@@ -2346,6 +3558,11 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
             "qa_scores": qa_scores,
             "tenure": tenure,
             "commentary": _commentary_lines(header, nqs, places, tenure, subtype),
+            # Centre v2 (DEC-84) — additive top-level keys
+            "dec83":     dec83_state,
+            "executive": executive_block,
+            "matrix":    matrix_block,
+            "drawer":    drawer_block,
         }
         return payload
     finally:
