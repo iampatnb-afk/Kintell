@@ -1,10 +1,42 @@
 # Project Status
 
-*Last updated: 2026-05-10 PM session 2 close — A4 Schools at SA2 shipped (DEC-82 first direct-primary-source ingest). Trajectory regression Patrick spotted during visual review confirmed pre-existing data gap (sa2_history.json covers 1,267/~2,400 SA2s); minted as OI-NEW-21 — V1-priority HIGH for next session per Patrick. The on-disk version supersedes the project-knowledge monolith if they disagree.*
+*Last updated: 2026-05-11 EOD — DEC-83 Commercial Layer V1 (Starting Blocks daily-rate + regulatory + operator-group identity) shipped end-to-end. Schema migration + 130-centre proof load + Algolia reconcile tool + Tier-2 doc refresh all landed in one session per session-density discipline. National scale-up to 18,223 services deferred to follow-up. Centre v2 joint design pass next major work — daily-rate data now in `kintell.db` as Layer 5 substrate. The on-disk version supersedes the project-knowledge monolith if they disagree.*
 
-> **NEXT-SESSION HEADLINE:** start with **OI-NEW-21 — Catchment trajectory coverage gap** (V1 priority HIGH per Patrick). See OPEN_ITEMS.md for the full investigation path + fix-shape estimates. Address before A5/A6/B/C remaining work.
+> **NEXT-SESSION HEADLINE:** **Centre v2 joint design pass** — content map for the 6-layer structure (header / executive interpretation / primary historical trends / secondary historical trends / institutional signal matrix / detail side-drawer). Daily-rate data is now ingested for the 130 pilot centres; design pass decides which fields surface where. Effort ~1.5-2 sess. See `project_centre_v2_redesign.md` (memory) for the locked structure decisions. Alternative pickups: national commercial-layer scale-up (18,223 services × 1.5s ≈ 7-8h overnight, ~0.5-1 sess of script work + monitoring), OR resume V1.5 ingest queue (A5 subtype-correct denominators ~0.3 sess, A6 SALM extension ~0.2 sess, B1 / B3 / B4 / B5 banding ~0.5 sess).
 
-## Headline (2026-05-10 PM session 2)
+## Headline (2026-05-11 — DEC-83 Commercial Layer V1 ship)
+
+**DEC-83 Commercial Layer V1 (daily-rate + regulatory + operator-group identity) shipped end-to-end in one session.** Probe → batched 9-decision design ratification → schema migration (7 new tables + 1 reused scaffold + 1 ALTER on services + 12 indexes) → extract module + pilot loader → 130-centre proof load → Algolia reconcile tool → Tier-2 doc refresh. Pre-build precedent check (DEC-65) caught existing scaffolds (`regulatory_events`, `nqs_history`); schema plan amended pre-build to reuse rather than duplicate. Source-payload re-inspection mid-design surfaced significant institutional-value fields (provider regulatory state, enforcement detail, conditions, large-provider operator-group identity, vacancies, fee-type classification, NQS area breakdown, operating hours); Patrick ratified scope expansion on capture-once-use-anywhere economics.
+
+**Key institutional capabilities now in `kintell.db`:**
+- **Daily-rate per (service, age_band, session_type, as_of_date)** — 8,220 fee rows for 109 of 130 pilot centres, 2018-2026 history. Fee classifications (ZCDC/ZOSH/ZFDC) preserved.
+- **Live CCS-revocation signal** via `service_regulatory_snapshot.ccs_revoked_by_ea` — addresses Strengthening Regulation Bill 2025 cross-cutting risk per PRODUCT_VISION §9 (previously tracked-but-uncaptured).
+- **9 ACECQA enforcement actions** populated `regulatory_events` (existing scaffold; first non-zero rows on this table); action_id preserved in detail JSON.
+- **76 service-level + 9 provider-level regulatory conditions** with full text — child-safety surface substrate (Centre v2 Layer 6).
+- **13 operator-group chains identified** — first time the project has structured operator-group identity for ACECQA "Large Provider" chains (e.g. Goodstart 3 providers / Guardian 12 / KU 1 / OAC 8 / Story House 17 / Montessori Academy 41). Critical substrate for Group page (OI-NEW-17) + Stream D PropCo (OI-NEW-13). 37 services in pilot now flagged with `large_provider_id`.
+- **486 vacancy snapshots** (352 has_vacancies + 134 no_vacancies_published) — first forward-looking demand-side signal at centre level. Vacancies populated for ~73% of pilot service×age_band combos.
+- **Operating hours per day** — valuation context, OSHC vs LDC distinction.
+- **Provider sub-block** (status / approval date / CCS-revoked / trade name) — provider-level posture for institutional credit work.
+
+**This session's deliverables (all on disk):**
+- `recon/daily_rate_integration_design.md` — probe-first design doc; ratified summary populated post-decision-batch
+- `recon/Document and Status DB/DECISIONS.md` — DEC-83 minted + same-session amendment header
+- `migrate_commercial_layer_schema.py` — schema migration patcher (STD-08 backup, audit_log row, idempotent)
+- `commercial_layer_extract.py` — pure-function extract module (~500 lines)
+- `commercial_layer_load_pilot.py` — V1 proof loader (reads pilot raw_payload, runs extract, writes audit_log row)
+- `algolia_reconcile.py` — V1 reconciliation tool (smoke test + delta report)
+- 2 fresh STD-08 backups: `pre_commercial_layer_schema_*.db`, `pre_commercial_layer_load_*.db`
+- Tier-2 docs refreshed: `PROJECT_STATUS.md` (this), `OPEN_ITEMS.md`, `ROADMAP.md`, `CENTRE_PAGE_V1_5_ROADMAP.md`, `PHASE_LOG.md`
+
+**DB state.** `kintell.db` 615.3 → 615.6 → 619.x MB (post-load). 36 → 43 user tables (+7). audit_log 175 → 177 (+2 rows: schema migration + load).
+
+**Verification.** All 8 V1 invariants PASS: every fee row resolves to services / non-negative / capture rows have external_id / snapshot rows resolve / large_provider_id on services resolves / link rows resolve / no condition has empty text / vacancy_status valid. Identity resolution validated 129/130 against full 18,223-service main DB (1 unresolved is SAN-less Redfern OCC, captured-only with service_id=NULL per design). Algolia smoke test PASS (71 hits at Haymarket, matches pilot exactly); 130 pilot centres all reconcile cleanly via `external_capture` join.
+
+**Worktree note.** Session ran from stale worktree `claude/priceless-goldstine-654f2a` (predated V1 ship); all edits and DB mutations targeted main repo absolute paths so worktree branch state is irrelevant. Work to be committed direct-on-master from main repo per Patrick's solo-developer workflow.
+
+---
+
+## Headline (2026-05-10 PM session 2 — preserved for traceability)
 
 **A4 Schools at SA2 shipped end-to-end. New "Education infrastructure" Position card.** First direct-primary-source ingest (ACARA School Profile 2008-2025 + School Location 2025) per the new strategic principle DEC-82 ("primary-source-first for new ingests; track derivative-sourced ABS-DBR metrics for V2 migration"). Eight new metrics ingested into `abs_sa2_education_employment_annual` (316,859 rows across 18 years 2008-2025), three rendered in the V1 card (school count + total enrolment + govt-school enrolment share); the other five sector breakdowns sit in DB ready for V2 / Excel export / group page. New top-level Position card alongside Catchment / Population / Labour Market — future home for preschool series + tertiary/VET context. audit_id 164 → 174 (8 ingest + 1 layer3_apply + 1 catchment-rebanding).
 
@@ -156,70 +188,88 @@ Always-show variant (P1). P-2 silent absence for <2 numeric points / unreadable 
 
 ## What's next
 
-**HIGHEST V1 PRIORITY — OI-NEW-21: Catchment trajectory coverage gap.** Surfaced during A4 visual review on 2026-05-10 PM session 2: `docs/sa2_history.json` covers 1,267 of ~2,400 Australian SA2s; the 1,133 absent SA2s render no catchment-position trajectories. Two of the four verifying SA2s (Bentley-Wilson WA, Outback NT) are in the gap. Patrick: this **must** be fixed for V1 — a ~47% national coverage gap on the headline credit-direct trajectory rendering is unacceptable for a commercial product. **Address before A5 / A6 / B / C remaining work.** ~0.3-0.7 sess depending on root cause (filter, structural, or missing-denominator). Probe first per DEC-65 — read `build_sa2_history.py` to identify the SA2 coverage filter, then decide between relaxing the filter, building a fallback trajectory path, or adding upstream ingest for missing denominators. Full investigation path + likely fix shape detailed in OI-NEW-21 (OPEN_ITEMS.md).
+**Centre v2 joint design pass — primary recommended next session.** Per `project_centre_v2_redesign.md` (memory): 6-layer structure (Header / Executive interpretation / Primary historical trends / Secondary historical trends / Institutional signal matrix / Detail side-drawer). The institutional signal matrix at Layer 5 is the natural home for daily-rate (now ingested), CCS revocation status, NQS area breakdown, fee-position vs catchment peer cohort, and operator-group identity. Joint design pass = content map for every existing piece + every new piece (daily-rate, regulatory state, conditions, vacancies, large-provider chain) assigned to its surface tier. Expected ~1.5-2 sess; produces a content-map DEC + the Layer 5/6 tile design before parallel renderer build (~3-5 sess). Old `/centres/{id}` route preserved via git tag `centre-v1-stake-YYYY-MM-DD` + `recon/v1_final_stake_YYYY-MM-DD/` bundle per the redesign memo.
 
-**V1.5 next-session priority** (after OI-NEW-21 closes): **A5 — Subtype-correct denominators (~0.3 sess)** OR **A6 — SALM extension (~0.2 sess)**. A5 is more impactful (refines `sa2_supply_ratio` per LDC/FDC/OSHC subtype — credit-direct metric); A6 is faster (promotes LFP triplet from Lite to Full row weight). Either can be picked first; both are independent.
+**Alternative pickups (Patrick's choice):**
+- **National commercial-layer scale-up** — extend `commercial_layer_load_pilot.py` pattern to drive off `services` table (18,223 rows × 1.5s polite pacing ≈ 7-8 hours overnight). ~0.5-1 sess of script work + monitoring overnight run + post-run validation. Closes the V1 "we have daily-rate data" claim across the full national fleet.
+- **V1.5 ingest queue resumption** — A5 subtype-correct denominators (~0.3 sess), A6 SALM extension (~0.2 sess), B1 / B3 / B4 / B5 banding (~0.5 sess), C2-other + C6 render polish (~0.4 sess). Total ~1.4 sess. These are useful for the centre-page (v1) surface; arguably less useful if Centre v2 lands first since v1 surface gets superseded.
+- **OI-NEW-22** Provider-level enforcement + conditions extraction (~0.5 sess) — bridging table + reconciliation against `entities`. Banked from this session.
 
-**V1.5 path remaining (~0.5-0.7 sess + OI-NEW-21 ~0.3-0.7 sess = ~0.8-1.4 sess):**
-- **OI-NEW-21** (~0.3-0.7 sess) — **HIGH** Catchment trajectory coverage gap fix
-- **A5** (~0.3 sess) — Subtype-correct denominators (LDC/FDC/OSHC distinct catchment populations)
-- **A6** (~0.2 sess) — SALM extension (promotes LFP triplet from Lite to Full)
-- **B1, B3, B4** (~0.7 sess) — Phase B core (B1 = `sa2_jsa_vacancy_rate` peer banding; B3 = schools-derived banding [partially done with A4]; B4 = subtype-aware banding depends on A5)
-- **C2-other + C6** (~0.4 sess) — Phase C core remaining (depend on B-pass)
-
-See **CENTRE_PAGE_V1_5_ROADMAP.md** for the canonical V1.5 dependency-ordered queue and **ROADMAP.md** for the parent dependency view.
+**Recommended sequencing per session-density discipline:** Centre v2 design pass first (locks what V1 looks like → drives whether we still need V1.5 ingests at all or whether v2 institutional matrix absorbs them differently) → then national commercial-layer scale-up → then implementation.
 
 **Optional housekeeping (low priority, anytime):**
-- **OI-12** — DB backup pruning. **CRITICAL** at ~8.5 GB cumulative. Keep policy needs relaxation.
+- **OI-12** — DB backup pruning. **CRITICAL** at ~10+ GB cumulative (2 new STD-08 backups this session). Keep policy needs relaxation.
 - **OI-35** — `layer3_apply.py` real fix (~0.5 sess).
-- **OI-13** — Frontend file backups gitignore tightening (~30 sec; +3 new `pre_oi36*` backups this session).
+- **OI-13** — Frontend file backups gitignore tightening.
 - **OI-14 / OI-15** — Date parsing + ARIA+ format codebase scans.
 - **OI-10** — `provider_management_type` enum normalisation.
-- **OI-28** — `populate_service_catchment_cache.py` cosmetic banner (5 sec).
-- **STD-37 candidate** — "search project knowledge before probing" mint.
+- **OI-28** — `populate_service_catchment_cache.py` cosmetic banner.
+- **STD-37 candidate** — "search project knowledge before probing" mint (still pending after multiple sessions).
 - **Recon probe sweep** — root probes → `recon/probes/`.
 
 ---
 
 ## Database state
 
-Path: `data\kintell.db` (~565 MB). 36 tables. **`audit_log: 149 rows`** (unchanged this session — OI-36 was renderer-only, no DB mutations).
+Path: `data\kintell.db` (~619 MB). **43 user tables (was 36 — +7 from DEC-83 schema).** `audit_log: 177 rows` (was 175 — +2 this session: schema migration audit_id 176, V1 proof load audit_id 177).
 
-**No new DB backups this session** (renderer-only work). Cumulative ~8.5 GB across 41+ files unchanged.
+**2 new STD-08 backups this session** (~1.23 GB added):
+- `data/pre_commercial_layer_schema_20260510_175758.db` (615.3 MB)
+- `data/pre_commercial_layer_load_20260510_181447.db` (615.6 MB)
 
-`docs/sa2_history.json`: v2 multi-subtype, 13.2 MB, 50 quarters, 1,267 SA2s, 4 subtype buckets. Tracked in git. Unchanged this session.
+Cumulative DB backups now ~10+ GB across 43+ files. **OI-12 backup-pruning relevance growing** — keep-policy relaxation now genuinely overdue.
+
+`docs/sa2_history.json`: v2-schema, 19.3 MB, 2,309 SA2s post-OI-NEW-21 polygon-first rebuild (2026-05-10 PM s3). Unchanged this session.
+
+**New tables (DEC-83):** `service_external_capture` (130 rows), `large_provider` (13 rows), `large_provider_provider_link` (92 rows), `service_fee` (8,220 rows), `service_regulatory_snapshot` (129 rows), `service_condition` (85 rows: 76 service + 9 provider levels), `service_vacancy` (486 rows: 352 has_vacancies + 134 no_vacancies_published).
+
+**Reused scaffold:** `regulatory_events` 0 → 9 rows (first non-zero rows on this previously-empty table; all "Compliance notice issued" by ACECQA, service-level only V1).
+
+**Schema mutation:** `services` +1 column `large_provider_id` (TEXT, FK to large_provider). 37 services in pilot now flagged into chains (Goodstart 5 / Guardian 5 / KU 8 / OAC 4 / Story House 1 / Camp Australia 2 / Junior Adventures Group 1 / TheirCare 2 / TeamKids 4 / Sydney Catholic Early Childhood Services 2 / MACSEYE 1 / Montessori Academy 1 / PCYC Queensland 1).
 
 ---
 
 ## Git state
 
-V1 ship: `bcdf84c` (2026-05-03 evening).
+V1 ship: `bcdf84c` (2026-05-03 evening). Pre-DEC-83 master HEAD: `0dce69b` (2026-05-10 PM s3 — OI-NEW-21 close).
 
-This session's commits, chronological:
+**This session: no commits yet.** All work landed on disk via Edit/Write tools targeting main repo absolute paths from a stale worktree session. Commit + push to be done from main repo terminal direct-on-master per Patrick's workflow.
 
-1. `9d49be9` — Catch-up regen of Tier-2 docs to 2026-05-04 EOD (closes STD-35 hygiene gap from `7e1ab91`)
-2. `430009a` — OI-36 close: sa2_nes_share renders in Catchment Position card + delta badge on Lite rows (centre.html v3.25→v3.28 + centre_page.py v20→v21)
-3. End-of-session doc refresh (this commit, landing now)
+**Files changed this session (uncommitted):**
 
-**HEAD: `<this commit's sha>`.** Origin/master is at `7e1ab91`; will need a push at end of session.
+| File | Status | Notes |
+|---|---|---|
+| `recon/Document and Status DB/DECISIONS.md` | modified | DEC-83 minted (with same-session amendment header for the regulatory_events scaffold reuse + slimmed regulatory_snapshot decision) |
+| `recon/daily_rate_integration_design.md` | new | Probe-first design doc, ratified summary populated |
+| `migrate_commercial_layer_schema.py` | new | Schema migration patcher |
+| `commercial_layer_extract.py` | new | ~500-line extract module |
+| `commercial_layer_load_pilot.py` | new | V1 proof loader |
+| `algolia_reconcile.py` | new | Reconciliation tool with smoke test |
+| `data/kintell.db` | modified | +7 tables, +1 column on services, +12 indexes, +9,184 commercial-layer rows, +9 regulatory_events rows, +37 services flagged with large_provider_id, +2 audit_log rows |
+| `data/pre_commercial_layer_schema_20260510_175758.db` | new | STD-08 backup pre-schema-migration |
+| `data/pre_commercial_layer_load_20260510_181447.db` | new | STD-08 backup pre-load |
+| `PROJECT_STATUS.md` | modified | This entry |
+| `OPEN_ITEMS.md` | modified | OI-NEW-4 Algolia portion closed; OI-NEW-22 + OI-NEW-23 minted |
+| `ROADMAP.md` | modified | Daily-rate moved out of §7 deferred parallel work |
+| `CENTRE_PAGE_V1_5_ROADMAP.md` | modified | A8 daily-rate context update |
+| `PHASE_LOG.md` | modified | Session entry prepended |
 
-### centre.html v3.25 → v3.28 sub-history
+**Suggested commit shape (3 commits, atomically grouped per DEC-22 collapsable pattern):**
+1. **DEC-83 schema + extract + load + reconcile + design doc** — all the new code + design + DECISIONS.md + DB mutations (large; could be bundled or split into "schema migration" / "extract+load" / "reconcile" — Patrick's call)
+2. **Tier-2 doc refresh** — PROJECT_STATUS, OPEN_ITEMS, ROADMAP, CENTRE_PAGE_V1_5_ROADMAP, PHASE_LOG (STD-35 hygiene)
 
-- v3.25 → v3.26 (commit `430009a` part 1) — added `sa2_nes_share` to `renderCatchmentPositionCard.order` array
-- v3.26 → v3.27 (commit `430009a` part 2) — added `_renderLiteDelta(p)` helper + wired into `_renderLiteRow` template
-- v3.27 → v3.28 (commit `430009a` part 3) — currency branch fix: matched actual `currency_weekly` / `currency_annual` formats (v3.27 mistakenly matched `currency_aud` which doesn't exist in this codebase)
-
-All three sub-versions in one commit per DEC-22 (verified together).
+DB backups (`pre_commercial_layer_*.db`) excluded from commits per existing `.gitignore` patterns covering `pre_*` files.
 
 ---
 
 ## Standards / decisions
 
+**New DECs locked this session:**
+- **DEC-83** — Commercial Layer V1: daily-rate integration from Starting Blocks (pricing + regulatory snapshot + operator-group identity). Includes same-session pre-build amendment to reuse `regulatory_events` scaffold and slim `service_regulatory_snapshot` (NQS area cols dropped — `nqs_history` is canonical from NQAITS).
+
 **No new STDs locked this session.**
 
-**No new DECs locked this session.**
-
-Banked items unchanged from 2026-05-04: STD-37 candidate (search project knowledge before probing), DEC-78 candidate (NES storage convention).
+Banked items: STD-37 candidate (search project knowledge before probing — still pending mint), refresh-cadence-discipline candidate STD (could absorb DEC-83 #6 three-tier refresh discipline once cadence wired).
 
 ---
 
@@ -228,18 +278,21 @@ Banked items unchanged from 2026-05-04: STD-37 candidate (search project knowled
 See OPEN_ITEMS.md for full text.
 
 **Closed this session:**
-- **OI-36** — centre.html / centre_page.py hardcode catchment-position rows. Closed in commit `430009a` (surgical render-order patch + bonus delta badge on all Lite rows).
+- **OI-NEW-4** (Algolia portion) — Starting Blocks Algolia smoke test integration shipped via `algolia_reconcile.py --smoke-test-only`. Refresh procedure documented in module docstring. Smoke test verified PASS this session (71 hits at Haymarket centroid, matching pilot's 2026-04-28 baseline exactly). Community Profiles retirement audit remains separate (open).
 
-**Opened this session:** none.
+**Opened this session:**
+- **OI-NEW-22** — Provider-level enforcement actions + conditions extraction deferred. Preserved in `service_external_capture.payload_json` but not extracted to structured rows pending provider→entity reconciliation work. ~0.5 sess when picked up.
+- **OI-NEW-23** — FDC services Algolia-index gap. Family Day Care services don't appear in Starting Blocks Algolia (centre-based services only); reconciliation logic for FDC needs alternate discovery path. Tracking only; not blocking V1.
 
-**Carried (unchanged):** OI-01–04, OI-06–10, OI-12–17, OI-19, OI-20–22, OI-24, OI-26, OI-28, OI-31, OI-33, OI-35.
+**Carried (unchanged):** OI-01–04, OI-06–10, OI-12–17, OI-19 (V1.5 partial close — daily-rate-integration A8 dependency now released; main remaining is A5/A6/B1/B3/B4/B5/C2-other/C6), OI-20–22, OI-24, OI-26, OI-28, OI-31, OI-33, OI-35, OI-NEW-1, OI-NEW-2, OI-NEW-3, OI-NEW-5 (Algolia portion now closed; Community Profiles + SEEK/Indeed audit remains), OI-NEW-6 through OI-NEW-21 (NEW-21 closed prior).
 
 ---
 
 ## Doc set
 
-The 2026-04-28 restructure produced the 12-doc set, since extended with `CENTRE_PAGE_V1.5_ROADMAP.md` (2026-05-04). Update history:
-
-- 2026-04-29c+d → 2026-04-30 → 2026-05-03 morning → 2026-05-03 PM → 2026-05-03 evening (V1 ship at `bcdf84c`)
-- 2026-05-04 (full day) — V1.5 scoping pass + C3 ship + A1 dissolution + A2 end-to-end + B2 + C2-NES (data side) + OI-34 closed + OI-35 + OI-36 minted. End-of-session commit `7e1ab91` landed only `CENTRE_PAGE_V1.5_ROADMAP.md` + monolith.
-- **2026-05-05 (this session)** — Catch-up regen of stale Tier-2 docs (`9d49be9`) + OI-36 close (`430009a`) + end-of-session doc refresh (this commit, landing now). Tier-2 docs all current at 2026-05-05 EOD content.
+Update history:
+- 2026-04-29c+d → 2026-04-30 → 2026-05-03 (V1.0 ship at `bcdf84c`)
+- 2026-05-04 (V1.5 scoping + C3 + A1 + A2 + B2 + C2-NES) → 2026-05-05 (OI-36 close + delta badge)
+- 2026-05-09 (DEC-79 commercial repositioning; CLAUDE.md + PRODUCT_VISION.md introduced)
+- 2026-05-10 (A10 + C8 morning, A3 + StreamC PM, A4 Schools PM s2, OI-NEW-21 polygon-first rebuild PM s3)
+- **2026-05-11 (this session)** — DEC-83 Commercial Layer V1 ship + Tier-2 monolith refresh. PROJECT_STATUS / OPEN_ITEMS / ROADMAP / CENTRE_PAGE_V1_5_ROADMAP / PHASE_LOG all updated. DECISIONS.md gains DEC-83 (with same-session amendment header). New design doc `recon/daily_rate_integration_design.md`.

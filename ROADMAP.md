@@ -1,6 +1,6 @@
 # Roadmap
 
-*Last updated: 2026-05-09 (commercial repositioning per DEC-79; V1 horizon redefined to ~Sept 2026 with five new streams). The on-disk version supersedes the project-knowledge monolith if they disagree.*
+*Last updated: 2026-05-11 (DEC-83 Commercial Layer V1 ship — daily-rate parallel work CLOSED for V1 data purposes; A8 / B7 / C7 dependencies released; Centre v2 next major work). Earlier 2026-05-09 lock established V1 horizon (~Sept 2026 with five streams). The on-disk version supersedes the project-knowledge monolith if they disagree.*
 
 **Note 2026-05-09:** Up to and including 2026-05-05, "V1" referred to the original centre-page credit-decision tool (shipped at HEAD `bcdf84c` on 2026-05-03). With DEC-79 the product has been repositioned as Novara Intelligence — Patrick Bell's commercial product. V1 is now redefined to the broader institutional decision-support release targeting ~Sept 2026. The earlier-V1 milestone is preserved as **"V1.0 (centre-page credit tool)"** for traceability. New V1 = "V1.0-shipped + V1.5 ingests + Catchment page + Group page + 5 new streams + Excel export + brand identity rename".
 
@@ -161,9 +161,9 @@ All Layer 4.3 design decisions resolved by 2026-04-29 closure session and shippe
 
 ## 7. Parallel work streams
 
-### Daily-rate centre-page integration
+### Daily-rate centre-page integration ✅ (closed 2026-05-11 via DEC-83)
 
-STD-36+ holds for daily-rate work. Integration deferred until daily-rate metric set is stable. A8 / B7 / C7 in CENTRE_PAGE_V1_5_ROADMAP track this dependency.
+**CLOSED 2026-05-11.** Commercial Layer V1 shipped: schema migration + extract module + 130-centre proof load + Algolia reconcile tool. 8,220 fee rows / 129 regulatory snapshots / 13 operator chains / 486 vacancy snapshots / 9 ACECQA enforcement events landed for the 130 pilot centres. National scale-up to 18,223 services deferred to follow-up session (~0.5-1 sess of script work + overnight refresh). Centre-page surface integration explicitly deferred to Centre v2 institutional signal matrix (Layer 5) per DEC-83 #8. A8 / B7 / C7 in CENTRE_PAGE_V1_5_ROADMAP closed for V1 commercial-layer-data purposes; render placement is Centre v2 work.
 
 ### Industry view
 

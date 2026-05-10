@@ -1,6 +1,6 @@
 # Centre Page V1.5 Roadmap
 
-*Last updated: 2026-05-10 PM session 2 (A4 Schools at SA2 CLOSED end-to-end as first direct-primary-source ingest per DEC-82; new "Education infrastructure" Position card. Spatial-join helper landed in `geo_helpers.py` reusable for V2 PropCo / hospital / transport ingests). The on-disk version supersedes the project-knowledge monolith if they disagree.*
+*Last updated: 2026-05-11 (DEC-83 Commercial Layer V1 ship — daily-rate / regulatory / operator-group identity ingested for 130 pilot centres; A8 dependency released. Centre v2 design pass next major work — daily-rate placement decisions made there per DEC-83 #8). Prior 2026-05-10 PM s2 lock established A4 Schools (DEC-82) close. The on-disk version supersedes the project-knowledge monolith if they disagree.*
 
 This roadmap is the canonical V1.5 work queue for the centre page. PROJECT_STATUS.md and ROADMAP.md reference this doc for V1.5 detail.
 
@@ -114,7 +114,7 @@ Stream C V1 close also retires OI-NEW-12 (childbearing-age + marital-status dept
 
 ### Future ingests (banked)
 - A7 — SEEK / advertised wages (workforce supply enrichment)
-- A8 — Daily-rate centre-page integration (depends on daily-rate metric stability)
+- A8 — Daily-rate centre-page integration ✅ **DATA SHIPPED 2026-05-11 via DEC-83 Commercial Layer V1.** Schema (`service_fee` + `service_regulatory_snapshot` + `service_condition` + `service_vacancy` + `large_provider` + `large_provider_provider_link` + `service_external_capture`) + 130-centre proof load + Algolia reconcile. National scale-up to 18,223 services follow-up. Centre-page surface integration deferred to Centre v2 institutional signal matrix (Layer 5) per DEC-83 #8 — not implemented in V1.5 centre-page; Layer 5 design pass picks up render placement decisions.
 
 ---
 

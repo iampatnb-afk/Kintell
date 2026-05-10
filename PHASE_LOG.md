@@ -1,3 +1,61 @@
+## 2026-05-11 — DEC-83 ship: Commercial Layer V1 (Starting Blocks daily-rate + regulatory + operator-group)
+
+**Session type:** Handover → probe (Starting Blocks pilot) → batched design decisions → DEC-83 mint → schema migration → extract+load port → 130-centre proof load → algolia reconcile → tier-2 doc refresh.
+
+**Context entering session.** Centre v2 redesign sequencing memo (`project_centre_v2_redesign.md`, 2026-05-10 PM s3) locked daily-rate integration ahead of the v2 joint design pass — Layer 5 (institutional signal matrix) cannot be content-mapped without daily-rate data. Pilot at `G:\My Drive\Patrick's Playground\childcare_market_spike\` had shipped 2026-04-28 with 130 centres / 8,244 fees / all 8 invariants passing. Worktree `priceless-goldstine-654f2a` was stale (predated V1 ship) — flagged early; work proceeded direct-on-master per Patrick's actual workflow.
+
+**Work shipped this session.**
+
+**1. Source-payload re-inspection (DEC-65 discipline) surfaced significant institutional-value fields beyond narrow daily-rate scope.** Pilot extracted credit-tool-narrow slice; full `__NEXT_DATA__` payload also carries: provider-level regulatory state, enforcement actions, conditions, large-provider operator-group identity (e.g. Guardian Early Learning's 12 constituent provider entities), vacancies, fee-type classification (ZCDC/ZOSH/ZFDC), 7-area NQS quality breakdown, NQS prior-rating trajectory, operating hours, website. Patrick ratified scope expansion — capture-once-use-anywhere economics beat re-fetching 18,223 services later.
+
+**2. Pre-build precedent check (DEC-65 amendment) caught existing scaffolds.** `regulatory_events` (0 rows, polymorphic event scaffold with subject_type/subject_id/event_type/event_date) — exactly the shape originally proposed for `service_enforcement_action`. `nqs_history` (807,526 rows) — canonical NQS quarterly state from NQAITS. Schema plan amended pre-build: drop `service_enforcement_action`, populate existing `regulatory_events`; strip NQS area cols from `service_regulatory_snapshot` (only single optional col retained for Starting-Blocks-vs-NQAITS cross-validation).
+
+**3. DEC-83 minted in canonical DECISIONS.md** with 10 numbered decisions covering: schema namespace (commercial-layer with `source` discriminator for V2 multi-source), 6 new tables + 1 reused scaffold, identity resolution (substr-LEFT-11 join, verified 129/130 pilot match), services-table-driven discovery (Algolia for reconciliation only, defers national driver to V2), three-tier refresh cadence (weekly fees / monthly regulatory / quarterly Algolia reconcile), full STD-08+STD-11+DEC-62 audit discipline, Centre page surface deferred to v2, pilot folder decommission, Algolia smoke-test pre-each-refresh (closes OI-NEW-4 Algolia portion), framing as "Commercial Layer V1: Daily-Rate Integration".
+
+**4. Schema migration (`migrate_commercial_layer_schema.py`) applied.** STD-08 backup `data/pre_commercial_layer_schema_20260510_175758.db` (615.3 MB). 7 new tables created: `service_external_capture` (provenance, raw __NEXT_DATA__), `large_provider`, `large_provider_provider_link`, `service_fee` (long-format daily fees), `service_regulatory_snapshot` (slimmed Starting-Blocks-unique state + 14 hours columns + provider sub-block), `service_condition` (CHECK level IN service|provider), `service_vacancy`. ALTER `services` ADD COLUMN `large_provider_id`. 12 indexes created. audit_id 175 → 176.
+
+**5. Extract module (`commercial_layer_extract.py`) + pilot loader (`commercial_layer_load_pilot.py`) built and applied.** Extract module covers: identity resolution (LEFT(11) primary), external capture upsert with SHA-256 dedup, 8 destination upsert functions (fees, regulatory snapshot, conditions, enforcement events into regulatory_events scaffold, vacancies, large_provider, link rows, services.large_provider_id update), proper idempotency per table (PK + ON CONFLICT or pre-check). Provider-level enforcement actions and conditions: V1 deferred (preserved verbatim in `service_external_capture.payload_json`); banked.
+
+**6. 130-centre proof load applied.** STD-08 backup `pre_commercial_layer_load_20260510_181447.db`. 130 processed → 129 resolved + 1 unresolved (Redfern Occasional CC, ulid `01JC2WYS8HSKZHWCWTRKHSGBNK`, captured with service_id=NULL per design). Final counts: 8,220 fee rows + 17 skipped, 129 regulatory snapshots, 85 distinct conditions (76 service + 9 provider), 9 ACECQA Compliance-notice enforcement events landed in `regulatory_events`, 486 vacancy snapshots (352 has_vacancies + 134 no_vacancies_published), 13 distinct large providers (Guardian 12/Goodstart 3/KU 1/OAC 8/Story House 17/Montessori Academy 41/etc.), 92 distinct provider-link rows, 37 services flagged with `large_provider_id`, 130 capture rows incl. 1 unresolved. All 8 V1 invariants PASS. audit_id 176 → 177.
+
+**7. Algolia reconciliation tool (`algolia_reconcile.py`) built + smoke-tested.** Smoke test PASS at Haymarket (71 hits, matches pilot's 71 exactly). Full pilot reconciliation: 130 Algolia hits all matched to services via `external_capture` join (0 unmatched on the Algolia side), 79 services in 3 pilot SA2s NOT in Algolia hits (potential Algolia-index gaps — many FDC services + some PSK community kindergartens; expected behaviour, FDC services typically don't appear in Algolia which indexes centre-based services). V1 = report-only; V2 will write tracking rows. Closes Algolia portion of OI-NEW-4. Community Profiles retirement audit remains separate.
+
+**8. Identity-resolution validation against full main DB.** 129/130 pilot centres resolved via substr(SAN,1,11) — exactly as predicted from pre-flight probe. Confirms join rule against the full 18,223-service main DB (not just the 3-SA2 sample). Algolia hits already in pilot `external_id` form match identically (130/130 in pilot SA2s). The 1 SAN-less Redfern OCC remains an edge case for V2 fuzzy-match reconciliation.
+
+**Files touched / created:**
+- `recon/daily_rate_integration_design.md` (new design doc; expanded post-payload-inspection; ratified summary populated post-decision-batch)
+- `recon/Document and Status DB/DECISIONS.md` (DEC-83 minted + same-session amendment header)
+- `migrate_commercial_layer_schema.py` (new schema migration patcher)
+- `commercial_layer_extract.py` (new extract module — 500 lines; pure functions + DB upserts)
+- `commercial_layer_load_pilot.py` (new V1 proof loader)
+- `algolia_reconcile.py` (new reconciliation tool with smoke test)
+- `data/pre_commercial_layer_schema_20260510_175758.db` (STD-08 backup)
+- `data/pre_commercial_layer_load_20260510_181447.db` (STD-08 backup)
+- `data/kintell.db` (mutated: +7 tables, +1 column on services, +12 indexes, +9,184 data rows across new tables, +9 rows in regulatory_events scaffold, +37 services flagged, +2 audit rows)
+- `PROJECT_STATUS.md`, `OPEN_ITEMS.md`, `ROADMAP.md`, `CENTRE_PAGE_V1_5_ROADMAP.md`, `PHASE_LOG.md` (this entry — Tier-2 monolith refresh per STD-35)
+
+**audit_log:** 175 → 177 (2 new rows: schema migration + V1 proof load).
+
+**Key institutional reveals from the data.**
+- **Fee classifications:** ZCDC (3,977 rows), ZOSH (850, OSHC fees), ZFDC (55, FDC fees), unclassified (3,338, newer pageProps source). Z-prefix is the fee-type distinction we'd have lost in narrow scope.
+- **Operator chains in pilot:** Goodstart Early Learning Ltd (3 ACECQA-provider entities + 5 services in pilot — surprising; Goodstart has ~600 services nationally so 3 providers means tight legal structure), Guardian Early Learning (12 providers + 5 services), Story House (17 providers), KU Children's Services (1 provider + 8 services — strong NSW NFP), OAC (8 providers + 4 services), Montessori Academy (41 providers + 1 service), Camp Australia/TheirCare/TeamKids/Junior Adventures Group (OSHC chains).
+- **9 ACECQA enforcement actions** all "Compliance notice issued"; action_id preserved in `regulatory_events.detail` JSON for traceability against ACECQA's ID space.
+- **76 service-level + 9 provider-level conditions** with full text (e.g. "Approved Provider must ensure where children under 7 are...").
+- **Vacancies populated for ~73% of pilot service×age_band combos (352/486)** — richer live demand signal than expected.
+- **Operating hours captured** (e.g. Mothercraft 07:00-18:00 Mon, Saturday=null/closed).
+- **CCS revoked count: 0** in pilot — no Strengthening-Regulation-Bill triggers in this 130-centre sample. Will surface when scaled to 18,223.
+
+**State at session end.** DEC-83 V1 ships end-to-end. Schema in main DB; data ingested for the 130 pilot centres; reconcile tool functional; full Tier-2 doc set refreshed. Centre v2 joint design pass is unblocked — daily-rate data ready as Layer 5 substrate. National scale-up (18,223 services + refresh cadence wiring) deferred to follow-up session(s); estimated +0.5-1.0 sess.
+
+**Banked follow-ups:**
+- **OI-NEW-22 (mint this session):** Provider-level enforcement actions + conditions deferred — preserved in `service_external_capture.payload_json` but not extracted to structured rows pending provider→entity reconciliation work.
+- **OI-NEW-23 (mint this session):** FDC Algolia gap — Family Day Care services don't appear in Starting Blocks Algolia index (centre-based services only). National reconciliation needs FDC-aware logic.
+- **National scale-up of commercial-layer ingest:** ~7-8 hours overnight for 18,223 services × 1.5s polite pacing. Deferred to a follow-up session.
+- **Pilot folder decommission** (DEC-83 #9): archive `G:\My Drive\Patrick's Playground\childcare_market_spike\` to `C:\Users\Patrick Bell\childcare_pilot_archive_2026-05-11\` once national scale-up validates the new ingest path. Closes Google-Drive write-loss risk.
+- **Centre v2 joint design pass (next major work):** content map for the 6-layer structure, deciding which daily-rate fields surface in Layer 5 institutional signal matrix vs Layer 6 detail drawer.
+
+---
+
 ## 2026-05-10 PM session 2 — Layer 4.4 A4 Schools at SA2 ship (DEC-82)
 
 **Session type:** Probe → design → ratify (Path B chosen) → ACARA file source → ingest with cross-validation → banding → render (new card) → smoke-test → tier-2 doc refresh + DEC-82 mint.

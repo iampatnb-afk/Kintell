@@ -1,6 +1,6 @@
 # Open Items
 
-*Last updated: 2026-05-10 (A10 + C8 Demographic Mix bundle CLOSED; OI-19 sub-bundle reduced; DEC-80 minted). The on-disk version supersedes the project-knowledge monolith if they disagree.*
+*Last updated: 2026-05-11 (DEC-83 Commercial Layer V1 ship; OI-NEW-4 Algolia portion CLOSED; OI-NEW-22 + OI-NEW-23 minted). The on-disk version supersedes the project-knowledge monolith if they disagree.*
 
 OI ID is global. Closed items kept for traceability. Severity tags: CRITICAL / Medium / Low / Cosmetic / Tracking.
 
@@ -23,12 +23,12 @@ Federal Worker Retention Payment (15% above-award) ends 30 Nov 2026. Fair Work C
 
 2026 Census on 11 August 2026; first data release June 2027 in three phases. **SA2 boundaries WILL change** between ASGS 2021 and ASGS 2026. Plan a Q3 2027 data refresh project: re-run Step 1c polygon backfill, re-band Layer 3, refresh `sa2_history.json`, validate `service_catchment_cache`. Touches Stream E (border exposure) too. Long-tail tracking; not blocking V1.
 
-### OI-NEW-4 — Starting Blocks Algolia smoke test + Community Profiles retirement audit
-*Origin: 2026-05-09. Status: open; ~0.2 sess.*
+### OI-NEW-4 — Starting Blocks Algolia smoke test (CLOSED 2026-05-11) + Community Profiles retirement audit (still open)
+*Origin: 2026-05-09. Status: **partial close 2026-05-11** — Algolia smoke test integrated; Community Profiles audit remains open.*
 
-Two related risks:
-- **Starting Blocks** — pilot at `G:\My Drive\Patrick's Playground\childcare_market_spike\` uses Algolia search method (locked architectural decision). Worth a network-tab inspection before next production run to confirm the Algolia index is still live and credentials still work.
-- **ABS Community Profiles** is being retired by ABS. Audit Layer 2 / module2*/scrape code for any dependency on Community Profiles URLs or page structures.
+**Algolia portion CLOSED 2026-05-11.** `algolia_reconcile.py --smoke-test-only` integrated as the canonical pre-each-refresh smoke test per DEC-83 #10. Refresh procedure (5-min DevTools sweep) documented in module docstring. Verified PASS this session: 71 hits at Haymarket centroid, matching pilot's 2026-04-28 baseline exactly. Production refresh runs (when wired) will call `algolia_reconcile.py --smoke-test-only` first and abort cleanly with refresh-procedure pointer if HTTP 403 / empty hits.
+
+**Community Profiles audit still open** (~0.1 sess). ABS Community Profiles being retired. Audit Layer 2 / `module2*` / scrape code for any dependency on Community Profiles URLs or page structures. Low risk — most ingest is workbook-based not page-scraping. Bank during next housekeeping pass.
 
 ### OI-NEW-5 — SEEK / Indeed anti-scraping audit
 *Origin: 2026-05-09. Status: open; ~0.2 sess.*
@@ -181,6 +181,27 @@ Once ACARA School Locations land via A4 (`abs_sa2_schools_annual` with lat/lon),
 
 **V2 banking rationale:** the spatial join itself ships in V1.5 (A4), but the service-level flag derivation + render placement is a separate scoping pass that touches OSHC + LDC service surfaces. Not blocking V1 ship.
 
+### OI-NEW-23 — FDC Algolia-index gap (tracking)
+*Origin: 2026-05-11 (surfaced during DEC-83 V1 reconcile pass). Status: tracking; not blocking V1.*
+
+Family Day Care services don't appear in Starting Blocks Algolia index — Algolia indexes centre-based services only (LDC / OSHC / preschool / vacation care). National commercial-layer reconciliation logic must use an alternate discovery path for FDC: either drive direct off `services` table where `service_sub_type='FDC'` and skip Algolia for those, or accept that FDC fee data will not flow from the Starting Blocks pipeline at all (FDC fees are typically per-hour and arranged via FDC scheme operators rather than published per-service).
+
+**Implication for V1 commercial-layer scope:** the daily-rate signal will not extend to ~12% of services that are FDC. This is acceptable for V1 (FDC fee economics are different from centre-based; institutional credit work usually treats them separately). Document the gap in the Centre v2 Layer 5 institutional signal matrix metric provenance copy.
+
+**Action when picked up:** decide whether to (a) flag FDC services as "fee data not applicable from this source" in any v2 surface, (b) attempt FDC fee ingest from FDC-scheme-operator websites (out of V1 scope), or (c) accept silent absence per P-2.
+
+### OI-NEW-22 — Provider-level enforcement actions + conditions extraction (deferred)
+*Origin: 2026-05-11 (banked during DEC-83 V1 ship). Status: open; ~0.5 sess.*
+
+Per DEC-83 V1: provider-level enforcement actions (`pageProps.provider.enforcementActions[]`) and conditions (`pageProps.provider.conditions[]`) are **preserved verbatim** in `service_external_capture.payload_json` but not extracted to structured rows. Reason: `regulatory_events.subject_id INTEGER NOT NULL` requires an integer ID for the subject, but Starting Blocks `provider_approval_number` (PR-XXXXXXXX) doesn't directly map to `entities.entity_id` without a reconciliation layer (entities table has no `provider_approval_number` column).
+
+**When picked up:**
+1. Build provider→entity bridge: either ALTER `entities` ADD `provider_approval_number TEXT` and populate from `services` (where matching), OR create a separate `provider_directory` table indexed by integer PK that links to provider_approval_number + name.
+2. Extract provider-level enforcement actions into `regulatory_events` with `subject_type='provider'`, `subject_id` = the new bridge integer ID. Same idempotency pattern as service-level (action_id in detail JSON).
+3. Extract provider-level conditions into `service_condition` with `level='provider'` (already supported by schema; just need to populate at extract time). Some service-level + provider-level conditions already populated this session (9 provider-level rows from svc.conditions[] within the per-service iteration; this OI is for the proper provider-block extraction at provider granularity).
+
+**Sequencing relative to other work:** Reasonable to bundle with Stream D PropCo schema work (OI-NEW-13) since both involve cleaning up the operator-graph structure (entities / providers / large_provider). Or with the operator-page work generally.
+
 ### OI-NEW-21 — Catchment trajectory coverage gap (V1 — CLOSED 2026-05-10 PM session 3)
 *Origin: 2026-05-10 PM session 2; surfaced during A4 visual review when Patrick switched between verifying centres in the multi-LDC capture and noticed catchment-position trajectories rendering for Bayswater Vic + Bondi Junction NSW but absent for Bentley-Wilson WA + Outback NT. Status: **CLOSED 2026-05-10 PM session 3** by polygon-first attribution rebuild of `build_sa2_history.py` v2 → v3. Probe doc: `recon/oi_new_21_probe.md`. audit_log row 175.*
 
@@ -246,20 +267,19 @@ The `abs_sa2_education_employment_annual` table currently holds **16 metrics ing
 ## OPEN — EXISTING (carried)
 
 ### OI-19 — Layer 4.4 V1.5 ingests bundle (PARTIAL CLOSE)
-*Origin: 2026-04-28. Status: partially shipped.*
+*Origin: 2026-04-28. Status: partially shipped — A8 daily-rate dependency RELEASED 2026-05-11.*
 
-Original scope: NES + parent-cohort 25-44 + schools + SALM-extension + (optionally) SEEK/advertised wages. Bundled to amortise ABS workbook reading + concordance work.
+Original scope: NES + parent-cohort 25-44 + schools + SALM-extension + (optionally) SEEK/advertised wages + daily-rate integration. Bundled to amortise ABS workbook reading + concordance work.
 
-**Closed 2026-05-04:** A2 (NES) end-to-end. **Closed 2026-05-05:** OI-36 (NES render + Lite delta badge). **Closed 2026-05-10:** A10 + C8 Demographic Mix bundle (T06 ATSI + T08 COB + T14 family + T10 language top-N + sub-panel render) — see DEC-80.
+**Closed 2026-05-04:** A2 (NES) end-to-end. **Closed 2026-05-05:** OI-36 (NES render + Lite delta badge). **Closed 2026-05-10 AM:** A10 + C8 Demographic Mix bundle (T06 ATSI + T08 COB + T14 family + T10 language top-N + sub-panel render) — see DEC-80. **Closed 2026-05-10 PM:** A3 + Stream C bundle (parent-cohort 25-44 + T05 partnered + 2× T07 fertility cohorts) — see DEC-81. **Closed 2026-05-10 PM s2:** A4 Schools at SA2 (DEC-82 first direct-primary-source ingest). **Closed 2026-05-10 PM s3:** OI-NEW-21 catchment trajectory coverage gap. **Closed 2026-05-11:** A8 daily-rate integration (DEC-83 Commercial Layer V1; ingested for 130 pilot centres; national scale-up follow-up).
 
-**Remaining bundle:**
-
-- **A3 (next, ~0.4 sess) + Stream C extension (~0.3 sess)** — parent-cohort 25-44 + T05 marital + T07 fertility (both validated by A10 probe; same TSP zip)
-- A4 (schools at SA2, ~0.5 sess)
+**Remaining bundle (V1.5 centre-page completion):**
 - A5 (subtype-correct denominators, ~0.3 sess)
 - A6 (SALM-extension, ~0.2 sess)
+- B1 / B3 / B4 / B5 banding (~0.5 sess)
+- C2-other / C6 render polish (~0.4 sess)
 
-OI-30 finding folds in: `abs_sa2_erp_annual` ingest extends backward beyond 2019 — adds ~0.3 sess.
+**Total V1.5 remaining: ~1.4 sess.** Sequencing-conditional on Centre v2 design pass — if v2 lands first, the v1 surface this V1.5 work feeds may be partially superseded by v2's institutional signal matrix.
 
 ### OI-35 — `layer3_apply.py` wholesale-rebuilds `layer3_sa2_metric_banding`, wiping catchment metrics
 *Origin: 2026-05-04. Status: open; workaround in place; real fix ~0.5 session.*
