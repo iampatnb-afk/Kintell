@@ -1,0 +1,3080 @@
+<!DOCTYPE html>
+<!-- centre.html v3.31 (2026-05-10 PM) — Layer 4.4 A4 Schools at SA2 (DEC-82 first direct-primary-source ingest). New top-level Position card "Education infrastructure" via renderEducationInfrastructureCard(centre), inserted between renderPopulationCard and renderLabourMarketCard. Three Lite rows: sa2_school_count_total + sa2_school_enrolment_total + sa2_school_enrolment_govt_share. Backed by ACARA School Profile 2008-2025 + School Location 2025 (DEC-82 direct primary source); 18-year trajectory 2008-2025 — richest cadence in the build. Five additional sector-breakdown metrics ingested + banded but not rendered in V1 (sit ready for V2 / Excel export / group page). Pairs with centre_page.py v23 (3 META + 3 INTENT_COPY + 3 TRAJECTORY_SOURCE + 1 new POSITION_CARD_ORDER key 'education_infrastructure') in same commit. -->
+<!-- centre.html v3.30 (2026-05-10) — Layer 4.4 A3 + Stream C bundle: 4 new Lite rows appended to the Demographic mix sub-panel inside Catchment Position card (sa2_parent_cohort_25_44_share + sa2_partnered_25_44_share + sa2_women_35_44_with_child_share + sa2_women_25_34_with_child_share). One surgical change: demoMetrics array in renderCatchmentPositionCard extended with the 4 new keys after sa2_single_parent_family_share. No new render helpers needed; existing _renderLiteRow + _renderLiteDelta handle annual (parent-cohort 6-point 2019-2024) and 3-point (Census) trajectories transparently via p.value_format + p.trajectory. Pairs with centre_page.py v22 (LAYER3_METRIC_META + INTENT_COPY + TRAJECTORY_SOURCE + POSITION_CARD_ORDER mirror, 4 entries each) in same commit. -->
+<!-- centre.html v3.29 (2026-05-10) — Layer 4.4 A10 + C8 Demographic Mix bundle ship (header comment back-filled): renderCatchmentPositionCard split into creditMetrics + demoMetrics with a dashed-divider sub-panel header "Demographic mix"; new _renderTopNCountriesOfBirth + _renderTopNLanguagesAtHome helpers via shared _renderTopNContext renderer. Pairs with centre_page.py v21 + new abs_sa2_country_of_birth_top_n + abs_sa2_language_at_home_top_n tables. -->
+<!-- centre.html v3.28 (2026-05-05) — OI-36b fix: _renderLiteDelta currency branch corrected. v3.27 matched 'currency_aud' which does not exist in this codebase; the actual formats are currency_weekly (sa2_median_household_income) and currency_annual (sa2_median_employee_income, sa2_median_total_income). Branch now matches both, with '/week' suffix appended for currency_weekly to match the parent value's display unit (e.g. '+$291/week from 2011 to 2021' for Bayswater median household income). currency_annual renders without suffix ('+$N,NNN from YYYY to YYYY'); these are currently Full-weight so don't render the badge in practice but the branch is kept consistent for future Lite re-classifications. No data-side change. -->
+<!-- centre.html v3.27 (2026-05-05) — OI-36b: delta badge on all Lite rows. New _renderLiteDelta(p) helper reads p.trajectory and emits a small first-to-last delta badge ('+9.5pp from 2011 to 2021' for NES Bayswater) inside the Lite row template, alongside the existing 'as at YYYY' stamp. Unit-aware via p.value_format (percent/percent_share -> 'pp', currency_aud -> '$N', ratio_x -> 'N×', else plain numeric). P-2 silent absence for <2 numeric points / unreadable years / zero delta. Always-show (P1); window-aware variant (P2) banked as future OI since _setTrajectoryRange does not trigger Lite re-render. Affects sa2_lfp_persons / sa2_lfp_females / sa2_lfp_males / sa2_median_household_income / sa2_nes_share. No data-side change. -->
+<!-- centre.html v3.26 (2026-05-05) — OI-36 close: sa2_nes_share added to renderCatchmentPositionCard.order so the Lite NES row renders in the Catchment Position card. Data-side already shipped at 3ddcf18 (LAYER3_METRIC_META + INTENT_COPY + TRAJECTORY_SOURCE entries for sa2_nes_share). Surgical scope: one entry added to one hardcoded array. Refactor to drive render order from POSITION_CARD_ORDER payload (eliminating JS-side hardcoded array entirely) banked as separate housekeeping OI. Companion centre_page.py v21 (POSITION_CARD_ORDER mirror) in same commit. -->
+<!-- centre.html v3.25 (2026-05-04) — C3 ship: absolute-change ("+N places · +M centres") rendered alongside trend % on the 4 catchment trajectory charts. New _computeEventAbsChange(events, startPeriod) helper sums centre_events.places_change and centre_events.net_centres for events at or after the active trend-window startPeriod. Inline with existing _formatTrendPct label inside the trendLabel HTML. Silent absence when p.centre_events absent or empty (Population / Labour Market / Workforce rows unaffected per P-2). -->
+<!-- centre.html v3.24 (2026-05-03) — OI-32 polish round 3 (operator review). Three additive renderer changes: (a) cohort distribution histogram now ships a centred explainer line below the bars ("Distribution of values across the peer cohort. The highlighted bar shows where this SA2 sits; the decile strip below converts that position to the 1–10 scale.") plus the existing cohort-note line switched from right-aligned to centre for visual consistency. (b) New _renderMiniDecileStrip helper renders a compact 10-cell horizontal strip using the same colour grammar as _renderDecileStrip (per-decile tones 6%/13%/20%, accent + outline on active cell, structural gaps between bands). (c) SEIFA decile fact in the Catchment section now calls _renderMiniDecileStrip inline so the SES position is visible at a glance — chosen over colour-coding because SES has no valence in LDC credit (high SES = higher fee tolerance AND more competition). Pairs with centre_page.py v20 (INDUSTRY band relabelling + about_data tightening) in same commit. -->
+<!-- centre.html v3.23 (2026-05-03) — OI-32 polish round (operator review of v3.22): About-this-measure panel font bumped 11.5px -> 12.5px for readability on the longer explainer text. No structural change; _renderAboutData logic unchanged. Pairs with centre_page.py v18 (text edits to sa2_demand_supply about_data + industry-band labels/notes; same commit). -->
+<!-- centre.html v3.22 (2026-05-03) — OI-32 close (Bug 4): catchment metric explainer text. New _renderAboutData(p) helper renders p.about_data as a permanent visible "About this measure" panel inside _renderFullRow, positioned after _renderIntentCopy and before the DER/COM badge row. Reuses the visual pattern established by the workforce row about_data block (v3.17). Splits on \n\n for paragraph breaks; \n within a paragraph becomes <br>. Silent absence per P-2 when p.about_data is null (non-catchment metrics, or catchment metrics with no copy yet). Pairs with centre_page.py v17 in same commit. -->
+<!-- centre.html v3.21 (2026-05-03) — Layer 4.2-A.3c Bug 1b fix: second copy of year-extraction regex in _filterTrajectoryByRange also un-anchored. v3.20 fixed _yearOfPeriod (used for the trend label) but missed this duplicate copy used by the trend window filter. Net effect of the bug: trend window buttons (3Y/5Y/10Y/All) had no effect on catchment trajectory charts. With both copies fixed, the filter clips correctly and the trend label updates with the selected window. -->
+<!-- centre.html v3.20 (2026-05-03) — Layer 4.2-A.3c Bug 1 fix: _yearOfPeriod() regex updated to find first 4-digit run anywhere in the period string (was anchored to start of string, returned NaN for quarter-format strings like "Q3 2013"). Restores trend-since labels on the 4 catchment trajectory charts that landed in v3.19. Backward compatible with annual ("2024") and census ("2024-Q3") formats. -->
+<!-- centre.html v3.19 (2026-05-03) — Layer 4.2-A.3c Part 3b: centre-entry/exit overlay added to the 4 catchment_position trajectory charts (supply_ratio, child_to_place, demand_supply, adjusted_demand). New _kintellEventAnnotation Chart.js plugin draws vertical dashed lines at quarters when centres of the matching subtype opened (green) or closed (red) or churned net-zero (grey) in this SA2. Plugin is data-driven via opts.plugins.kintellEventAnnotation = {events}; absent events = silent no-op (Population/Labour Market/Workforce charts unaffected). Companion to centre_page.py v15 which attaches p.centre_events to the 4 catchment metric entries. -->
+<!-- centre.html v3.18 (2026-05-03) — Layer 4.2-A.4: STD-34 calibration metadata surfaced in DER tooltip on the 3 catchment_position metrics that derive from the participation_rate calibration (sa2_adjusted_demand, sa2_demand_supply, sa2_demand_share_state). New _buildCalibrationRow helper formats `calibrated_rate=X.XX — <rule_text>` for inclusion as a "Calibration" row in the DER tooltip; renderBadge gains a calibration field handler; _renderContextRow gains a conditional DER badge (no cohort/decile fields — Context has no peer cohort by design; carries source + calibration only when present). Companion to centre_page.py v13. -->
+<!-- centre.html v3.17 (2026-04-30) — Layer 4.2-A.3a-fix iter 4 (F1-β): r.about_data rendered as a permanent visible "About this measure" block below the chart on workforce IVI rows. Silent absence when not populated. Pairs with centre_page.py v12. -->
+<!-- centre.html v3.16 (2026-04-30) — Layer 4.2-A.3a-fix iter 3: workforce-section local trend window. New 6M / 1Y / 2Y / 5Y / All selector at top of Workforce Supply Context, default 2Y. Sparklines filter to selected window; Y-axis now uses beginAtZero=false so monthly variance is visible. Re-render is workforce-scoped (other charts untouched). Global trajectory range bar caption corrected. -->
+<!-- centre.html v3.15 (2026-04-30) — Layer 4.2-A.3a-fix extension: workforce supply sparklines now have the same trajectory-polish treatment as Population / Labour Market / Catchment — dot points, vertical crosshair, external HTML readout slot above each chart, all in place. Reuses previously-defined _kintellExternalReadout (v3.13) and _kintellCrosshair (v3.12). -->
+<!-- centre.html v3.14 (2026-04-30) — Layer 4.2-A.3b (renderer): industry-absolute band line wired beneath the band chips for catchment metrics. Reads payload fields industry_band / industry_band_label / industry_band_note (centre_page.py v10). Renders only when populated; silent absence otherwise. -->
+<!-- centre.html v3.13 (2026-04-30) — Layer 4.2-A.3a-fix iter 2: external HTML readout above each trajectory chart, replacing Chart.js native tooltip. Chart.js tooltip disabled (enabled:false); external callback updates a fixed-position <div> above the canvas. Line + crosshair + active dot fully visible underneath; readout never overlaps. -->
+<!-- centre.html v3.12 (2026-04-30) — Layer 4.2-A.3a-fix: three trajectory polish items — (A) tooltip clipping resolved properly via wrapper padding-top headroom; (B) sparkline now shows individual dot points (pointRadius 2, hover 6) so periods are visible; (C) new crosshair plugin draws a vertical dashed line at the snapped data index, turning hover into a measurement experience. -->
+<!-- centre.html v3.11 (2026-04-30) — Layer 4.2-A.3a: two visual fixes — (1) Chart.js tooltip clipping resolved via yAlign=bottom + position=nearest; (2) sparkline X-axis labels re-enabled (maxTicksLimit=5, autoSkip), canvas height bumped 48->64 to accommodate. Tooltip no longer overlaps into the histogram below; charts now show year ticks on sparkline mode. -->
+<!-- centre.html v3.10 (2026-04-30) — Layer 4.2-A.3: catchment ratios wired in as new "Catchment position" card (5 rows: supply_ratio, demand_supply, child_to_place, adjusted_demand, demand_share_state). Page reorder per option α: credit block (Catchment / Population / Labour / Workforce) at top, operational block (NQS / Places / Catchment-meta / Tenure / QA) below. Companion to centre_page.py v9. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kintell — Centre</title>
+<!-- Chart.js for trend rendering. Same version as index.html / dashboard.html
+     so trajectory charts on this page visually match the industry-snapshot
+     and dashboard charts. Per visual_consistency_audit Option 1 / E1. -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  /* Inherits the visual language of operator.html v8 — same CSS vars,
+     same .op-section / .fact / .km-badge / .nqs-pill / .com-line classes
+     so look-and-feel is automatic. */
+  :root {
+    --bg: #0f1419;
+    --panel: #1a1f26;
+    --panel-2: #232933;
+    --panel-3: #2a313c;
+    --border: #2d343f;
+    --text: #e6e8eb;
+    --text-dim: #9aa4b1;
+    --text-mute: #6b7684;
+    --accent: #4a9eff;
+    --green: #4ade80;
+    --green-bg: #14301e;
+    --amber: #fbbf24;
+    --amber-bg: #2f2310;
+    --red: #f87171;
+    --red-bg: #2e1414;
+    --purple: #a78bfa;
+    --purple-bg: #1f1a2e;
+    --grey: #94a3b8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* App header */
+  header.app {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: 16px;
+  }
+  header.app h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  header.app .breadcrumb { color: var(--text-mute); font-size: 13px; }
+  header.app .breadcrumb a { color: var(--text-dim); }
+  header.app .breadcrumb a:hover { color: var(--accent); }
+  header.app .right { margin-left: auto; display: flex; gap: 12px; font-size: 13px; }
+  body.embed header.app { display: none; }
+
+  main {
+    padding: 18px 24px 60px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  body.embed main { padding: 8px 16px 28px; }
+
+  /* States */
+  .state-msg {
+    text-align: center; padding: 60px 20px;
+    color: var(--text-mute); font-size: 14px;
+  }
+  .state-msg.error {
+    color: var(--red); background: var(--red-bg);
+    border: 1px solid #5c2626; border-radius: 8px;
+    padding: 24px; margin: 40px 0;
+  }
+
+  /* Centre header card */
+  .centre-header {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 26px;
+    margin-bottom: 18px;
+  }
+  .centre-name {
+    font-size: 26px; font-weight: 600; line-height: 1.2;
+    margin: 0;
+  }
+  .centre-address {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-top: 6px;
+  }
+  .centre-meta-row {
+    display: flex; flex-wrap: wrap; gap: 10px 18px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--text-dim);
+    align-items: center;
+  }
+  .centre-meta-row .sep { color: var(--text-mute); }
+  .centre-meta-row b { color: var(--text); font-weight: 500; }
+
+  /* Quick-fact strip */
+  .scale-strip {
+    display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px;
+  }
+  .chip {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 12px 6px;
+    display: flex; flex-direction: column;
+    min-width: 96px;
+  }
+  .chip .n {
+    font-size: 18px; font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .chip .l {
+    font-size: 10px; color: var(--text-mute);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  /* External tools row */
+  .ext-tools {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px;
+  }
+  .ext-tools a {
+    font-size: 12px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 4px 10px; border-radius: 3px;
+  }
+  .ext-tools a:hover { color: var(--accent); text-decoration: none; }
+
+  /* Section cards (mirrors operator.html) */
+  .section-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  .op-section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px 14px;
+    margin-bottom: 14px;
+  }
+  .op-section h3 {
+    margin: 0 0 10px 0;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 700;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+  }
+  .op-section h3 .note {
+    float: right;
+    font-size: 10px;
+    color: var(--text-mute);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+  }
+  .placeholder {
+    color: var(--text-mute); font-size: 13px;
+    font-style: italic;
+    padding: 6px 0;
+  }
+  .placeholder .will-show {
+    display: block;
+    margin-top: 6px;
+    color: var(--text-dim); font-style: normal;
+    font-size: 12px;
+  }
+
+  .fact {
+    display: flex; justify-content: space-between;
+    padding: 4px 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: 13px;
+    gap: 12px;
+    align-items: baseline;
+  }
+  .fact:last-child { border-bottom: none; }
+  .fact b { font-variant-numeric: tabular-nums; color: var(--text); }
+  .fact .k { color: var(--text-dim); flex-shrink: 0; }
+  .fact .v {
+    text-align: right;
+    display: inline-flex; gap: 8px; align-items: center;
+    flex-wrap: wrap; justify-content: flex-end;
+  }
+  .fact .v b { font-weight: 500; }
+
+  /* NQS pill */
+  .nqs-pill {
+    display: inline-block;
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 3px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .nqs-pill.excellent     { background: #14301e; color: #22c55e; }
+  .nqs-pill.exceeding     { background: var(--green-bg); color: var(--green); }
+  .nqs-pill.meeting       { background: rgba(74,222,128,0.15); color: #a7f3b8; }
+  .nqs-pill.working       { background: var(--amber-bg); color: var(--amber); }
+  .nqs-pill.significant   { background: var(--red-bg); color: var(--red); }
+  .nqs-pill.provisional   { background: var(--panel-3); color: var(--text-dim); }
+  .nqs-pill.notrated      { background: var(--panel-3); color: var(--text-mute); font-style: italic; }
+
+  /* Status pills (cadence, tenure) */
+  .status-pill {
+    display: inline-block;
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 3px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .status-pill.green  { background: var(--green-bg); color: var(--green); }
+  .status-pill.amber  { background: var(--amber-bg); color: var(--amber); }
+  .status-pill.red    { background: var(--red-bg);   color: var(--red); }
+  .status-pill.grey   { background: var(--panel-3);  color: var(--text-dim); }
+
+  .brand-chip {
+    font-size: 11px; color: var(--purple);
+    background: var(--purple-bg); border: 1px solid #352957;
+    padding: 0 6px; border-radius: 3px; font-weight: 500;
+  }
+  .brand-chip.none {
+    color: var(--text-mute);
+    background: var(--panel-3);
+    border-color: var(--border);
+    font-style: italic;
+    font-weight: 400;
+  }
+
+  .ownership-pill {
+    display: inline-block;
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 3px;
+    background: var(--panel-3);
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+
+  /* QA scores grid */
+  .qa-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .qa-row {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    gap: 10px;
+    align-items: baseline;
+    padding: 5px 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: 12.5px;
+  }
+  .qa-row:last-child { border-bottom: none; }
+  .qa-row .qa-key {
+    color: var(--text-mute);
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .qa-row .qa-label { color: var(--text-dim); }
+  .qa-empty {
+    color: var(--text-mute);
+    font-style: italic;
+    font-size: 12.5px;
+    padding: 6px 0;
+  }
+
+  /* OBS/DER/COM badges (copied verbatim from operator.html v8) */
+  .km-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    padding: 2px 5px;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    line-height: 1;
+    vertical-align: middle;
+    cursor: help;
+    user-select: none;
+    position: relative;
+  }
+  .km-badge.obs {
+    color: var(--text-mute);
+    background: rgba(107, 118, 132, 0.10);
+    border-color: rgba(107, 118, 132, 0.35);
+  }
+  .km-badge.der {
+    color: var(--accent);
+    background: rgba(74, 158, 255, 0.10);
+    border-color: rgba(74, 158, 255, 0.35);
+  }
+  .km-badge.com {
+    color: var(--amber);
+    background: rgba(251, 191, 36, 0.10);
+    border-color: rgba(251, 191, 36, 0.35);
+  }
+  .km-badge .km-tip {
+    visibility: hidden; opacity: 0;
+    transition: opacity 0.12s ease;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 30;
+    width: 320px;
+    padding: 10px 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+    color: var(--text);
+    font-size: 11.5px;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-align: left;
+    pointer-events: none;
+    cursor: default;
+  }
+  .km-badge:hover .km-tip,
+  .km-badge:focus-within .km-tip {
+    visibility: visible; opacity: 1;
+  }
+  .km-tip .km-row {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    column-gap: 8px;
+    padding: 3px 0;
+  }
+  .km-tip .km-row + .km-row { border-top: 1px dashed var(--border); }
+  .km-tip .km-key {
+    color: var(--text-mute);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding-top: 2px;
+  }
+  .km-tip .km-val { color: var(--text); }
+  .km-tip .km-val code {
+    font-family: "SF Mono", "Consolas", monospace;
+    font-size: 10.5px;
+    background: rgba(74, 158, 255, 0.08);
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: var(--text);
+  }
+  .km-badge.right-anchor .km-tip { left: auto; right: 0; }
+
+  /* Methodology legend */
+  .methodology-legend {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 14px;
+    padding: 8px 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 11.5px;
+    color: var(--text-dim);
+    flex-wrap: wrap;
+  }
+  .methodology-legend .ml-label {
+    color: var(--text-mute);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding-right: 4px;
+    border-right: 1px solid var(--border);
+    margin-right: 4px;
+  }
+  .methodology-legend .ml-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* COM commentary line */
+  .com-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 14px;
+    padding: 10px 12px;
+    background: var(--amber-bg);
+    border: 1px solid rgba(251, 191, 36, 0.30);
+    border-radius: 6px;
+    font-size: 12.5px;
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .com-line.severity-green { background: var(--green-bg); border-color: rgba(74,222,128,0.30); }
+  .com-line.severity-red   { background: var(--red-bg);   border-color: rgba(248,113,113,0.30); }
+  .com-line.severity-info  { background: var(--panel-2);  border-color: var(--border); }
+  .com-line .km-badge { flex-shrink: 0; margin-top: 1px; }
+  .com-line .com-text { flex: 1; }
+
+  /* Responsive */
+  @media (max-width: 960px) {
+    .section-row { grid-template-columns: 1fr; }
+  }
+
+  /* Layer 4.2-B-fix2: trajectory range buttons.
+     Lifted from index.html .range-btn pattern; mapped onto Palette A
+     tokens (--accent / --panel-2 / --border / --text). */
+  .range-btn {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 4px 12px;
+    font: inherit;
+    font-size: 11.5px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .range-btn:hover { color: var(--text); border-color: var(--accent); }
+  .range-btn.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+    font-weight: 500;
+  }
+  .traj-range-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 8px 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 11px;
+    color: var(--text-mute);
+  }
+  .traj-range-bar .label {
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 600;
+    font-size: 10.5px;
+  }
+  .traj-range-bar .btns { display: flex; gap: 6px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+
+<header class="app">
+  <h1>Kintell</h1>
+  <span class="breadcrumb" id="breadcrumb">Centre</span>
+  <span class="right">
+    <a href="review.html">Review queue</a>
+  </span>
+</header>
+
+<main id="main">
+  <div class="state-msg" id="loading">Loading centre…</div>
+</main>
+
+<script>
+const API = "/api";
+const params = new URLSearchParams(location.search);
+const SERVICE_ID = params.get("id");
+const EMBED = params.get("embed") === "1";
+if (EMBED) document.body.classList.add("embed");
+
+// ── Helpers (mirrored from operator.html v8) ────────────────────────
+function htmlEscape(s) {
+  if (s == null) return "";
+  return String(s).replace(/[&<>"]/g,
+    c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+}
+function fmtN(n) {
+  if (n == null) return "—";
+  return Number(n).toLocaleString();
+}
+async function api(path, opts={}) {
+  const r = await fetch(API + path, {
+    ...opts,
+    headers: { "Content-Type": "application/json", ...(opts.headers||{}) }
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+function urlGoogle(name, extra="") {
+  return "https://www.google.com/search?q=" +
+    encodeURIComponent(`${name} ${extra}`.trim());
+}
+function urlAcecqa(serviceApprovalNumber) {
+  return "https://www.acecqa.gov.au/resources/national-registers/services?service_search=" +
+    encodeURIComponent(serviceApprovalNumber || "");
+}
+function urlAbn(name) {
+  return "https://abr.business.gov.au/Search/Run?searchText=" +
+    encodeURIComponent(name);
+}
+
+const NQS_CLASSES = {
+  "Excellent":                         "excellent",
+  "Exceeding NQS":                     "exceeding",
+  "Meeting NQS":                       "meeting",
+  "Working Towards NQS":               "working",
+  "Significant Improvement Required":  "significant",
+  "Provisional — Not Yet Assessed":    "provisional",
+  "(not rated)":                       "notrated",
+};
+function nqsClass(label) {
+  return NQS_CLASSES[label] || "notrated";
+}
+function nqsPill(label) {
+  if (!label) return `<span class="nqs-pill notrated">(not rated)</span>`;
+  return `<span class="nqs-pill ${nqsClass(label)}">${htmlEscape(label)}</span>`;
+}
+
+// Format date helpers — accept DD/MM/YYYY or YYYY-MM-DD, return "Mon YYYY"
+const MON_NUM = { Jan:"01",Feb:"02",Mar:"03",Apr:"04",May:"05",Jun:"06",
+                  Jul:"07",Aug:"08",Sep:"09",Oct:"10",Nov:"11",Dec:"12" };
+const MON_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function parseAusToIso(s) {
+  if (!s) return null;
+  const str = String(s).trim();
+  let m = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(str);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  m = /^(\d{4})-(\d{2})-(\d{2})/.exec(str);
+  if (m) return m[0];
+  return null;
+}
+function formatMonYYYY(s) {
+  const iso = parseAusToIso(s);
+  if (!iso) return s || "—";
+  const [y, m] = iso.split("-");
+  const mi = parseInt(m, 10) - 1;
+  if (mi < 0 || mi > 11) return s;
+  return `${MON_SHORT[mi]} ${y}`;
+}
+
+// ── Calibration row helper (Layer 4.2-A.4) ─────────────────────────
+// Returns the formatted "Calibration" tooltip value when the entry
+// carries STD-34 calibration metadata (calibrated_rate + rule_text
+// from service_catchment_cache, attached by centre_page.py v13 for
+// metrics with uses_calibration=True). Returns null otherwise so
+// renderBadge's if-guard skips the row cleanly.
+function _buildCalibrationRow(p) {
+  if (!p || !p.rule_text) return null;
+  const rate = (p.calibrated_rate != null)
+    ? Number(p.calibrated_rate).toFixed(2)
+    : "—";
+  return `<code>calibrated_rate=${rate}</code> — ${htmlEscape(p.rule_text)}`;
+}
+
+// ── OBS/DER/COM badge renderer ──────────────────────────────────────
+function renderBadge(classification, methodology, rightAnchor=false) {
+  const cls = String(classification || "").toLowerCase();
+  if (!["obs","der","com"].includes(cls)) return "";
+  const m = methodology || {};
+  const rows = [];
+  if (m.source)    rows.push({ k: "Source",    v: m.source });
+  if (m.formula)   rows.push({ k: "Formula",   v: m.formula });
+  if (m.rule)      rows.push({ k: "Rule",      v: m.rule });
+  if (m.inputs)    rows.push({ k: "Inputs",    v: m.inputs });
+  if (m.calibration) rows.push({ k: "Calibration", v: m.calibration });
+  if (m.threshold) rows.push({ k: "Threshold", v: m.threshold });
+  if (m.asAt)      rows.push({ k: "As at",     v: m.asAt });
+  const tipHtml = rows.length === 0 ? "" : `
+    <span class="km-tip" role="tooltip">
+      ${rows.map(r => `
+        <span class="km-row">
+          <span class="km-key">${htmlEscape(r.k)}</span>
+          <span class="km-val">${r.v}</span>
+        </span>
+      `).join("")}
+    </span>
+  `;
+  const anchorCls = rightAnchor ? " right-anchor" : "";
+  return `<span class="km-badge ${cls}${anchorCls}" tabindex="0" aria-label="${cls.toUpperCase()} metric">${cls.toUpperCase()}${tipHtml}</span>`;
+}
+
+function renderMethodologyLegend() {
+  return `
+    <div class="methodology-legend">
+      <span class="ml-label">methodology</span>
+      <span class="ml-item">${renderBadge("OBS")} <span>Observed — primary-source data</span></span>
+      <span class="ml-item">${renderBadge("DER")} <span>Derived — transparent formula</span></span>
+      <span class="ml-item">${renderBadge("COM")} <span>Commentary — rule-based interpretation</span></span>
+    </div>
+  `;
+}
+
+// ── Render functions ────────────────────────────────────────────────
+
+function renderHeader(centre) {
+  const h = centre.header;
+  const addr = h.address || {};
+  const addrStr = [addr.address_line, addr.suburb, addr.state, addr.postcode]
+    .filter(Boolean).join(", ");
+  const grp = h.parent_group || {};
+  const ent = h.entity || {};
+  const brand = h.brand;
+
+  const brandChip = brand
+    ? `<span class="brand-chip">${htmlEscape(brand.name)}</span>`
+    : `<span class="brand-chip none">no brand</span>`;
+
+  const groupLink = grp.group_id
+    ? `<a href="operator.html?id=${grp.group_id}">${htmlEscape(grp.name || "—")}</a>`
+    : htmlEscape(grp.name || "—");
+
+  const sapn = h.service_approval_number || "";
+  const tools = [
+    sapn ? { label: `acecqa: ${htmlEscape(sapn)}`, href: urlAcecqa(sapn) } : null,
+    ent.legal_name ? { label: `abr: ${htmlEscape(ent.legal_name)}`,
+                       href: urlAbn(ent.legal_name) } : null,
+    h.service_name ? { label: "google",
+                       href: urlGoogle(h.service_name, addr.suburb || "") } : null,
+  ].filter(Boolean);
+
+  const chips = [
+    { l: "Approved places", n: fmtN(centre.places.approved_places.value) },
+    { l: "Subtype",         n: centre.places.service_sub_type.code || "—" },
+    { l: "SEIFA decile",    n: centre.catchment.seifa_decile.value ?? "—" },
+    { l: "Remoteness",      n: centre.catchment.remoteness.label || "—" },
+  ];
+
+  return `
+    <div class="centre-header">
+      <h2 class="centre-name">${htmlEscape(h.service_name || "Unnamed centre")}</h2>
+      ${addrStr ? `<div class="centre-address">${htmlEscape(addrStr)}</div>` : ""}
+      <div class="centre-meta-row">
+        <span>operator: <b>${groupLink}</b></span>
+        <span class="sep">·</span>
+        <span class="ownership-pill">${htmlEscape(grp.ownership_type_label || "Not classified")}</span>
+        <span class="sep">·</span>
+        <span>${brandChip}</span>
+        ${ent.legal_name ? `<span class="sep">·</span><span>entity: <b>${htmlEscape(ent.legal_name)}</b></span>` : ""}
+      </div>
+      <div class="scale-strip">
+        ${chips.map(c => `
+          <div class="chip">
+            <span class="n">${htmlEscape(String(c.n))}</span>
+            <span class="l">${htmlEscape(c.l)}</span>
+          </div>
+        `).join("")}
+      </div>
+      ${tools.length ? `
+        <div class="ext-tools">
+          ${tools.map(t => `<a href="${t.href}" target="_blank" rel="noopener">${t.label}</a>`).join("")}
+        </div>
+      ` : ""}
+      ${renderMethodologyLegend()}
+    </div>
+  `;
+}
+
+function renderNqsCard(centre) {
+  const n = centre.nqs;
+  const cadence = n.inspection_cadence || {};
+  const cadenceColour = ({
+    current: "green",
+    due_soon: "amber",
+    stale: "red",
+    no_rating: "grey",
+  })[cadence.status] || "grey";
+
+  const ratingValue = n.overall_rating?.value;
+  const issuedDate = n.rating_issued_date?.value;
+
+  return `
+    <section class="op-section">
+      <h3>NQS Rating</h3>
+      <div class="fact">
+        <span class="k">Overall rating</span>
+        <span class="v">
+          ${nqsPill(ratingValue)}
+          ${renderBadge("OBS", {
+            source: "ACECQA national register",
+            asAt: issuedDate ? formatMonYYYY(issuedDate) : "—"
+          }, true)}
+        </span>
+      </div>
+      <div class="fact">
+        <span class="k">Rating issued</span>
+        <span class="v">
+          <b>${htmlEscape(formatMonYYYY(issuedDate))}</b>
+          ${renderBadge("OBS", {
+            source: "ACECQA national register",
+            asAt: issuedDate ? formatMonYYYY(issuedDate) : "—"
+          }, true)}
+        </span>
+      </div>
+      <div class="fact">
+        <span class="k">Inspection cadence</span>
+        <span class="v">
+          <span class="status-pill ${cadenceColour}">${htmlEscape(cadence.label || "—")}</span>
+          ${renderBadge("DER", {
+            rule: "Stale ≥ 24 months since rating; due soon ≥ 18 months.",
+            inputs: "<code>rating_issued_date</code>",
+            threshold: "Stale: 24m; Due soon: 18m"
+          }, true)}
+        </span>
+      </div>
+    </section>
+  `;
+}
+
+function renderPlacesCard(centre) {
+  const p = centre.places;
+  const subtype = p.service_sub_type;
+  const excludedNote = subtype.excluded_from_workforce
+    ? `<div class="placeholder">${htmlEscape(subtype.exclusion_reason || "Excluded from workforce model")}</div>`
+    : "";
+
+  return `
+    <section class="op-section">
+      <h3>Places &amp; Service Type</h3>
+      <div class="fact">
+        <span class="k">Approved places</span>
+        <span class="v">
+          <b>${fmtN(p.approved_places.value)}</b>
+          ${renderBadge("OBS", { source: "ACECQA national register" }, true)}
+        </span>
+      </div>
+      <div class="fact">
+        <span class="k">Subtype</span>
+        <span class="v">
+          <b>${htmlEscape(subtype.label)}</b>
+          ${subtype.code ? `<span style="color:var(--text-mute);font-size:11px;">(${htmlEscape(subtype.code)})</span>` : ""}
+          ${renderBadge("OBS", { source: "ACECQA service_sub_type" }, true)}
+        </span>
+      </div>
+      ${p.provider_management_type?.value ? `
+        <div class="fact">
+          <span class="k">Management type</span>
+          <span class="v">
+            <b>${htmlEscape(p.provider_management_type.value)}</b>
+            ${renderBadge("OBS", { source: "ACECQA national register" }, true)}
+          </span>
+        </div>
+      ` : ""}
+      <div class="fact">
+        <span class="k">Long day care flag</span>
+        <span class="v"><b>${p.long_day_care_flag ? "Yes" : "No"}</b></span>
+      </div>
+      ${_renderKinderBlock(p)}
+      ${excludedNote}
+    </section>
+  `;
+}
+
+// ── Kinder recognition block (mirrors operator-page treatment) ──────
+//
+// Renders a small 3-row composite:
+//   1. Headline (DER) — "Kinder: confirmed (ACECQA + name match)" etc.
+//   2. ACECQA flag evidence row (OBS) — Yes / No / Unknown
+//   3. Name-match evidence row (DER) — Yes "matched 'X'" / No
+//
+// Hidden entirely only when ACECQA has no record AND name doesn't
+// match — i.e. when there is genuinely nothing to say. Otherwise both
+// evidence rows render so the reader sees both signals explicitly.
+//
+// Headline state and signals come from p.kinder_summary in the payload
+// (computed in centre_page.py v7). The signals array is open — future
+// detection methods append entries; this renderer reads positive_keys
+// from the array but doesn't hardcode a fixed signal set in the
+// evidence rendering loop. Adding a third method = one entry in the
+// Python signals array + one optional tooltip-rule string here.
+function _renderKinderBlock(p) {
+  const summary = p && p.kinder_summary;
+  const acecqa = p && p.kinder_approved;
+  const nameMatch = p && p.kinder_name_match;
+
+  // v3.7 — always render. Kinder is a permanent fixture of the Places
+  // card so the reader sees we checked, even when the result is
+  // "Not flagged". Defensive: still hide if the entire payload subtree
+  // is missing (pre-v7 payload).
+  // v3.8 — visual integration: three flat .fact rows matching the rest
+  // of the Places card. Same k/v structure as Approved places / Subtype
+  // / Management type / Long day care flag. Bold main value + muted
+  // qualifier in parentheses + badge — same pattern as Subtype's
+  // "<b>Long Day Care</b> (LDC) [OBS]".
+  if (!summary || !nameMatch) return "";
+
+  const acecqaUnknown = (acecqa?.value === null || acecqa?.value === undefined);
+  const acecqaPositive = !!acecqa?.value;
+  const namePositive = !!nameMatch?.value;
+
+  // Headline: split into bold "main" (Confirmed / Likely / Not flagged)
+  // and muted "qualifier" in parentheses, matching Subtype's pattern.
+  let summaryMain, summaryQualifier;
+  switch (summary?.state) {
+    case "confirmed_both":
+      summaryMain = "Confirmed"; summaryQualifier = "ACECQA + name match"; break;
+    case "confirmed_acecqa":
+      summaryMain = "Confirmed"; summaryQualifier = "ACECQA"; break;
+    case "likely_name_only":
+      summaryMain = "Likely"; summaryQualifier = "name match only — not in ACECQA"; break;
+    default:
+      summaryMain = "Not flagged"; summaryQualifier = null; break;
+  }
+
+  const summaryDerBadge = renderBadge("DER", {
+    rule: "Composite of ACECQA flag + service-name regex match. State is one of: confirmed_both, confirmed_acecqa, likely_name_only, not_flagged.",
+    inputs: `<code>kinder_approved=${acecqaUnknown ? "null" : (acecqaPositive ? "true" : "false")}</code>, <code>name_match=${namePositive ? "true" : "false"}</code>`,
+    formula: "ACECQA + name → confirmed_both; ACECQA only → confirmed_acecqa; name only → likely_name_only; neither → not_flagged.",
+    source: "centre_page.py kinder signals composition (v7)."
+  }, true);
+
+  // ACECQA evidence row
+  const acecqaValueText = acecqaUnknown ? "Unknown" : (acecqaPositive ? "Yes" : "No");
+  const acecqaSource = acecqa?.source || "ACECQA national register";
+  const acecqaObsBadge = renderBadge("OBS", { source: htmlEscape(acecqaSource) }, true);
+
+  // Name-match evidence row
+  const matchedText = nameMatch?.matched_text;
+  const nameDerBadge = renderBadge("DER", {
+    rule: htmlEscape(nameMatch?.rule || "regex on services.service_name"),
+    formula: `<code>${htmlEscape(nameMatch?.pattern || "")}</code> case-insensitive, word-boundary`,
+    inputs: matchedText ? `Matched: <code>${htmlEscape(matchedText)}</code>` : "No match",
+    threshold: htmlEscape(nameMatch?.caveat || "Name evidence, not an official kinder approval record.")
+  }, true);
+
+  return `
+    <div class="fact">
+      <span class="k">Kinder</span>
+      <span class="v">
+        <b>${htmlEscape(summaryMain)}</b>
+        ${summaryQualifier ? `<span style="color:var(--text-mute);font-size:11px;">(${htmlEscape(summaryQualifier)})</span>` : ""}
+        ${summaryDerBadge}
+      </span>
+    </div>
+    <div class="fact">
+      <span class="k">Kinder — ACECQA flag</span>
+      <span class="v">
+        <b>${acecqaValueText}</b>
+        ${acecqaSource ? `<span style="color:var(--text-mute);font-size:11px;">(${htmlEscape(acecqaSource)})</span>` : ""}
+        ${acecqaObsBadge}
+      </span>
+    </div>
+    <div class="fact">
+      <span class="k">Kinder — name match</span>
+      <span class="v">
+        <b>${namePositive ? "Yes" : "No"}</b>
+        ${(namePositive && matchedText) ? `<span style="color:var(--text-mute);font-size:11px;">(matched "${htmlEscape(matchedText)}")</span>` : ""}
+        ${nameDerBadge}
+      </span>
+    </div>
+  `;
+}
+
+function renderCatchmentCard(centre) {
+  const c = centre.catchment;
+  return `
+    <section class="op-section">
+      <h3>Catchment</h3>
+      <div class="fact">
+        <span class="k">SEIFA decile</span>
+        <span class="v">
+          <b>${c.seifa_decile.value ?? "—"}</b>
+          ${c.seifa_decile.value != null ? '<span style="color:var(--text-mute);font-size:11px;">/10</span>' : ""}
+          ${_renderMiniDecileStrip(c.seifa_decile.value)}
+          ${renderBadge("OBS", { source: "ABS SEIFA, joined via SA2" }, true)}
+        </span>
+      </div>
+      <div class="fact">
+        <span class="k">Remoteness</span>
+        <span class="v">
+          <b>${htmlEscape(c.remoteness.label)}</b>
+          ${renderBadge("OBS", { source: "ABS ARIA+ remoteness classification" }, true)}
+        </span>
+      </div>
+      ${c.sa2.code ? `
+        <div class="fact">
+          <span class="k">SA2</span>
+          <span class="v">
+            <b>${htmlEscape(c.sa2.name || c.sa2.code)}</b>
+            ${renderBadge("OBS", { source: "ABS Australian Statistical Geography Standard" }, true)}
+          </span>
+        </div>
+      ` : ""}
+      <div class="placeholder" style="margin-top:8px;font-size:11.5px;">
+        Catchment ratios (supply, demand, child-per-place, share of state demand)
+        <span class="will-show">render in the Catchment position card above.</span>
+      </div>
+    </section>
+  `;
+}
+
+// ── Layer 4 — POSITION rendering ────────────────────────────────────
+//
+// Visual primitive adapted from the operator.html SEIFA pattern
+// (renderCatchment in docs/operator.html v8): decile-aware horizontal
+// element + low/mid/high band split + decile-style headline. At centre
+// level we have one SA2 per metric, so the histogram becomes a
+// "you-are-here" 10-cell strip with all cells in the same neutral tone
+// (truly neutral palette per design doc §11.2 / D2 — no red/green
+// valence in cells; semantics live in band-copy text only).
+
+function _formatPositionValue(p) {
+  const raw = p.raw_value;
+  if (raw == null) return "—";
+  const fmt = p.value_format;
+  if (fmt === "int")              return fmtN(raw);
+  if (fmt === "percent")          return `${Number(raw).toFixed(1)}%`;
+  if (fmt === "currency_annual")  return `$${fmtN(Math.round(raw))} p.a.`;
+  if (fmt === "currency_weekly")  return `$${fmtN(Math.round(raw))}/week`;
+  // Layer 4.2-A.3 catchment formats:
+  if (fmt === "ratio_x")          return `${Number(raw).toFixed(2)}×`;
+  if (fmt === "percent_share")    return `${(Number(raw) * 100).toFixed(2)}%`;
+  return fmtN(raw);
+}
+
+function _formatPositionPeriod(p) {
+  if (p.period_label) return p.period_label;
+  if (p.year != null) return String(p.year);
+  return "";
+}
+
+// Build a short bracketed cohort label for the metric title — e.g.
+// "vs Qld", "vs Outer Regional Qld", "vs all Outer Regional", "vs Australia".
+// Source: cohort_def + the cohort_label string already on the payload
+// (which is e.g. "vs other Outer Regional SA2s in Qld"). Keep this short
+// enough to sit in brackets after the metric display name.
+function _buildCohortShortLabel(p) {
+  if (!p || !p.cohort_def) return "";
+  // Extract the bits we need from the long-form cohort_label.
+  // Long-form examples (from centre_page.py _build_cohort_label):
+  //   state              -> "vs other SA2s in {state_name}"
+  //   remoteness         -> "vs other {ra_name} SA2s nationwide"
+  //   state_x_remoteness -> "vs other {ra_name} SA2s in {state_name}"
+  //   national           -> "vs all SA2s nationwide"
+  const long = p.cohort_label || "";
+  if (p.cohort_def === "state") {
+    const m = /in\s+([A-Z]{2,3}|[A-Z][a-z]+|Other Territories)\s*$/i.exec(long);
+    return m ? `vs ${m[1]}` : "vs state";
+  }
+  if (p.cohort_def === "remoteness") {
+    const m = /vs other\s+(.+?)\s+SA2s/i.exec(long);
+    return m ? `vs all ${m[1]}` : "vs remoteness";
+  }
+  if (p.cohort_def === "state_x_remoteness") {
+    const m = /vs other\s+(.+?)\s+SA2s in\s+([A-Z]{2,3}|[A-Z][a-z]+|Other Territories)\s*$/i.exec(long);
+    if (m) return `vs ${m[1]} ${m[2]}`;
+    return "vs state-x-remoteness";
+  }
+  if (p.cohort_def === "national") return "vs Australia";
+  return "";
+}
+
+// ── Layer 4.2-B-fix2: Trajectory range state ─────────────────────────
+//
+// Single global window applied to every trajectory chart on the page.
+// 0 = "All" (no clipping). For non-zero values, we filter points whose
+// period falls within the last N years from the most recent point in
+// that series. Each metric's series may have a different "most recent
+// point" (e.g. unemployment 2025-Q4 vs LFP 2021), so the window is
+// applied per-chart relative to its own end.
+//
+// Default window: 0 (All) — gives a complete-history view on first load.
+let _TRAJECTORY_RANGE_YEARS = 0;
+let _LAST_CENTRE = null; // captured by render() so setRange can re-render
+
+// ── Layer 4.3 Thread A: Per-chart range overrides ───────────────────
+//
+// Per-metric override map alongside the global. Keyed by metric name;
+// values are override years (e.g. 1, 2). A missing key (or null) means
+// "use the global window". The metric-keyed shape is forward-compatible
+// with future short-data series picking up sub-global windows (Thread B
+// SALM-LFP, etc.) — adding an entry to _PER_CHART_RANGE_OPTIONS is
+// sufficient; nothing else changes.
+//
+// Click-to-toggle: clicking the active per-chart button clears the
+// override and falls back to the global window. Single global "Trend
+// window" bar (DEC-73) remains the page-wide control.
+let _TRAJECTORY_OVERRIDE_YEARS = {};
+
+// Metrics eligible for sub-global windows. Only metrics with sufficient
+// time-series cadence to make 1Y / 2Y meaningful belong here. SALM
+// unemployment is quarterly (61 points 2010Q4–2025Q4) — 1Y = 4 quarters,
+// 2Y = 8 quarters. Census-only metrics (LFP triplet, income trio) have
+// too few points for sub-global windows; they stay on the global.
+const _PER_CHART_RANGE_OPTIONS = {
+  "sa2_unemployment_rate": [1, 2],
+};
+
+function _setTrajectoryRange(years, btnEl) {
+  _TRAJECTORY_RANGE_YEARS = years;
+  // Update active state on the button row
+  document.querySelectorAll(".traj-range-bar .range-btn").forEach(b => {
+    b.classList.remove("active");
+  });
+  if (btnEl) btnEl.classList.add("active");
+  // Re-render the page so charts pick up the new window
+  if (_LAST_CENTRE) render(_LAST_CENTRE);
+}
+
+// Returns the effective range years for a given metric — per-chart
+// override if set, otherwise the global trend-window value.
+function _getEffectiveRangeYears(metric) {
+  const override = _TRAJECTORY_OVERRIDE_YEARS[metric];
+  return (override !== undefined && override !== null) ? override : _TRAJECTORY_RANGE_YEARS;
+}
+
+// Click-to-toggle handler. Clicking the active button clears the
+// override (falls back to global); clicking any other button sets it.
+function _setPerChartRange(metric, years, btnEl) {
+  const current = _TRAJECTORY_OVERRIDE_YEARS[metric];
+  if (current === years) {
+    delete _TRAJECTORY_OVERRIDE_YEARS[metric];
+  } else {
+    _TRAJECTORY_OVERRIDE_YEARS[metric] = years;
+  }
+  // Re-render so the chart picks up the new window
+  if (_LAST_CENTRE) render(_LAST_CENTRE);
+}
+
+// Emits a small right-aligned button strip ABOVE the trajectory canvas
+// for metrics in _PER_CHART_RANGE_OPTIONS. Returns "" for any metric
+// not eligible for sub-global windows.
+// ── Layer 4.3 sub-pass 4.3.8 — Trend-window % change ────────────────
+//
+// For each Full-weight chart, compute the % change from the first to
+// last point in the currently-active window. Surfaced two ways:
+//   1. Static label top-right of the chart: "+X.X% since YYYY"
+//   2. Running % from window-start added to Chart.js hover tooltip
+//      via the afterLabel callback (multi-line tooltip native to
+//      Chart.js).
+//
+// Both update live when the user clicks any range button (global or
+// per-chart) — the existing re-render flow re-computes the filtered
+// points and the label rebuilds with them.
+//
+// Decisions (locked in 4.3.8 probe):
+//   D3: start anchor = first point IN filtered window (honest about
+//       what the % is computed against, even when window > available
+//       data). Label says "since 2017" not "since 2014" if earliest
+//       point in a 10Y window is 2017.
+//   D4: tooltip is two-line — line 1 unchanged from before, line 2
+//       adds the running %. First point in window has no line 2 (it
+//       IS the start; no change to display).
+//   Implementation defaults: 1 decimal precision; explicit + for
+//   positive; en-dash − for negative; <2 points = no label, no
+//   tooltip extension; full-trajectory empty = no label (matches
+//   existing silent behaviour).
+//
+// Renderer-implementation choice within DEC-73 (Trajectory window UX)
+// scope, same pattern as Thread A's per-chart overrides — no new DEC.
+
+// Extract the year portion of a period string. Handles "2024",
+// "2024-Q3", and "Q3 2013" (the catchment trajectory format added
+// in v3.19; the leading-^ anchor in the v3.18 version returned NaN
+// for quarter-leading strings).
+function _yearOfPeriod(period) {
+  const s = String(period);
+  const m = /(\d{4})/.exec(s);  // v3.20: find first 4-digit run anywhere
+  return m ? parseInt(m[1], 10) : NaN;
+}
+
+// Format a signed % change with 1 decimal. Explicit + prefix for
+// positive; en-dash − prefix for negative (Unicode minus, matches
+// design palette discipline).
+function _formatTrendPct(pct) {
+  if (pct == null || !isFinite(pct)) return "";
+  const abs = Math.abs(pct).toFixed(1);
+  if (pct > 0) return `+${abs}%`;
+  if (pct < 0) return `−${abs}%`;
+  return `+0.0%`;
+}
+
+// Compute % change from points[0] to points[points.length - 1].
+// Returns null if not computable (need ≥2 points; start value cannot
+// be 0 or null). Returns {pct, startPeriod, endPeriod, startValue}.
+function _computeTrendPctChange(points) {
+  if (!points || points.length < 2) return null;
+  const start = points[0];
+  const end = points[points.length - 1];
+  if (start == null || end == null) return null;
+  const sv = Number(start.value);
+  const ev = Number(end.value);
+  if (!isFinite(sv) || !isFinite(ev) || sv === 0) return null;
+  const pct = ((ev - sv) / sv) * 100;
+  return {
+    pct,
+    startPeriod: start.period,
+    endPeriod: end.period,
+    startValue: sv,
+  };
+}
+
+
+// ── C3: absolute-change helper ─────────────────────────────────────
+//
+// Aggregates centre_events.places_change and centre_events.net_centres
+// for events whose quarter sits at or after the active trend-window
+// startPeriod. Returns {placesChange, centresChange, eventCount} or
+// null when there are no qualifying events. Used inline with the
+// trend-% label on catchment trajectory charts.
+function _computeEventAbsChange(events, startPeriod) {
+  if (!events || !events.length || !startPeriod) return null;
+  const startYr = _yearOfPeriod(startPeriod);
+  if (startYr == null || isNaN(startYr)) return null;
+  let pl = 0, c = 0, n = 0;
+  for (const e of events) {
+    if (!e || !e.quarter) continue;
+    const eyr = _yearOfPeriod(e.quarter);
+    if (eyr == null || isNaN(eyr)) continue;
+    if (eyr < startYr) continue;
+    pl += (e.places_change || 0);
+    c  += (e.net_centres   || 0);
+    n  += 1;
+  }
+  if (n === 0) return null;
+  return { placesChange: pl, centresChange: c, eventCount: n };
+}
+
+
+// Buttons-only emit for inline composition with the trend-% label
+// (sub-pass 4.3.8). Returns the button HTML without an outer wrapper
+// div — caller wraps. Returns "" if metric has no per-chart options.
+function _renderPerChartRangeBarButtons(metric) {
+  const opts = _PER_CHART_RANGE_OPTIONS[metric];
+  if (!opts) return "";
+  const override = _TRAJECTORY_OVERRIDE_YEARS[metric];
+  return opts.map(years => {
+    const isActive = (override === years);
+    const titleAttr = isActive
+      ? "Click to clear and use the global trend window"
+      : `Override to last ${years} year${years > 1 ? "s" : ""}`;
+    return `<button class="range-btn${isActive ? " active" : ""}" `
+         + `onclick="_setPerChartRange('${metric}', ${years}, this)" `
+         + `title="${titleAttr}">${years}Y</button>`;
+  }).join("");
+}
+
+// Backward-compat wrapper — wraps buttons in the original right-aligned
+// flex div. Retained in case any caller outside _renderTrajectory uses
+// it. Sub-pass 4.3.8's _renderTrajectory uses the buttons-only helper
+// above so it can compose them with the trend-% label on the same row.
+function _renderPerChartRangeBar(metric) {
+  const btns = _renderPerChartRangeBarButtons(metric);
+  if (!btns) return "";
+  return `
+    <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;">
+      ${btns}
+    </div>
+  `;
+}
+
+function _renderTrajectoryRangeBar() {
+  // Renders only when there's data to show — skipped if no SA2 / no Layer 3.
+  const opts = [
+    { years: 3,  label: "3Y" },
+    { years: 5,  label: "5Y" },
+    { years: 10, label: "10Y" },
+    { years: 0,  label: "All" },
+  ];
+  const btns = opts.map(o => {
+    const isActive = (o.years === _TRAJECTORY_RANGE_YEARS);
+    return `<button class="range-btn${isActive ? " active" : ""}" `
+         + `onclick="_setTrajectoryRange(${o.years}, this)">${o.label}</button>`;
+  }).join("");
+  return `
+    <div class="traj-range-bar">
+      <span class="label">Trend window</span>
+      <div class="btns">${btns}</div>
+      <span style="margin-left:auto;font-size:10.5px;color:var(--text-mute);">
+        applies to Population, Labour, Catchment trajectories
+      </span>
+    </div>
+  `;
+}
+
+// Filter trajectory points to those within the last N years from the
+// series' most recent point. Handles annual ("2024"), census ("2024-Q3"),
+// and quarterly ("Q3 2013") period formats.
+function _filterTrajectoryByRange(points, years) {
+  if (!years || years <= 0 || !points.length) return points;
+  // Extract the year portion of each point's period.
+  // v3.21: regex un-anchored so it matches the catchment quarter format
+  // ("Q3 2013") added in v3.19. Pre-v3.21 the ^-anchor returned NaN
+  // for quarter-leading strings, the function bailed out via the
+  // isNaN check below, and the trend window filter never applied to
+  // catchment charts.
+  const yearOf = (period) => {
+    const s = String(period);
+    const m = /(\d{4})/.exec(s);
+    return m ? parseInt(m[1], 10) : NaN;
+  };
+  const lastYear = yearOf(points[points.length - 1].period);
+  if (isNaN(lastYear)) return points;
+  const cutoff = lastYear - years;
+  return points.filter(pt => yearOf(pt.period) > cutoff);
+}
+
+// ── Layer 4.2-B-fix: Chart.js trajectory ───────────────────────────
+//
+// Previous v3 used bespoke SVG for the trajectory. v3.1 replaces it with
+// Chart.js — same library, same makeLine / makeDataset / makeOpts helpers
+// as index.html and dashboard.html. Cohort histogram and decile strip
+// remain bespoke SVG (they're position indicators, not trends; Chart.js
+// is heavier than needed for a 30px shape strip).
+//
+// Per-metric stroke colours follow the index.html "chart-catch-combined"
+// convention (System B palette intentionally embedded inside this System
+// A page — embedded "industry-style" mini-charts inside the centre
+// drilldown context). Stroke colour does NOT carry valence; valence
+// lives only in band-copy text per E2.
+//
+const _CHART_STROKE_BY_METRIC = {
+  // Population family — teal (matches index.html chart-catch-pop)
+  sa2_under5_count:            "#00c9a7",
+  sa2_total_population:        "#00c9a7",
+  sa2_births_count:            "#00c9a7",
+  // Labour-market — multi-hue per index.html convention
+  sa2_unemployment_rate:       "#e05c3a", // hot — index uses for new-approvals etc.
+  sa2_median_employee_income:  "#3d7eff", // primary blue
+  sa2_median_household_income: "#3d7eff",
+  sa2_median_total_income:     "#3d7eff",
+  sa2_lfp_persons:             "#9b59b6", // purple — index uses for supply demand
+  sa2_lfp_females:             "#9b59b6",
+  sa2_lfp_males:               "#9b59b6",
+};
+const _CHART_FILL_BY_METRIC = {
+  sa2_under5_count:            "rgba(0,201,167,0.08)",
+  sa2_total_population:        "rgba(0,201,167,0.08)",
+  sa2_births_count:            "rgba(0,201,167,0.08)",
+  sa2_unemployment_rate:       "rgba(224,92,58,0.08)",
+  sa2_median_employee_income:  "rgba(61,126,255,0.08)",
+  sa2_median_household_income: "rgba(61,126,255,0.08)",
+  sa2_median_total_income:     "rgba(61,126,255,0.08)",
+  sa2_lfp_persons:             "rgba(155,89,182,0.08)",
+  sa2_lfp_females:             "rgba(155,89,182,0.08)",
+  sa2_lfp_males:               "rgba(155,89,182,0.08)",
+};
+
+// v3.13: external tooltip readout. Updates a fixed-position
+// <div> above the chart (slot id derived from canvas id) when
+// the user hovers the chart. Replaces native Chart.js tooltip
+// rendering for trajectory charts so the readout never
+// overlaps the data line.
+// v3.13a readout: defensive parser. Collects every text
+// fragment Chart.js v4 may have placed in the tooltip
+// internal state — body[].before / .lines / .after, plus
+// tt.beforeBody and tt.afterBody arrays. Whatever the
+// callbacks (label, afterLabel, beforeBody, afterBody)
+// produced, we capture and render it.
+function _kintellExternalReadout(context) {
+  const chart = context.chart;
+  const tt = context.tooltip;
+  const canvasId = chart.canvas && chart.canvas.id;
+  if (!canvasId) return;
+  const slot = document.getElementById("readout-" + canvasId);
+  if (!slot) return;
+  if (!tt || tt.opacity === 0) {
+    slot.innerHTML = '<span style="color:var(--text-mute);font-style:italic;">hover the line to read values</span>';
+    return;
+  }
+  const titleLines = tt.title || [];
+  const beforeBody = tt.beforeBody || [];
+  const bodyItems = tt.body || [];
+  const afterBody = tt.afterBody || [];
+  const lines = [];
+  beforeBody.forEach(l => { if (l) lines.push(l); });
+  bodyItems.forEach(b => {
+    (b.before || []).forEach(l => { if (l) lines.push(l); });
+    (b.lines  || []).forEach(l => { if (l) lines.push(l); });
+    (b.after  || []).forEach(l => { if (l) lines.push(l); });
+  });
+  afterBody.forEach(l => { if (l) lines.push(l); });
+  const titleHtml = titleLines.length
+    ? `<span style="color:var(--text-mute);font-size:11.5px;margin-right:10px;">${titleLines[0]}</span>`
+    : "";
+  const linesHtml = lines.map((l, i) =>
+    i === 0
+      ? `<b style="color:var(--text);">${l}</b>`
+      : `<span style="color:var(--text-mute);font-size:11.5px;margin-left:10px;">${l}</span>`
+  ).join("");
+  slot.innerHTML = titleHtml + linesHtml;
+}
+
+// v3.12b: custom tooltip positioner. Pins horizontally to
+// the active data point but vertically to the top of the
+// chart area. Combined with yAlign="bottom" the tooltip box
+// extends UP from this pinned y, sitting just above the
+// chart edge — leaving the data line + crosshair + active
+// dot clearly visible underneath.
+if (window.Chart && Chart.Tooltip && Chart.Tooltip.positioners) {
+  Chart.Tooltip.positioners.topPin = function(items, eventPos) {
+    if (!items || !items.length) return false;
+    const item = items[0];
+    const chart = item.element && item.element.$context && item.element.$context.chart;
+    const ca = chart && chart.chartArea;
+    return {
+      x: item.element.x,
+      y: ca ? (ca.top - 4) : item.element.y,
+    };
+  };
+}
+
+// v3.12: crosshair plugin for trajectory charts.
+// Draws a vertical dashed line at the active tooltip x-position
+// (which Chart.js snaps to nearest data index because
+// interaction.mode is "index"). Effect: hovering feels like
+// scrubbing a ruler — pause anywhere on the line, read the
+// value cleanly, see exactly which period the cursor is on.
+const _kintellCrosshair = {
+  id: "kintellCrosshair",
+  afterDraw(chart) {
+    const tt = chart.tooltip;
+    if (!tt || !tt.opacity) return;
+    const active = tt.dataPoints && tt.dataPoints[0];
+    if (!active) return;
+    const ctx = chart.ctx;
+    const ca  = chart.chartArea;
+    const x   = active.element.x;
+    ctx.save();
+    ctx.strokeStyle = "rgba(180,200,230,0.40)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(x, ca.top);
+    ctx.lineTo(x, ca.bottom);
+    ctx.stroke();
+    ctx.restore();
+  }
+};
+
+// v3.19 (Layer 4.2-A.3c): centre-entry/exit overlay for catchment charts.
+// Vertical dashed lines at quarters when centres of the matching subtype
+// opened or closed in this SA2. Data-driven via opts.plugins.
+// kintellEventAnnotation = { events: [...] } — when events are absent,
+// the plugin silently no-ops (Population/Labour Market/Workforce charts
+// unaffected). Adapted from dashboard.html's eventAnnotationPlugin
+// pattern but reads events from chart options rather than scope-bound
+// sectorEvents, so each chart can carry its own per-SA2 / per-subtype
+// event set.
+//
+// Color encoding:
+//   additions (net_centres > 0) -> green   — competitive expansion
+//   removals  (net_centres < 0) -> red     — competitive contraction
+//   net-zero churn              -> grey    — same-quarter rebrand etc.
+const _kintellEventAnnotation = {
+  id: "kintellEventAnnotation",
+  afterDraw(chart) {
+    const cfg = chart.options && chart.options.plugins && chart.options.plugins.kintellEventAnnotation;
+    if (!cfg || !cfg.events || !cfg.events.length) return;
+    const events = cfg.events;
+    const ctx2 = chart.ctx;
+    const xAxis = chart.scales.x;
+    const yAxis = chart.scales.y;
+    if (!xAxis || !yAxis) return;
+
+    // Labels currently displayed on the chart (after any range filter).
+    const labels = chart.data.labels || [];
+
+    events.forEach(ev => {
+      const idx = labels.indexOf(ev.quarter);
+      if (idx < 0) return;  // event quarter is outside the visible window
+
+      const xPixel = xAxis.getPixelForValue(idx);
+      if (xPixel < xAxis.left || xPixel > xAxis.right) return;
+
+      const net = Number(ev.net_centres) || 0;
+      const color = net > 0 ? "rgba(0,201,167,0.55)"   // green: additions
+                  : net < 0 ? "rgba(224,92,58,0.55)"   // red: removals
+                  :           "rgba(155,155,155,0.40)"; // grey: churn
+
+      ctx2.save();
+      ctx2.strokeStyle = color;
+      ctx2.lineWidth = 1.5;
+      ctx2.setLineDash([4, 3]);
+      ctx2.beginPath();
+      ctx2.moveTo(xPixel, yAxis.top);
+      ctx2.lineTo(xPixel, yAxis.bottom);
+      ctx2.stroke();
+      ctx2.restore();
+    });
+  }
+};
+
+// Chart.js helpers — verbatim from index.html so behaviour matches.
+function _kintell_makeOpts(yLabel, extra) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        // v3.13: native Chart.js tooltip disabled. The
+        // tooltip MACHINERY (active-point detection, label
+        // callbacks) still runs — we hook into it via the
+        // external callback below to update a fixed DOM
+        // element above the canvas.
+        enabled: false,
+        external: _kintellExternalReadout,
+        // Keep these so the callbacks (label, afterLabel)
+        // continue to be invoked and produce body lines.
+        displayColors: false,
+      },
+    },
+    scales: {
+      x: {
+        grid: { display: false, drawBorder: false },
+        ticks: {
+          color: "#6b7684",
+          font: { size: 9 },
+          maxRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 8,
+        },
+      },
+      y: {
+        grid: { color: "rgba(45,52,63,0.4)", drawBorder: false },
+        ticks: { color: "#6b7684", font: { size: 9 } },
+        title: {
+          display: !!yLabel,
+          text: yLabel || "",
+          color: "#8890a8",
+          font: { size: 9 },
+        },
+      },
+      ...(extra || {}),
+    },
+  };
+}
+
+function _kintell_makeLine(label, data, color, fill) {
+  return {
+    label,
+    data,
+    borderColor: color,
+    backgroundColor: fill || "transparent",
+    fill: !!fill,
+    tension: 0,
+    pointRadius: 0,
+    borderWidth: 2,
+    spanGaps: true,
+  };
+}
+
+// Registry + queue: chart instances rendered AFTER main.innerHTML is set,
+// because Chart.js needs the canvas attached to the DOM. _pendingCharts
+// is drained by render() at the end of its single-shot render.
+const _CHART_INSTANCES = {};
+const _CHART_PENDING = [];
+
+function _flushPendingCharts() {
+  // Destroy any previous chart instances first (defensive — render() is
+  // single-shot today but if we ever re-render this avoids leaks).
+  Object.keys(_CHART_INSTANCES).forEach(id => {
+    try { _CHART_INSTANCES[id].destroy(); } catch (e) {}
+    delete _CHART_INSTANCES[id];
+  });
+  while (_CHART_PENDING.length) {
+    const fn = _CHART_PENDING.shift();
+    try { fn(); } catch (e) { console.warn("chart init failed:", e); }
+  }
+}
+
+// Layer 4.2-B-fix: Chart.js-backed trajectory.
+//
+// Returns a <canvas> wrapper element with a unique id. The actual Chart.js
+// instantiation is queued in _CHART_PENDING and runs after main.innerHTML
+// is set (Chart.js needs the canvas attached to the DOM).
+//
+// Threshold logic preserved from v3:
+//   >= 7 points -> sparkline-style (no point markers, area fill)
+//   <  7 points -> dot trajectory (point markers visible)
+//
+// All charts get hover tooltip with per-point period+value via Chart.js's
+// built-in tooltip — replaces the bespoke <title> attribute from v3.
+function _renderTrajectory(metric, p) {
+  const allPoints = (p && p.trajectory) || [];
+  if (!allPoints.length) return "";
+
+  // Apply effective trend window — per-chart override falls back to
+  // global (DEC-73 + Layer 4.3 Thread A). Per metric, window is relative
+  // to that series' most recent point.
+  const effectiveYears = _getEffectiveRangeYears(metric);
+  const points = _filterTrajectoryByRange(allPoints, effectiveYears);
+
+  // Sub-pass 4.3.8 — top-line strip combining the trend-% label
+  // (LEFT) and any per-chart range buttons (RIGHT). For metrics with
+  // no per-chart buttons, the label sits alone right-aligned per the
+  // "top-right of each chart" anchor confirmed in the previous round.
+  // v3.6 — prominence bump: 11→13px, --text-mute → --text-dim,
+  // value rendered semibold so the % reads as the headline.
+  const trend = _computeTrendPctChange(points);
+  const absChange = (trend && p.centre_events && p.centre_events.length)
+    ? _computeEventAbsChange(p.centre_events, trend.startPeriod)
+    : null;
+  const absChangeLabel = absChange
+    ? ` · <span style="color:var(--text-mute);">${absChange.placesChange >= 0 ? "+" : ""}${absChange.placesChange} places · ${absChange.centresChange >= 0 ? "+" : ""}${absChange.centresChange} ${Math.abs(absChange.centresChange) === 1 ? "centre" : "centres"}</span>`
+    : "";
+  const trendLabel = (trend && p.row_weight !== "lite" && p.row_weight !== "context")
+    ? `<span style="font-size:13px;color:var(--text-dim);font-variant-numeric:tabular-nums;">
+         <b style="font-weight:600;color:var(--text);">${_formatTrendPct(trend.pct)}</b>
+         <span style="color:var(--text-mute);"> since ${htmlEscape(String(_yearOfPeriod(trend.startPeriod)))}</span>${absChangeLabel}
+       </span>`
+    : "";
+  const perChartBtns = _renderPerChartRangeBarButtons(metric);
+
+  let topStrip = "";
+  if (trendLabel && perChartBtns) {
+    // Both present — label LEFT, buttons RIGHT
+    topStrip = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;">
+        ${trendLabel}
+        <div style="display:flex;gap:6px;">${perChartBtns}</div>
+      </div>
+    `;
+  } else if (trendLabel) {
+    // Label alone, right-aligned (top-right anchor)
+    topStrip = `
+      <div style="display:flex;justify-content:flex-end;margin-top:6px;">
+        ${trendLabel}
+      </div>
+    `;
+  } else if (perChartBtns) {
+    // Buttons alone — preserves the v3.4 layout
+    topStrip = `
+      <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;">
+        ${perChartBtns}
+      </div>
+    `;
+  }
+
+  if (!points.length) {
+    // Selected window contains no points for this metric — render an
+    // honest empty-state rather than a misleading flat-line chart.
+    // Top strip still renders so the user can see / clear an override.
+    return `
+      ${topStrip}
+      <div style="margin-top:6px;padding:8px;background:var(--panel-2);
+                  border:1px dashed var(--border);border-radius:4px;
+                  color:var(--text-mute);font-size:11px;font-style:italic;
+                  text-align:center;">
+        no points in selected window — try a wider range
+      </div>
+    `;
+  }
+
+  // Per-metric stroke fallback to default blue
+  const stroke = _CHART_STROKE_BY_METRIC[metric] || "#3d7eff";
+  const fill = _CHART_FILL_BY_METRIC[metric] || "rgba(61,126,255,0.08)";
+
+  const isSparkline = points.length >= 7;
+  const labels = points.map(pt => String(pt.period));
+  const data = points.map(pt => Number(pt.value));
+
+  // Capture window-start value for the tooltip's running-% callback.
+  // Closure-captured below in the chart init queue.
+  const windowStartValue = data.length ? data[0] : null;
+  const windowStartPeriod = points.length ? points[0].period : null;
+  const valueFormat = p.value_format || null;
+
+  // Unique id per row (metric + service-id keeps it stable on re-renders)
+  const canvasId = `traj-${metric}-${Math.random().toString(36).slice(2, 8)}`;
+  // v3.11: both modes now show x-axis labels (sparkline gets
+  // sparse ticks via maxTicksLimit=5). Canvas height bumped to
+  // 64 so tooltip has headroom and ticks fit cleanly.
+  const canvasHeight = isSparkline ? 64 : 64;
+
+  // Queue the chart init to run after the canvas is in the DOM.
+  _CHART_PENDING.push(() => {
+    const el = document.getElementById(canvasId);
+    if (!el) return;
+
+    const dataset = _kintell_makeLine(p.display || metric, data, stroke, fill);
+    // v3.12: BOTH modes show dot points. Sparkline gets
+    // smaller dots (radius 2), dot-trajectory gets larger
+    // (radius 3). Hover bumps to a clearly-visible 5/6.
+    dataset.pointBackgroundColor = stroke;
+    dataset.pointBorderColor = stroke;
+    if (!isSparkline) {
+      dataset.pointRadius = 3;
+      dataset.pointHoverRadius = 5;
+    } else {
+      dataset.pointRadius = 2;
+      dataset.pointHoverRadius = 6;
+    }
+
+    const opts = _kintell_makeOpts(null, null);
+    if (isSparkline) {
+      // v3.11: show sparse year labels on sparkline mode.
+      // 5-tick limit keeps the axis legible without crowding.
+      opts.scales.x.ticks.display = true;
+      opts.scales.x.ticks.maxTicksLimit = 5;
+      opts.scales.x.ticks.autoSkip = true;
+      opts.scales.x.ticks.font = { size: 9 };
+    } else {
+      // Show all dot labels for short series
+      opts.scales.x.ticks.maxTicksLimit = points.length;
+      opts.scales.x.ticks.font = { size: 9 };
+    }
+
+    // Sub-pass 4.3.8 — tooltip extension: line 2 shows running % from
+    // window-start to that point. First point in window has no line 2
+    // (it IS the start; no change to display).
+    opts.plugins.tooltip.callbacks = {
+      label: function (ctx) {
+        const v = Number(ctx.parsed.y);
+        let formatted;
+        if (valueFormat === "percent")               formatted = `${v.toFixed(1)}%`;
+        else if (valueFormat === "currency_annual")  formatted = `$${Math.round(v).toLocaleString()} p.a.`;
+        else if (valueFormat === "currency_weekly")  formatted = `$${Math.round(v).toLocaleString()}/week`;
+        else if (valueFormat === "int")              formatted = Math.round(v).toLocaleString();
+        else                                         formatted = String(v);
+        return `${ctx.dataset.label}: ${formatted}`;
+      },
+      afterLabel: function (ctx) {
+        // v3.13a: populate trend line for EVERY point
+        // including window-start (operator wants the
+        // readout consistent across all cursor positions).
+        if (windowStartValue == null || windowStartValue === 0) return null;
+        const here = Number(ctx.parsed.y);
+        if (!isFinite(here)) return null;
+        const pct = ((here - windowStartValue) / windowStartValue) * 100;
+        const startYear = _yearOfPeriod(windowStartPeriod);
+        return `${_formatTrendPct(pct)} since ${startYear}`;
+      },
+    };
+
+    // v3.19 (Layer 4.2-A.3c): if this metric carries centre_events
+    // (only the 4 catchment metrics do, per centre_page.py v15), pass
+    // them through to the new _kintellEventAnnotation plugin via opts.
+    if (p && p.centre_events && p.centre_events.length) {
+      if (!opts.plugins) opts.plugins = {};
+      opts.plugins.kintellEventAnnotation = { events: p.centre_events };
+    }
+
+    _CHART_INSTANCES[canvasId] = new Chart(el, {
+      type: "line",
+      data: { labels, datasets: [dataset] },
+      options: opts,
+      plugins: [_kintellCrosshair, _kintellEventAnnotation],
+    });
+  });
+
+  return `
+    ${topStrip}
+    <div id="readout-${canvasId}" style="height:18px;font-size:12.5px;line-height:18px;color:var(--text);margin-top:10px;margin-bottom:4px;padding:0 4px;">
+      <span style="color:var(--text-mute);font-style:italic;">hover the line to read values</span>
+    </div>
+    <div style="height:${canvasHeight}px;position:relative;">
+      <canvas id="${canvasId}"></canvas>
+    </div>
+  `;
+}
+
+// Layer 4.2-B cohort distribution histogram. 20 equal-width bins of
+// raw_value across the cohort, with this SA2's bin highlighted. Reads
+// p.cohort_distribution from the payload (built server-side by
+// _cohort_distribution in centre_page.py per Decision D2).
+function _renderCohortHistogram(p) {
+  const dist = p && p.cohort_distribution;
+  if (!dist || !dist.bins || !dist.bins.length) return "";
+
+  const bins = dist.bins;
+  const maxCount = bins.reduce((m, b) => Math.max(m, b.count || 0), 0);
+  if (maxCount === 0) return "";
+  const selfBin = (dist.self_bin != null) ? dist.self_bin : -1;
+
+  // Each bar: height proportional to count/maxCount, bottom-aligned
+  const barHtml = bins.map((b, i) => {
+    const isSelf = (i === selfBin);
+    const heightPct = ((b.count || 0) / maxCount) * 100;
+    const bg = isSelf ? "var(--accent)" : "rgba(74,158,255,0.20)";
+    const titleTxt = `${b.bin_min.toFixed(2)} – ${b.bin_max.toFixed(2)}: ${b.count} SA2${b.count === 1 ? "" : "s"}${isSelf ? "  ← this SA2" : ""}`;
+    return `<div title="${htmlEscape(titleTxt)}" style="flex:1;min-width:6px;height:${heightPct.toFixed(1)}%;background:${bg};border-radius:1px 1px 0 0;${isSelf ? "box-shadow:0 0 0 1px var(--accent);" : ""}"></div>`;
+  }).join("");
+
+  const cohortNote = `cohort distribution · n=${dist.cohort_n} · range ${dist.min.toFixed(0)}–${dist.max.toFixed(0)}`;
+
+  // v3.24: explainer text added below histogram (centred); cohort
+  // note alignment changed from right to centre to match.
+  const explainerTxt = "Distribution of values across the peer cohort. The highlighted bar shows where this SA2 sits; the decile strip below converts that position to the 1–10 scale.";
+  return `
+    <div style="margin-top:8px;">
+      <div style="display:flex;align-items:flex-end;gap:1px;height:30px;background:transparent;">
+        ${barHtml}
+      </div>
+      <div style="font-size:11px;color:var(--text-mute);font-style:italic;line-height:1.45;margin-top:6px;text-align:center;">
+        ${htmlEscape(explainerTxt)}
+      </div>
+      <div style="font-size:9.5px;color:var(--text-mute);letter-spacing:0.04em;margin-top:4px;text-align:center;">
+        ${htmlEscape(cohortNote)}
+      </div>
+    </div>
+  `;
+}
+
+// Layer 4.2-B: gradient strip. Single-hue blue ramp per Decision D2 —
+// duller blue tints on non-active cells (low/mid/high), full --accent
+// outline on the SA2's cell. Pure positional gradient — no valence.
+function _renderDecileStrip(decile) {
+  const cells = [];
+  // Per-decile background tones (RGBA, --accent decomposed = 74,158,255).
+  // Bottom band ~6%, mid ~13%, top ~20%. Visible at a glance, dull
+  // enough not to compete with the SA2's full-saturation cell.
+  const TONE_BY_DECILE = {
+    1: 0.06, 2: 0.06, 3: 0.06,
+    4: 0.13, 5: 0.13, 6: 0.13,
+    7: 0.20, 8: 0.20, 9: 0.20, 10: 0.20,
+  };
+  for (let d = 1; d <= 10; d++) {
+    const isHere = (d === decile);
+    const tone = TONE_BY_DECILE[d];
+    const baseStyle =
+      "flex:1;min-width:18px;height:24px;" +
+      `background:rgba(74,158,255,${tone});` +
+      "border:1px solid var(--border);display:flex;align-items:center;" +
+      "justify-content:center;font-size:10px;color:var(--text-mute);" +
+      "font-variant-numeric:tabular-nums;border-radius:2px;";
+    const hereStyle = isHere
+      ? "border:2px solid var(--accent);box-shadow:inset 0 0 0 1px var(--accent);" +
+        "color:var(--text);font-weight:700;background:rgba(74,158,255,0.32);"
+      : "";
+    // Slight gap between bands (3↔4, 6↔7) — band dividers are structural.
+    const gapBefore = (d === 4 || d === 7) ? "margin-left:6px;" : "";
+    cells.push(
+      `<div title="Decile ${d}" style="${baseStyle}${hereStyle}${gapBefore}">${d}</div>`
+    );
+  }
+  return `<div style="display:flex;gap:2px;margin-top:8px;">${cells.join("")}</div>`;
+}
+
+// ── v3.24: Mini decile strip for inline use in fact rows ─────────────
+//
+// Compact version of _renderDecileStrip — same colour grammar (per-
+// decile tones 6%/13%/20%, accent fill + outline on active cell,
+// structural gaps between deciles 3-4 and 6-7) but inline-sized
+// (6px wide cells, 10px tall, no number labels). Designed to sit
+// beside a numeric value in a fact row without claiming vertical
+// space. Returns "" when decile is null.
+//
+// Used by the SEIFA decile fact in the Catchment section. Could be
+// reused for any future "decile-as-fact" surface (e.g. ARIA band).
+function _renderMiniDecileStrip(decile) {
+  if (decile == null) return "";
+  const TONE_BY_DECILE = {
+    1: 0.06, 2: 0.06, 3: 0.06,
+    4: 0.13, 5: 0.13, 6: 0.13,
+    7: 0.20, 8: 0.20, 9: 0.20, 10: 0.20,
+  };
+  const cells = [];
+  for (let d = 1; d <= 10; d++) {
+    const isHere = (d === decile);
+    const tone = TONE_BY_DECILE[d];
+    const baseStyle =
+      "display:inline-block;width:6px;height:10px;" +
+      `background:rgba(74,158,255,${tone});` +
+      "border-radius:1px;vertical-align:middle;";
+    const hereStyle = isHere
+      ? "background:var(--accent);box-shadow:0 0 0 1px var(--accent);"
+      : "";
+    const gapBefore = (d === 4 || d === 7) ? "margin-left:3px;"
+                    : (d === 1 ? "" : "margin-left:1px;");
+    cells.push(`<span title="Decile ${d}${isHere ? ' (this SA2)' : ''}" style="${baseStyle}${hereStyle}${gapBefore}"></span>`);
+  }
+  return `<span style="display:inline-flex;align-items:center;margin-left:8px;vertical-align:middle;">${cells.join("")}</span>`;
+}
+
+function _renderBandChips(metric, p) {
+  const bands = ["low", "mid", "high"];
+  // Sub-pass 4.3.7 — perspective-aware band copy lookup. For non-
+  // reversible metrics this just returns p.band_copy unchanged. For
+  // reversible metrics in inverse perspective, returns the locked
+  // template per DEC-74.
+  const bc = _bandCopyForPerspective(metric, p);
+  return `
+    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+      ${bands.map(b => {
+        const isActive = (b === p.band);
+        const color = isActive ? "var(--text)" : "var(--text-dim)";
+        const borderColor = isActive ? "var(--accent)" : "var(--border)";
+        const fontWeight = isActive ? "600" : "400";
+        const text = bc[b] || b;
+        const labelPrefix = `<span style="color:var(--text-mute);font-size:9.5px;letter-spacing:0.06em;text-transform:uppercase;font-weight:700;margin-right:4px;">${b}</span>`;
+        return `<span style="font-size:11.5px;background:var(--panel-2);` +
+               `border:1px solid ${borderColor};padding:2px 8px;` +
+               `border-radius:99px;color:${color};font-weight:${fontWeight};` +
+               `display:inline-flex;align-items:center;">` +
+               `${labelPrefix}${htmlEscape(text)}</span>`;
+      }).join("")}
+    </div>
+  `;
+}
+
+// ── Layer 4.3 sub-pass 4.3.8 — inline intent copy ───────────────────
+//
+// Reads p.intent_copy from the payload (set by centre_page.py v6 from
+// the LAYER3_METRIC_INTENT_COPY constant). Renders a single italic
+// muted-color line beneath the band chips. Silent if no entry — P-2
+// honest absence; future metrics pick up copy automatically by adding
+// to the constant in centre_page.py.
+//
+// Visual treatment matches the "as at YYYY" stamp pattern used in
+// Lite rows: 11px italic, --text-mute. Sits below the visual data
+// signal (chips, decile strip, histogram) and above the DER+COM
+// badges, so the eye scans data first then reads framing.
+function _renderIntentCopy(p) {
+  const copy = p && p.intent_copy;
+  if (!copy) return "";
+  return `
+    <div style="margin-top:8px;font-size:11.5px;font-style:italic;color:var(--text-mute);line-height:1.5;">
+      ${htmlEscape(String(copy))}
+    </div>
+  `;
+}
+
+// ── v3.22 (OI-32) — "About this measure" panel for Position rows ─────
+//
+// Renders p.about_data as a permanent visible explainer panel inside
+// _renderFullRow, below the italic intent_copy line and above the
+// DER/COM badge row. Visual style mirrors the workforce row about_data
+// block (v3.17): subtle background, left border, uppercase label.
+//
+// Format conventions (mirrored on Python side, LAYER3_METRIC_ABOUT_DATA):
+//   - Plain text only (htmlEscape applied here)
+//   - "\n\n" splits into separate paragraph divs (visual gap)
+//   - "\n" within a paragraph splits into <br> lines (tight)
+//
+// Silent absence per P-2: returns "" when p.about_data is null or
+// empty after trimming. Currently populated only for the 4 Full-weight
+// catchment metrics (sa2_supply_ratio, sa2_child_to_place,
+// sa2_demand_supply, sa2_adjusted_demand); other Position metrics
+// see no panel until copy is added on the Python side.
+function _renderAboutData(p) {
+  const txt = p && p.about_data;
+  if (!txt) return "";
+  const paragraphs = String(txt)
+    .split("\n\n")
+    .map(s => s.trim())
+    .filter(Boolean);
+  if (paragraphs.length === 0) return "";
+  const body = paragraphs.map((par, i) => {
+    const lines = par
+      .split("\n")
+      .map(s => htmlEscape(s.trim()))
+      .filter(Boolean)
+      .join("<br>");
+    const mt = (i === 0) ? "0" : "6px";
+    return `<div style="margin-top:${mt};">${lines}</div>`;
+  }).join("");
+  return `
+    <div style="margin-top:10px;padding:8px 10px;background:rgba(255,255,255,0.02);border-radius:4px;border-left:2px solid var(--border);font-size:12.5px;color:var(--text-mute);line-height:1.5;">
+      <div style="font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:10px;color:var(--text-dim);margin-bottom:6px;">About this measure</div>
+      ${body}
+    </div>
+  `;
+}
+
+// ── Layer 4.3 sub-pass 4.3.7 — perspective toggle (DEC-74) ──────────
+//
+// Infrastructure for the per-row perspective toggle that swaps a
+// reversible ratio's framing at render time. In V1 this sits inert
+// because no metric in the registry carries reversible:true. The
+// catchment ratios from Layer 4.2-A.3 will arrive with the field set
+// — at which point this toggle activates per row with no further
+// renderer changes.
+//
+// Reversible pairs (DEC-74):
+//   supply_ratio (high_is_concerning) ↔ child_to_place (high_is_positive)
+//   demand_supply (high_is_positive)  ↔ demand_supply_inv (high_is_concerning)
+//
+// State is kept in module-local memory keyed by metric. Default reads
+// from p.default_perspective; toggle button flips between the two
+// perspectives. No persistence across page loads in V1.
+//
+// Locked band-copy templates per DEC-74. The template per direction
+// is fixed: when the renderer swaps perspective, the band copy swaps
+// with it rather than reading stale text. Templates are merged with
+// the metric's own band_copy (centre_page.py side) at render time —
+// the registry's band_copy is for the metric's DEFAULT perspective;
+// the inverse perspective uses the locked template below.
+const _PERSPECTIVE_STATE = {};   // metric -> 'forward' | 'inverse'
+
+const _PERSPECTIVE_BAND_COPY_TEMPLATES = {
+  // Direction-keyed locked templates per DEC-74.
+  high_is_concerning: {
+    low:  "low — limited stress",
+    mid:  "moderate",
+    high: "elevated — flag for review",
+  },
+  high_is_positive: {
+    low:  "thin — caution",
+    mid:  "moderate",
+    high: "strong — supportive signal",
+  },
+};
+
+function _activePerspective(metric, p) {
+  if (!p?.reversible) return "forward";
+  return _PERSPECTIVE_STATE[metric] || (p.default_perspective || "forward");
+}
+
+function _togglePerspective(metric, ev) {
+  if (ev) ev.stopPropagation();
+  const cur = _PERSPECTIVE_STATE[metric] || "forward";
+  _PERSPECTIVE_STATE[metric] = (cur === "forward") ? "inverse" : "forward";
+  // Re-render the page — same single-shot render path used by the
+  // global trend-window bar, so this picks up cleanly.
+  if (typeof _LAST_CENTRE !== "undefined" && _LAST_CENTRE) {
+    render(_LAST_CENTRE);
+  }
+}
+
+function _renderPerspectiveToggle(metric, p) {
+  if (!p?.reversible) return "";
+  const labels = p.perspective_labels || { forward: "Forward", inverse: "Inverse" };
+  const active = _activePerspective(metric, p);
+  const fwdActive = (active === "forward");
+  return `
+    <span style="display:inline-flex;gap:4px;align-items:center;font-size:11px;">
+      <button class="range-btn${fwdActive ? " active" : ""}"
+              onclick="_togglePerspective('${metric}', event)"
+              title="Switch perspective">
+        ${htmlEscape(labels.forward || "Forward")}
+      </button>
+      <span style="color:var(--text-mute);">/</span>
+      <button class="range-btn${!fwdActive ? " active" : ""}"
+              onclick="_togglePerspective('${metric}', event)"
+              title="Switch perspective">
+        ${htmlEscape(labels.inverse || "Inverse")}
+      </button>
+    </span>
+  `;
+}
+
+// Returns the band-copy dict for the active perspective. If perspective
+// is 'forward' (or metric isn't reversible), uses the metric's own
+// band_copy. If 'inverse', uses the locked template for the INVERTED
+// direction (high_is_concerning becomes high_is_positive and vice versa).
+function _bandCopyForPerspective(metric, p) {
+  const active = _activePerspective(metric, p);
+  if (!p?.reversible || active === "forward") {
+    return p?.band_copy || {};
+  }
+  // Inverse perspective: flip direction
+  const inverseDirection = (p.direction === "high_is_concerning")
+    ? "high_is_positive" : "high_is_concerning";
+  return _PERSPECTIVE_BAND_COPY_TEMPLATES[inverseDirection] || {};
+}
+
+// ── Layer 4.3 sub-pass 4.3.6 — row_weight switch (DEC-75) ───────────
+//
+// Three row weights, set per-metric on the registry in centre_page.py
+// and propagated onto every payload entry as p.row_weight:
+//
+//   "full"    — trajectory + cohort histogram + decile strip + chips
+//               (the existing template; default for unknown values)
+//   "lite"    — decile strip + chips + "as at YYYY" stamp; no
+//               trajectory, no cohort histogram. For SA2-cohort metrics
+//               with <5 dense series points (LFP triplet — 3 Census
+//               points is not a trajectory).
+//   "context" — single-fact line + period stamp; no decile, no chips,
+//               no cohort histogram. For state-level / national metrics
+//               with no SA2 peer cohort. Currently dormant in the
+//               Position-row code path: the only context-weighted
+//               metric (jsa_vacancy_rate) is status='deferred' until
+//               sub-pass 4.3.9 relocates it to the Workforce supply
+//               context block (DEC-76).
+//
+// Switch lives inside the normal/low confidence branch — deferred /
+// unavailable / insufficient stubs are independent of row_weight.
+//
+// Future row classes (e.g. daily-rate) add a 4th branch with no
+// retrofit: row_weight is a string, the switch has explicit cases,
+// and the default-to-"full" fallback keeps unknown values rendering.
+
+function renderPositionRow(metric, p) {
+  if (!p) return "";
+  const baseDisplay = htmlEscape(p.display || metric);
+  const conf = p.confidence || "unavailable";
+
+  // Short cohort label for the metric title — only when there's a cohort.
+  // Deferred rows get no label (no cohort yet); unavailable rows get none
+  // (no row to band against). Insufficient rows DO get one — the cohort
+  // is known, we're just suppressing the strip because n<10.
+  const cohortShort = (conf === "deferred" || conf === "unavailable")
+    ? ""
+    : _buildCohortShortLabel(p);
+  const display = cohortShort
+    ? `${baseDisplay} <span style="color:var(--text-mute);font-size:11.5px;font-weight:400;">(${htmlEscape(cohortShort)})</span>`
+    : baseDisplay;
+
+  // Deferred slot — coming-next placeholder
+  if (conf === "deferred") {
+    return `
+      <div class="fact" style="opacity:.55;">
+        <span class="k">${display}</span>
+        <span class="v">
+          <span style="color:var(--text-mute);font-style:italic;font-size:12px;">
+            (coming next)
+          </span>
+        </span>
+      </div>
+    `;
+  }
+
+  // No Layer 3 row for this SA2 / metric
+  if (conf === "unavailable") {
+    // Layer 4.3 Thread A: improved empty-state for SALM-missing SA2s.
+    // SALM (ABS Small Area Labour Markets) does not publish unemployment
+    // for every SA2 — small-population areas are suppressed. Replace the
+    // silent em-dash with a named reason for the unemployment row only.
+    // Other metrics retain the em-dash; their missing-data causes differ
+    // (Census-only series, deferred metrics) and warrant per-metric copy
+    // when those rows are revisited.
+    const isUnemployment = (metric === "sa2_unemployment_rate");
+    const fallback = isUnemployment
+      ? `<span style="color:var(--text-mute);font-style:italic;font-size:11.5px;">
+           SALM does not publish at this SA2 (small-population suppression)
+         </span>`
+      : `<span style="color:var(--text-mute);font-style:italic;font-size:12px;">—</span>`;
+    return `
+      <div class="fact">
+        <span class="k">${display}</span>
+        <span class="v">${fallback}</span>
+      </div>
+    `;
+  }
+
+  const rawStr = _formatPositionValue(p);
+  const periodStr = _formatPositionPeriod(p);
+  const periodTag = periodStr
+    ? `<span style="color:var(--text-mute);font-size:11px;">(${htmlEscape(periodStr)})</span>`
+    : "";
+
+  // OBS badge for the raw value (NOW)
+  const obsBadge = renderBadge("OBS", { source: p.source || "—" }, true);
+
+  // cn < 10 — suppress the strip, keep the value + suppression notice
+  if (conf === "insufficient") {
+    return `
+      <div style="padding:10px 0;border-bottom:1px dashed var(--border);">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;">
+          <span style="color:var(--text-dim);font-size:13px;">${display}</span>
+          <span style="display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+            <b style="font-variant-numeric:tabular-nums;color:var(--text);font-weight:500;">${rawStr}</b>
+            ${periodTag}
+            ${obsBadge}
+          </span>
+        </div>
+        <div style="color:var(--text-mute);font-style:italic;font-size:11.5px;margin-top:6px;">
+          insufficient peer cohort (n=${p.cohort_n}) — peer comparison suppressed
+        </div>
+      </div>
+    `;
+  }
+
+  // ── Normal / low: row_weight switch (DEC-75) ──────────────────────
+  const weight = p.row_weight || "full";
+  const ctx = { display, rawStr, periodStr, periodTag, obsBadge, metric };
+  if (weight === "lite")    return _renderLiteRow(p, ctx);
+  if (weight === "context") return _renderContextRow(p, ctx);
+  return _renderFullRow(p, ctx); // "full" + default fallback
+}
+
+// ── Full row (the existing template, unchanged behaviour) ───────────
+function _renderFullRow(p, ctx) {
+  const decile = p.decile;
+  const band = p.band || "mid";
+  const cohortLine = `n=${p.cohort_n}`;
+  const conf = p.confidence || "unavailable";
+  const lowConfPill = (conf === "low")
+    ? `<span style="background:var(--amber-bg);color:var(--amber);font-size:10px;` +
+      `font-weight:600;padding:1px 6px;border-radius:3px;letter-spacing:.04em;` +
+      `margin-left:6px;">low confidence</span>`
+    : "";
+
+  const headlineHtml =
+    `<b style="color:var(--text);font-weight:600;">Decile ${decile}</b> ` +
+    `<span style="color:var(--text-mute);">·</span> ` +
+    `<span style="color:var(--text-dim);">${htmlEscape(band)}</span> ` +
+    `<span style="color:var(--text-mute);">·</span> ` +
+    `<span style="color:var(--text-mute);font-size:11.5px;">${cohortLine}</span>` +
+    `${lowConfPill}`;
+
+  const derBadge = renderBadge("DER", {
+    source: `<code>layer3_sa2_metric_banding</code> (cohort_def=<code>${htmlEscape(p.cohort_def || "")}</code>, key=<code>${htmlEscape(p.cohort_key || "")}</code>)`,
+    rule: htmlEscape(p.cohort_label || ""),
+    formula: "decile = NTILE(10) within cohort; band = low (1–3) / mid (4–6) / high (7–10).",
+    inputs: `<code>raw_value=${htmlEscape(String(p.raw_value))}</code>, <code>percentile=${htmlEscape(String((p.percentile != null) ? Number(p.percentile).toFixed(1) : ""))}</code>`,
+    calibration: _buildCalibrationRow(p),
+    threshold: "Suppress if cohort_n < 10; low-confidence pill if 10 ≤ cohort_n < 20."
+  }, true);
+  const comBadge = renderBadge("COM", {
+    rule: `band-copy from <code>LAYER3_METRIC_META[${htmlEscape(ctx.metric)}].band_copy["${htmlEscape(band)}"]</code>`,
+    source: "Rule-based, see centre_page.py LAYER3_METRIC_META."
+  }, true);
+
+  return `
+    <div style="padding:10px 0;border-bottom:1px dashed var(--border);">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">
+        <span style="color:var(--text-dim);font-size:13px;">${ctx.display}</span>
+        <span style="display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+          ${_renderPerspectiveToggle(ctx.metric, p)}
+          <b style="font-variant-numeric:tabular-nums;color:var(--text);font-weight:500;">${ctx.rawStr}</b>
+          ${ctx.periodTag}
+          ${ctx.obsBadge}
+        </span>
+      </div>
+      ${_renderTrajectory(ctx.metric, p)}
+      <div style="margin-top:6px;font-size:12px;">${headlineHtml}</div>
+      ${_renderCohortHistogram(p)}
+      ${_renderDecileStrip(decile)}
+      ${_renderBandChips(ctx.metric, p)}
+      ${_renderIndustryBand(p)}
+      ${_renderIntentCopy(p)}
+      ${_renderAboutData(p)}
+      <div style="margin-top:8px;display:flex;justify-content:flex-end;gap:6px;">
+        ${derBadge}
+        ${comBadge}
+      </div>
+    </div>
+  `;
+}
+
+// ── Layer 4.2-A.3b: industry-absolute band line ──────────────
+//
+// Renders BELOW the local-relative band chips. Two lenses on
+// the same data: chips show "where this SA2 sits vs same-state
+// same-remoteness peers" (decile 1-10); industry band shows
+// "where this SA2 sits in absolute industry terms" (PC + RSI
+// + Credit Committee Brief grounded thresholds).
+//
+// Silent absence: if p.industry_band is null (metric not opted
+// in to industry thresholds, or raw_value is null), renders
+// nothing. Honest absence per P-2.
+function _renderIndustryBand(p) {
+  if (!p || !p.industry_band) return "";
+  const label = htmlEscape(p.industry_band_label || p.industry_band);
+  const note  = htmlEscape(p.industry_band_note || "");
+  // Match band key to a subtle accent. Direction-aware where
+  // possible: "saturated"/"soft"/"desert" lean cautionary;
+  // "well_served"/"strong"/"viable" lean positive; midbands
+  // stay neutral. Palette stays muted per design §11.2.
+  const cautionKeys  = ["saturated", "soft", "desert",
+                         "undersupplied", "severe", "constrained"];
+  const positiveKeys = ["well_served", "strong", "viable",
+                         "at_target", "excess_capacity"];
+  let pill;
+  if (cautionKeys.includes(p.industry_band)) {
+    pill = `<span style="background:rgba(224,92,58,0.10);color:var(--amber,#d8b050);border:1px solid rgba(224,92,58,0.25);padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;">${label}</span>`;
+  } else if (positiveKeys.includes(p.industry_band)) {
+    pill = `<span style="background:rgba(122,197,122,0.10);color:var(--ok,#7ac57a);border:1px solid rgba(122,197,122,0.25);padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;">${label}</span>`;
+  } else {
+    pill = `<span style="background:rgba(180,200,230,0.06);color:var(--text-dim);border:1px solid rgba(180,200,230,0.15);padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;">${label}</span>`;
+  }
+  return `
+    <div style="margin-top:8px;padding:6px 8px;background:rgba(255,255,255,0.02);border-radius:4px;border-left:2px solid var(--border);">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--text-mute);">
+        <span style="font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:10px;">Industry</span>
+        ${pill}
+      </div>
+      ${note ? `<div style="margin-top:3px;font-size:11px;color:var(--text-mute);font-style:italic;">${note}</div>` : ""}
+    </div>
+  `;
+}
+
+// ── Lite row (DEC-75) ───────────────────────────────────────────────
+// Decile strip + chips + "as at YYYY" stamp. NO trajectory, NO cohort
+// histogram. Honest absence (P-2) — the SA2 still has a peer-position,
+// but the underlying data is too thin to justify a trajectory chart or
+// a cohort distribution view.
+
+// ── OI-36b (centre.html v3.27): delta badge for Lite rows ────────────
+//
+// Lite metrics (LFP triplet, median household income, sa2_nes_share)
+// have a trajectory array in the payload but render no chart per
+// DEC-75 (3 Census points or fewer is not a continuous series). A
+// small delta badge surfaces the headline first-to-last change so
+// the slow-moving demographic shifts (NES +9.5pp 2011-2021, etc.)
+// are visible at a glance.
+//
+// Always-show variant (P1). Window-aware variant (P2) is banked —
+// existing _setTrajectoryRange doesn't trigger a page re-render, so
+// window-awareness on Lite rows would need new event-subscription
+// wiring beyond today's scope.
+//
+// Returns "" silently when:
+//   - no trajectory in payload
+//   - fewer than 2 numeric points
+//   - earliest and latest periods cannot be year-extracted
+//   - delta is exactly zero (avoids "+0.0pp from 2011 to 2021" noise)
+//
+// Format dispatch by p.value_format:
+//   percent / percent_share  ->  "+9.5pp from 2011 to 2021"
+//   currency_aud             ->  "+$1,234 from 2018 to 2022"
+//   other                    ->  "+0.04× from 2011 to 2021"
+function _renderLiteDelta(p) {
+  const traj = (p && p.trajectory) || [];
+  if (traj.length < 2) return "";
+
+  // First and last numeric points (skip nulls per Census triplet
+  // pattern where one period may be missing).
+  const numericPts = traj.filter(pt => pt && pt.value != null
+                                       && !isNaN(Number(pt.value)));
+  if (numericPts.length < 2) return "";
+
+  const first = numericPts[0];
+  const last  = numericPts[numericPts.length - 1];
+  const firstYear = _yearOfPeriod(first.period);
+  const lastYear  = _yearOfPeriod(last.period);
+  if (isNaN(firstYear) || isNaN(lastYear) || firstYear === lastYear) {
+    return "";
+  }
+
+  const delta = Number(last.value) - Number(first.value);
+  if (delta === 0) return "";
+
+  const sign = delta > 0 ? "+" : "";
+  const fmt = p.value_format || "";
+  let deltaStr;
+  if (fmt === "percent" || fmt === "percent_share") {
+    deltaStr = `${sign}${delta.toFixed(1)}pp`;
+  } else if (fmt === "currency_weekly" || fmt === "currency_annual") {
+    const rounded = Math.round(delta);
+    const abs = Math.abs(rounded).toLocaleString();
+    const suffix = (fmt === "currency_weekly") ? "/week" : "";
+    deltaStr = `${rounded < 0 ? "−" : "+"}$${abs}${suffix}`;
+  } else if (fmt === "ratio_x") {
+    deltaStr = `${sign}${delta.toFixed(2)}×`;
+  } else {
+    deltaStr = `${sign}${delta.toFixed(2)}`;
+  }
+
+  return `<span style="margin-left:8px;color:var(--text-dim);
+                       font-size:11px;font-weight:500;
+                       font-variant-numeric:tabular-nums;">
+            ${deltaStr} from ${firstYear} to ${lastYear}
+          </span>`;
+}
+
+function _renderLiteRow(p, ctx) {
+  const decile = p.decile;
+  const band = p.band || "mid";
+  const cohortLine = `n=${p.cohort_n}`;
+  const conf = p.confidence || "unavailable";
+  const lowConfPill = (conf === "low")
+    ? `<span style="background:var(--amber-bg);color:var(--amber);font-size:10px;` +
+      `font-weight:600;padding:1px 6px;border-radius:3px;letter-spacing:.04em;` +
+      `margin-left:6px;">low confidence</span>`
+    : "";
+
+  const headlineHtml =
+    `<b style="color:var(--text);font-weight:600;">Decile ${decile}</b> ` +
+    `<span style="color:var(--text-mute);">·</span> ` +
+    `<span style="color:var(--text-dim);">${htmlEscape(band)}</span> ` +
+    `<span style="color:var(--text-mute);">·</span> ` +
+    `<span style="color:var(--text-mute);font-size:11.5px;">${cohortLine}</span>` +
+    `${lowConfPill}`;
+
+  // "as at YYYY" stamp — derived from the most recent point in the
+  // trajectory series if present, otherwise from period_label / year
+  // on the entry. The trajectory data is still flowing through the
+  // payload for Lite metrics (LFP has 3 Census points); we just don't
+  // render it as a chart.
+  const asAtRaw = (p.trajectory && p.trajectory.length)
+    ? p.trajectory[p.trajectory.length - 1].period
+    : (p.period_label || p.year);
+  const asAtStamp = asAtRaw
+    ? `<div style="margin-top:6px;font-size:11px;color:var(--text-mute);font-style:italic;">
+         as at ${htmlEscape(String(asAtRaw))} · static snapshot, no trajectory
+       </div>`
+    : "";
+
+  const derBadge = renderBadge("DER", {
+    source: `<code>layer3_sa2_metric_banding</code> (cohort_def=<code>${htmlEscape(p.cohort_def || "")}</code>, key=<code>${htmlEscape(p.cohort_key || "")}</code>)`,
+    rule: htmlEscape(p.cohort_label || ""),
+    formula: "decile = NTILE(10) within cohort; band = low (1–3) / mid (4–6) / high (7–10). Lite weight per DEC-75: <5 dense series points, no trajectory rendered.",
+    inputs: `<code>raw_value=${htmlEscape(String(p.raw_value))}</code>, <code>percentile=${htmlEscape(String((p.percentile != null) ? Number(p.percentile).toFixed(1) : ""))}</code>`,
+    calibration: _buildCalibrationRow(p),
+    threshold: "Suppress if cohort_n < 10; low-confidence pill if 10 ≤ cohort_n < 20."
+  }, true);
+  const comBadge = renderBadge("COM", {
+    rule: `band-copy from <code>LAYER3_METRIC_META[${htmlEscape(ctx.metric)}].band_copy["${htmlEscape(band)}"]</code>`,
+    source: "Rule-based, see centre_page.py LAYER3_METRIC_META."
+  }, true);
+
+  return `
+    <div style="padding:10px 0;border-bottom:1px dashed var(--border);">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">
+        <span style="color:var(--text-dim);font-size:13px;">${ctx.display}</span>
+        <span style="display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+          <b style="font-variant-numeric:tabular-nums;color:var(--text);font-weight:500;">${ctx.rawStr}</b>
+          ${ctx.periodTag}
+          ${ctx.obsBadge}
+        </span>
+      </div>
+      <div style="margin-top:6px;font-size:12px;">${headlineHtml}</div>
+      ${_renderDecileStrip(decile)}
+      ${_renderBandChips(ctx.metric, p)}
+      ${_renderIndustryBand(p)}
+      ${asAtStamp}
+      ${_renderLiteDelta(p)}
+      ${_renderIntentCopy(p)}
+      <div style="margin-top:8px;display:flex;justify-content:flex-end;gap:6px;">
+        ${derBadge}
+        ${comBadge}
+      </div>
+    </div>
+  `;
+}
+
+// ── Context-only row (DEC-75) ───────────────────────────────────────
+// Single-fact line + period stamp. No band, no decile, no chips, no
+// histogram, no trajectory chart. For state-level / national metrics
+// with no SA2 peer cohort.
+//
+// In V1 this branch is dormant in the Position-row code path: the only
+// context-weighted metric (jsa_vacancy_rate) is status='deferred', so
+// it hits the deferred stub above. Sub-pass 4.3.9 (DEC-76) relocates
+// it to the Workforce supply context block, which has its own renderer.
+// This branch exists so the row_weight contract is complete and so any
+// future Position-row metric that needs context treatment renders
+// without retrofit.
+function _renderContextRow(p, ctx) {
+  const obsBadge = ctx.obsBadge;
+  // v3.18 (Layer 4.2-A.4): conditional DER on Context rows when
+  // calibration metadata is present (e.g., sa2_demand_share_state).
+  // No cohort/decile fields — Context has no peer cohort by design;
+  // this DER carries source + calibration only.
+  const _calibStr = _buildCalibrationRow(p);
+  const derBadge = _calibStr
+    ? renderBadge("DER", {
+        source: htmlEscape(p.source || ""),
+        calibration: _calibStr,
+      }, true)
+    : "";
+  return `
+    <div style="padding:10px 0;border-bottom:1px dashed var(--border);">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">
+        <span style="color:var(--text-dim);font-size:13px;">${ctx.display}</span>
+        <span style="display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+          <b style="font-variant-numeric:tabular-nums;color:var(--text);font-weight:500;">${ctx.rawStr}</b>
+          ${ctx.periodTag}
+          ${obsBadge}
+          ${derBadge}
+        </span>
+      </div>
+      <div style="margin-top:6px;font-size:11px;color:var(--text-mute);font-style:italic;">
+        state-level — no SA2 peer cohort
+      </div>
+      ${_renderIntentCopy(p)}
+    </div>
+  `;
+}
+
+// ── OI-23 fix (sub-pass 4.3.6): page-level trajectory range bar ─────
+//
+// The trend-window bar (DEC-73) was previously gated on Population-card
+// metrics having data. With Thread A's per-chart 1Y/2Y override on
+// unemployment, an SA2 with Labour-Market data but no live Population
+// metrics would lose the global control entirely. Promoting the bar
+// to page level above both cards fixes that.
+//
+// Visibility gate: render the bar whenever ANY Full-weight row on the
+// page carries trajectory data. Lite and Context-only rows have no
+// trajectory by design, so they are ignored. If no Full row has data,
+// the bar hides — there is nothing for it to control.
+function _pageHasFullTrajectory(centre) {
+  const pos = (centre && centre.position) || {};
+  for (const card of ["population", "labour_market"]) {
+    const cardPos = pos[card] || {};
+    for (const k of Object.keys(cardPos)) {
+      const e = cardPos[k];
+      if (!e) continue;
+      const weight = e.row_weight || "full";
+      if (weight !== "full") continue;
+      if (e.trajectory && e.trajectory.length) return true;
+    }
+  }
+  return false;
+}
+
+// ── Layer 4.2-A.3: Catchment position card (headline credit signal) ──
+//
+// Renders 5 catchment metrics with peer banding. supply_ratio
+// and demand_supply carry the DEC-74 perspective toggle.
+// demand_share_state is row_weight=context (rank-by-construction;
+// no peer cohort).
+function renderCatchmentPositionCard(centre) {
+  const pos = (centre.position && centre.position.catchment_position) || {};
+  // Layer 4.4 A10/C8 — Catchment Position card now hosts the Demographic
+  // Mix sub-panel below the credit-signal block. Sub-panel divider
+  // separates the two visual groups; top-3 country-of-birth context
+  // line renders below sa2_overseas_born_share.
+  const creditMetrics = [
+    "sa2_supply_ratio",
+    "sa2_demand_supply",
+    "sa2_child_to_place",
+    "sa2_adjusted_demand",
+    "sa2_demand_share_state",
+  ];
+  const demoMetrics = [
+    "sa2_nes_share",
+    "sa2_atsi_share",
+    "sa2_overseas_born_share",
+    "sa2_single_parent_family_share",
+    // Layer 4.4 A3 + Stream C — appended 2026-05-10
+    "sa2_parent_cohort_25_44_share",
+    "sa2_partnered_25_44_share",
+    "sa2_women_35_44_with_child_share",
+    "sa2_women_25_34_with_child_share",
+  ];
+  const order = [...creditMetrics, ...demoMetrics];
+  const hasAny = order.some(k => {
+    const e = pos[k];
+    return e && !["unavailable", "deferred"].includes(e.confidence);
+  });
+  const demoHasAny = demoMetrics.some(k => {
+    const e = pos[k];
+    return e && !["unavailable", "deferred"].includes(e.confidence);
+  });
+
+  const renderDemoRow = (k) => {
+    const row = renderPositionRow(k, pos[k]);
+    if (k === "sa2_nes_share") {
+      return row + _renderTopNLanguagesAtHome(centre);
+    }
+    if (k === "sa2_overseas_born_share") {
+      return row + _renderTopNCountriesOfBirth(centre);
+    }
+    return row;
+  };
+
+  const demoBlock = demoHasAny
+    ? `<div class="demographic-mix-divider" style="
+         margin: 18px 0 10px;
+         padding-top: 14px;
+         border-top: 1px dashed var(--border);
+       ">
+         <div style="font-size:12.5px;font-weight:600;color:var(--text);letter-spacing:0.02em;">
+           Demographic mix
+           <span class="note" style="font-weight:400;font-size:11px;margin-left:8px;">
+             SA2 peer position &mdash; community context
+           </span>
+         </div>
+       </div>
+       ${demoMetrics.map(renderDemoRow).join("")}`
+    : "";
+
+  return `
+    <section class="op-section">
+      <h3>Catchment position <span class="note">SA2 peer position — credit signal</span></h3>
+      ${hasAny
+        ? creditMetrics.map(k => renderPositionRow(k, pos[k])).join("") + demoBlock
+        : `<div class="placeholder">Catchment-position metrics
+            <span class="will-show">Will show: supply ratio, demand vs supply, children per place, adjusted demand, share of state demand, plus a Demographic mix sub-panel (NES, ATSI, overseas-born, single-parent-family) — all banded against same-state and same-remoteness peer cohorts.</span>
+          </div>`
+      }
+    </section>
+  `;
+}
+
+// Layer 4.4 A10/C8 — top-3 country-of-birth context line. Reads from
+// centre.community_profile (populated by _build_community_profile in
+// centre_page.py). Display-only context; no banding, no calibration
+// influence per design D-A2. Silent absence (P-2) when payload is empty.
+function _renderTopNCountriesOfBirth(centre) {
+  const cp = centre && centre.community_profile;
+  const list = cp && cp.country_of_birth_top_n;
+  return _renderTopNContext(
+    list,
+    "Top countries of birth (2021)",
+    "country"
+  );
+}
+
+// Layer 4.4 A10/C8 follow-up — top-3 language-at-home context line,
+// shown directly below the NES row. Same display contract as the
+// country-of-birth line above.
+function _renderTopNLanguagesAtHome(centre) {
+  const cp = centre && centre.community_profile;
+  const list = cp && cp.language_at_home_top_n;
+  return _renderTopNContext(
+    list,
+    "Top languages at home (2021)",
+    "language"
+  );
+}
+
+// Shared renderer for top-N context lines (country of birth + language
+// at home). Mid-grey panel with dashed left border; reads `key` field
+// off each list entry.
+function _renderTopNContext(list, label, key) {
+  if (!Array.isArray(list) || !list.length) return "";
+  const items = list
+    .filter(r => r && typeof r.share_pct === "number")
+    .map(r => `${htmlEscape(String(r[key] || ""))} ${r.share_pct.toFixed(1)}%`)
+    .join(" &middot; ");
+  if (!items) return "";
+  return `<div class="topn-context" style="
+            font-size:11.5px;
+            color:var(--text-dim);
+            padding:6px 0 4px 12px;
+            margin:-6px 0 10px 4px;
+            border-left:2px solid var(--border);
+          ">
+    <span style="font-weight:600;letter-spacing:0.02em;color:var(--text);">${htmlEscape(label)}:</span>
+    ${items}
+  </div>`;
+}
+
+function renderPopulationCard(centre) {
+  const pos = (centre.position && centre.position.population) || {};
+  const order = [
+    "sa2_under5_count",
+    "sa2_total_population",
+    "sa2_births_count",
+    "sa2_under5_growth_5y",
+  ];
+  // True if at least one slot has live Layer 3 data
+  const hasAny = order.some(k => {
+    const e = pos[k];
+    return e && !["unavailable", "deferred"].includes(e.confidence);
+  });
+
+  // OI-23 fix (sub-pass 4.3.6): the trend-window bar is no longer
+  // rendered inside this card. It is promoted to page level by
+  // render() so it remains reachable when a Labour-Market metric
+  // (e.g. unemployment) has data while Population metrics do not.
+  return `
+    <section class="op-section">
+      <h3>Population <span class="note">SA2 peer position</span></h3>
+      ${hasAny
+        ? order.map(k => renderPositionRow(k, pos[k])).join("")
+        : `<div class="placeholder">SA2 peer-position metrics
+            <span class="will-show">Will show: under-5 population, total population, births,
+            and 5-year growth — banded against same-state and same-remoteness peer cohorts.</span>
+          </div>`
+      }
+      <div class="placeholder" style="margin-top:14px;font-size:11.5px;border-top:1px dashed var(--border);padding-top:10px;">
+        Trajectory band (5y CAGR, 10y sparkline, births trend)
+        <span class="will-show">arriving in the next Layer 4 pass.</span>
+      </div>
+    </section>
+  `;
+}
+
+// Layer 4.4 A4 — Education infrastructure card (DEC-82 first direct-primary-source ingest).
+// Hosts ACARA School Profile + Location-derived signals at SA2 level. New top-level
+// Position card alongside Catchment position / Population / Labour Market.
+// Three Lite rows in V1; sector breakdowns (5 more banded ACARA metrics) sit in
+// the DB ready for V2 expansion / Excel export / group page.
+function renderEducationInfrastructureCard(centre) {
+  const pos = (centre.position && centre.position.education_infrastructure) || {};
+  const order = [
+    "sa2_school_count_total",
+    "sa2_school_enrolment_total",
+    "sa2_school_enrolment_govt_share",
+  ];
+  const hasAny = order.some(k => {
+    const e = pos[k];
+    return e && !["unavailable", "deferred"].includes(e.confidence);
+  });
+
+  return `
+    <section class="op-section">
+      <h3>Education infrastructure <span class="note">SA2 peer position &mdash; institutional context</span></h3>
+      ${hasAny
+        ? order.map(k => renderPositionRow(k, pos[k])).join("")
+        : `<div class="placeholder">Education infrastructure metrics
+            <span class="will-show">Will show: schools in catchment, total student enrolment, and government-school enrolment share &mdash; all banded against same-state and same-remoteness peer cohorts. ACARA-sourced; 18-year trajectory.</span>
+          </div>`
+      }
+    </section>
+  `;
+}
+
+function renderLabourMarketCard(centre) {
+  const pos = (centre.position && centre.position.labour_market) || {};
+  const order = [
+    "sa2_unemployment_rate",
+    "sa2_median_employee_income",
+    "sa2_median_household_income",
+    "sa2_median_total_income",
+    "sa2_lfp_persons",
+    "sa2_lfp_females",
+    "sa2_lfp_males",
+    "jsa_vacancy_rate",
+  ];
+  const hasAny = order.some(k => {
+    const e = pos[k];
+    return e && !["unavailable", "deferred"].includes(e.confidence);
+  });
+
+  return `
+    <section class="op-section">
+      <h3>Labour market <span class="note">SA2 peer position</span></h3>
+      ${hasAny
+        ? order.map(k => renderPositionRow(k, pos[k])).join("")
+        : `<div class="placeholder">SA2 peer-position metrics
+            <span class="will-show">Will show: unemployment, the income trio, the LFP triplet,
+            and JSA vacancy rate — banded against the relevant peer cohort.</span>
+          </div>`
+      }
+      <div class="placeholder" style="margin-top:14px;font-size:11.5px;border-top:1px dashed var(--border);padding-top:10px;">
+        Trajectory band (12m delta, 36m sparkline, decadal LFP trajectory, JSA trend)
+        <span class="will-show">arriving in the next Layer 4 pass.</span>
+      </div>
+    </section>
+  `;
+}
+
+// ── Workforce supply context block (DEC-76, sub-pass 4.3.9) ─────────
+//
+// Default-open page-level block alongside Population and Labour Market.
+// 4 rows from the workforce_supply payload:
+//   1. Child carer vacancy index (ANZSCO 4211) — JSA IVI, state-monthly
+//   2. Early childhood teacher vacancy index (ANZSCO 2411) — JSA IVI
+//   3. ECEC Award minimum rates — Fair Work, national
+//   4. Three-Day Guarantee policy — national policy fact (Jan 2026)
+//
+// All rows are Context-only weight per DEC-75 (no SA2 peer cohort).
+// Each row carries a "state-level" or "national" stamp + intent copy.
+// JSA IVI rows render a state-level sparkline when data is live; render
+// as deferred otherwise (the IVI table-name wire-up is the bundle's
+// follow-up task — see workforce_supply probe artefact).
+// ── Layer 4.2-A.3a-fix iter 3: workforce window state ────────
+// Workforce Supply Context has its own trend-window selector.
+// The page-top bar applies only to annual/quarterly trajectory
+// charts; workforce data is monthly with much shorter useful
+// horizons. State is just a number-of-months value; 0 = "All".
+let _WFS_WINDOW_MONTHS = 24;  // default 2Y
+
+// Period strings expected: "YYYY-MM" (JSA IVI monthly).
+// Tolerates "YYYY-Qn" and "YYYY". Returns {y, m} or null.
+function _wfsParsePeriod(p) {
+  const s = String(p);
+  const mm = /^(\d{4})-(\d{2})$/.exec(s);
+  if (mm) return { y: parseInt(mm[1], 10),
+                   m: parseInt(mm[2], 10) };
+  const qq = /^(\d{4})-Q([1-4])$/.exec(s);
+  if (qq) return { y: parseInt(qq[1], 10),
+                   m: parseInt(qq[2], 10) * 3 };
+  const yy = /^(\d{4})$/.exec(s);
+  if (yy) return { y: parseInt(yy[1], 10), m: 12 };
+  return null;
+}
+
+function _wfsFilterByWindow(points, months) {
+  if (!months || months <= 0 || !points || !points.length) {
+    return points;
+  }
+  const last = _wfsParsePeriod(
+    points[points.length - 1].period);
+  if (!last) return points;
+  let cy = last.y;
+  let cm = last.m - months;
+  while (cm <= 0) { cy -= 1; cm += 12; }
+  return points.filter(pt => {
+    const p = _wfsParsePeriod(pt.period);
+    if (!p) return true;
+    if (p.y > cy) return true;
+    if (p.y < cy) return false;
+    return p.m >= cm;
+  });
+}
+
+// Workforce-scoped chart re-instantiation: destroys only
+// chart instances whose canvas id starts with "wfs-",
+// then runs queued instantiations. Other charts (catchment,
+// population, labour) are left alone.
+function _flushPendingChartsWorkforceScoped() {
+  Object.keys(_CHART_INSTANCES).forEach(id => {
+    if (!id.startsWith("wfs-")) return;
+    try { _CHART_INSTANCES[id].destroy(); } catch (e) {}
+    delete _CHART_INSTANCES[id];
+  });
+  while (_CHART_PENDING.length) {
+    const fn = _CHART_PENDING.shift();
+    try { fn(); } catch (e) {
+      console.warn("chart init failed:", e);
+    }
+  }
+}
+
+function _setWfsWindow(months, btn) {
+  _WFS_WINDOW_MONTHS = months;
+  if (!window._kintellLastCentre) return;
+  const old = document.getElementById("kintell-wfs-card");
+  if (!old) return;
+  // Replace the card HTML in-place. The replacement is the
+  // full <section> string; outerHTML re-parses + injects.
+  old.outerHTML = renderWorkforceSupplyCard(
+    window._kintellLastCentre);
+  // Now drain pending chart instantiations, scoped to wfs.
+  _flushPendingChartsWorkforceScoped();
+}
+
+function _renderWfsRangeBar() {
+  const opts = [
+    { months: 6,  label: "6M" },
+    { months: 12, label: "1Y" },
+    { months: 24, label: "2Y" },
+    { months: 60, label: "5Y" },
+    { months: 0,  label: "All" },
+  ];
+  const btns = opts.map(o => {
+    const isActive = (o.months === _WFS_WINDOW_MONTHS);
+    return `<button class="range-btn${isActive ? " active" : ""}" `
+         + `onclick="_setWfsWindow(${o.months}, this)">${o.label}</button>`;
+  }).join("");
+  return `
+    <div class="traj-range-bar" style="margin-top:8px;margin-bottom:12px;">
+      <span class="label">Window</span>
+      <div class="btns">${btns}</div>
+      <span style="margin-left:auto;font-size:10.5px;color:var(--text-mute);">
+        applies to workforce sparklines
+      </span>
+    </div>
+  `;
+}
+
+function renderWorkforceSupplyCard(centre) {
+  const ws = centre && centre.workforce_supply;
+  if (!ws || !Array.isArray(ws.rows) || !ws.rows.length) return "";
+
+  const rows = ws.rows.map(r => _renderWorkforceSupplyRow(r)).join("");
+
+  return `
+    <section class="op-section" id="kintell-wfs-card">
+      <h3>Workforce supply context
+        <span class="note">state &amp; national signals · default open</span>
+      </h3>
+      ${_renderWfsRangeBar()}
+      ${rows}
+    </section>
+  `;
+}
+
+function _renderWorkforceSupplyRow(r) {
+  const intentCopyHtml = r.intent_copy
+    ? `<div style="margin-top:6px;font-size:11.5px;font-style:italic;color:var(--text-mute);line-height:1.5;">
+         ${htmlEscape(String(r.intent_copy))}
+       </div>`
+    : "";
+
+  // v3.17: about_data — permanent visible methodology block.
+  // Rendered as a subtle "About this measure" panel beneath
+  // the intent copy. Silent absence when payload doesn't
+  // populate it (e.g. ECEC Award, 3-Day Guarantee rows).
+  const aboutDataHtml = r.about_data
+    ? `<div style="margin-top:8px;padding:6px 10px;background:rgba(255,255,255,0.02);border-radius:4px;border-left:2px solid var(--border);font-size:11px;color:var(--text-mute);line-height:1.5;">
+         <span style="font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:10px;color:var(--text-dim);">About this measure</span>
+         <span style="margin-left:6px;">${htmlEscape(String(r.about_data))}</span>
+       </div>`
+    : "";
+
+  // Scope stamp — state-level or national
+  const scopeStampHtml = r.scope_stamp
+    ? `<span style="font-size:11px;color:var(--text-mute);font-style:italic;">${htmlEscape(r.scope_stamp)}</span>`
+    : "";
+
+  // Latest-value or fact, depending on row type
+  let valueHtml = "";
+  let trajectoryHtml = "";
+
+  if (r.confidence === "live" && r.latest) {
+    // JSA IVI live row: latest value + state-level sparkline.
+    // v3.9 — integer-aware formatting: raw counts (e.g. JSA IVI
+    // vacancy_count) render as "6,543" with thousands separator;
+    // decimal values render with 1 decimal place.
+    const latest = r.latest;
+    const v = latest.value;
+    const formatted = (typeof v === "number")
+      ? (Number.isInteger(v) ? v.toLocaleString() : v.toFixed(1))
+      : htmlEscape(String(v));
+    valueHtml = `
+      <span style="display:inline-flex;gap:8px;align-items:baseline;">
+        <b style="font-variant-numeric:tabular-nums;color:var(--text);font-weight:600;font-size:14px;">
+          ${formatted}
+        </b>
+        <span style="color:var(--text-mute);font-size:11px;">(${htmlEscape(String(latest.period))})</span>
+      </span>
+    `;
+    trajectoryHtml = _renderWorkforceSupplySparkline(r);
+  } else if (r.confidence === "live" && r.fact) {
+    // National policy fact row — single-line statement
+    valueHtml = `<span style="color:var(--text);font-size:13px;font-weight:500;">${htmlEscape(r.fact)}</span>`;
+  } else {
+    // Deferred / pending wire-up — render as honest placeholder
+    valueHtml = `<span style="color:var(--text-mute);font-style:italic;">— pending</span>`;
+  }
+
+  const obsBadge = renderBadge("OBS", { source: r.source || "—" }, true);
+  const statusNoteHtml = (r.status_note && r.confidence !== "live")
+    ? `<div style="margin-top:4px;font-size:11px;color:var(--text-mute);font-style:italic;">${htmlEscape(r.status_note)}</div>`
+    : "";
+
+  return `
+    <div style="padding:10px 0;border-bottom:1px dashed var(--border);">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">
+        <span style="color:var(--text-dim);font-size:13px;">${htmlEscape(r.display)}</span>
+        <span style="display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+          ${valueHtml}
+          ${obsBadge}
+        </span>
+      </div>
+      <div style="margin-top:4px;">${scopeStampHtml}</div>
+      ${trajectoryHtml}
+      ${intentCopyHtml}
+      ${aboutDataHtml}
+      ${statusNoteHtml}
+    </div>
+  `;
+}
+
+function _renderWorkforceSupplySparkline(r) {
+  const fullTraj = (r && r.trajectory) || [];
+  if (fullTraj.length < 2) return "";
+  // v3.16: filter to active window before plotting.
+  const traj = _wfsFilterByWindow(fullTraj, _WFS_WINDOW_MONTHS);
+  if (traj.length < 2) return "";
+  const stroke = "#3d7eff";
+  const fill = "rgba(61,126,255,0.08)";
+  const labels = traj.map(pt => String(pt.period));
+  const data = traj.map(pt => Number(pt.value));
+
+  const canvasId = `wfs-${r.metric}-${Math.random().toString(36).slice(2, 8)}`;
+  _CHART_PENDING.push(() => {
+    const el = document.getElementById(canvasId);
+    if (!el) return;
+    const dataset = _kintell_makeLine(r.display, data, stroke, fill);
+    // v3.15: dot points visible at every period (matches
+    // trajectory polish on Population / Labour / Catchment).
+    dataset.pointRadius      = 2;
+    dataset.pointHoverRadius = 6;
+    dataset.pointBackgroundColor = stroke;
+    dataset.pointBorderColor     = stroke;
+    const opts = _kintell_makeOpts(null, null);
+    // v3.16: optimise Y-axis to show variance. Compute
+    // padded min/max from filtered data; beginAtZero=false.
+    if (data.length) {
+      const dmin = Math.min.apply(null, data);
+      const dmax = Math.max.apply(null, data);
+      const range = Math.max(dmax - dmin, 1);
+      const pad = range * 0.08;
+      opts.scales.y.beginAtZero = false;
+      opts.scales.y.min = Math.max(0, dmin - pad);
+      opts.scales.y.max = dmax + pad;
+    }
+    // v3.11: workforce sparkline gets sparse year labels.
+    opts.scales.x.ticks.display = true;
+    opts.scales.x.ticks.maxTicksLimit = 5;
+    opts.scales.x.ticks.autoSkip = true;
+    opts.scales.x.ticks.font = { size: 9 };
+    // v3.15: switch native tooltip OFF, route to external
+    // HTML readout (defined globally in v3.13). Same
+    // pattern as trajectory charts.
+    if (!opts.plugins) opts.plugins = {};
+    opts.plugins.tooltip = {
+      enabled: false,
+      external: _kintellExternalReadout,
+      displayColors: false,
+    };
+    _CHART_INSTANCES[canvasId] = new Chart(el, {
+      type: "line",
+      data: { labels, datasets: [dataset] },
+      options: opts,
+      plugins: [_kintellCrosshair],
+    });
+  });
+
+  return `
+    <div id="readout-${canvasId}" style="height:18px;font-size:12.5px;line-height:18px;color:var(--text);margin-top:6px;margin-bottom:2px;padding:0 4px;">
+      <span style="color:var(--text-mute);font-style:italic;">hover the line to read values</span>
+    </div>
+    <div style="height:42px;position:relative;">
+      <canvas id="${canvasId}"></canvas>
+    </div>
+  `;
+}
+
+function renderQaCard(centre) {
+  const qa = centre.qa_scores || [];
+  if (qa.length === 0) {
+    return `
+      <section class="op-section">
+        <h3>Quality Assessment Areas</h3>
+        <div class="qa-empty">No quality assessment scores on record.</div>
+      </section>
+    `;
+  }
+  return `
+    <section class="op-section">
+      <h3>Quality Assessment Areas <span class="note">${qa.length} populated</span></h3>
+      <div class="qa-grid">
+        ${qa.map(q => `
+          <div class="qa-row">
+            <span class="qa-key">${htmlEscape(q.key.toUpperCase())}</span>
+            <span class="qa-label">${htmlEscape(q.label)}</span>
+            <span>${nqsPill(q.rating)}</span>
+          </div>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderTenureCard(centre) {
+  const t = centre.tenure;
+  const isBrown = t.status === "brownfield";
+  const pillClass = isBrown ? "amber" : "green";
+  const transferLine = isBrown && t.transfer_date
+    ? `<div class="fact">
+        <span class="k">Last transfer</span>
+        <span class="v">
+          <b>${htmlEscape(formatMonYYYY(t.transfer_date))}</b>
+          <span style="color:var(--text-mute);font-size:11px;">(${t.months_since_transfer} months ago)</span>
+          ${renderBadge("OBS", { source: "ACECQA last_transfer_date" }, true)}
+        </span>
+      </div>`
+    : "";
+
+  const approvalLine = t.approval_granted_date
+    ? `<div class="fact">
+        <span class="k">Original approval</span>
+        <span class="v">
+          <b>${htmlEscape(formatMonYYYY(t.approval_granted_date))}</b>
+          ${renderBadge("OBS", { source: "ACECQA approval_granted_date" }, true)}
+        </span>
+      </div>`
+    : "";
+
+  return `
+    <section class="op-section">
+      <h3>Tenure</h3>
+      <div class="fact">
+        <span class="k">Acquisition type</span>
+        <span class="v">
+          <span class="status-pill ${pillClass}">${htmlEscape(t.label)}</span>
+          ${renderBadge("DER", {
+            rule: "Brownfield iff last_transfer_date > approval_granted_date.",
+            inputs: "<code>approval_granted_date, last_transfer_date</code>"
+          }, true)}
+        </span>
+      </div>
+      ${approvalLine}
+      ${transferLine}
+    </section>
+  `;
+}
+
+function renderCommentary(centre) {
+  const lines = centre.commentary || [];
+  if (lines.length === 0) return "";
+  return lines.map(l => `
+    <div class="com-line severity-${htmlEscape(l.severity || "info")}">
+      ${renderBadge("COM", {
+        rule: "Auto-generated from centre payload.",
+        asAt: "real-time"
+      })}
+      <div class="com-text">${htmlEscape(l.text)}</div>
+    </div>
+  `).join("");
+}
+
+// ── Main render ─────────────────────────────────────────────────────
+function render(centre) {
+  // v3.16: stash so the workforce window selector can
+  // re-render its card in-place without a full reload.
+  window._kintellLastCentre = centre;
+  // Capture for trajectory-range button re-render (Layer 4.2-B-fix2)
+  _LAST_CENTRE = centre;
+
+  const breadcrumb = document.getElementById("breadcrumb");
+  const grpId = centre.header.parent_group?.group_id;
+  const grpName = centre.header.parent_group?.name || "Operator";
+  if (grpId) {
+    breadcrumb.innerHTML = `<a href="operator.html?id=${grpId}">${htmlEscape(grpName)}</a> › ${htmlEscape(centre.header.service_name || "Centre")}`;
+  } else {
+    breadcrumb.textContent = centre.header.service_name || "Centre";
+  }
+
+  const main = document.getElementById("main");
+  // Layer 4.2-A.3 page reorder (option α): credit block first
+  // (Catchment position / Population / Labour / Workforce),
+  // operational block second (NQS / Places / Catchment-meta /
+  // Tenure / QA). Trend-window bar sits above the credit block
+  // since all trajectory charts live in those four cards.
+  main.innerHTML = `
+    ${renderHeader(centre)}
+
+    ${_pageHasFullTrajectory(centre) ? _renderTrajectoryRangeBar() : ""}
+
+    <!-- ── credit block ── -->
+    ${renderCatchmentPositionCard(centre)}
+    ${renderPopulationCard(centre)}
+    ${renderEducationInfrastructureCard(centre)}
+    ${renderLabourMarketCard(centre)}
+    ${renderWorkforceSupplyCard(centre)}
+
+    <hr style="border:0;border-top:1px solid var(--border);margin:28px 0 12px;">
+
+    <!-- ── operational block ── -->
+    <div class="section-row">
+      ${renderNqsCard(centre)}
+      ${renderPlacesCard(centre)}
+    </div>
+    <div class="section-row">
+      ${renderCatchmentCard(centre)}
+      ${renderTenureCard(centre)}
+    </div>
+    ${renderQaCard(centre)}
+    ${renderCommentary(centre)}
+  `;
+
+  // Layer 4.2-B-fix: instantiate any Chart.js canvases queued during
+  // string-template render. Canvases need to be in the DOM first, which
+  // is why this runs after main.innerHTML is set.
+  _flushPendingCharts();
+}
+
+async function load() {
+  if (!SERVICE_ID) {
+    document.getElementById("main").innerHTML =
+      `<div class="state-msg error">No <code>?id=&lt;service_id&gt;</code> in URL.</div>`;
+    return;
+  }
+  try {
+    const r = await api(`/centre/${SERVICE_ID}`);
+    if (!r.ok || !r.centre) {
+      document.getElementById("main").innerHTML =
+        `<div class="state-msg error">Centre not found (service_id ${htmlEscape(SERVICE_ID)}).</div>`;
+      return;
+    }
+    render(r.centre);
+  } catch (e) {
+    document.getElementById("main").innerHTML =
+      `<div class="state-msg error">Failed to load centre: ${htmlEscape(String(e.message || e))}</div>`;
+  }
+}
+
+load();
+</script>
+</body>
+</html>

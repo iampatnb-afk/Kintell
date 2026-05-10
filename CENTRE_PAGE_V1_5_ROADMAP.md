@@ -1,6 +1,6 @@
 # Centre Page V1.5 Roadmap
 
-*Last updated: 2026-05-11 (DEC-83 Commercial Layer V1 ship — daily-rate / regulatory / operator-group identity ingested for 130 pilot centres; A8 dependency released. Centre v2 design pass next major work — daily-rate placement decisions made there per DEC-83 #8). Prior 2026-05-10 PM s2 lock established A4 Schools (DEC-82) close. The on-disk version supersedes the project-knowledge monolith if they disagree.*
+*Last updated: 2026-05-12 (DEC-84 Centre v2 design pass closed — V1.5 pending-ingest render landing now defaults to Layer 5 matrix rows automatically per DEC-84 #10; ingest scripts write to existing tables and the matrix renderer surfaces new metrics via registry pattern, no v1 card-insertion render coupling). Prior 2026-05-11 lock established DEC-83 Commercial Layer V1 ship; 2026-05-10 PM s2 lock established A4 Schools (DEC-82) close. The on-disk version supersedes the project-knowledge monolith if they disagree.*
 
 This roadmap is the canonical V1.5 work queue for the centre page. PROJECT_STATUS.md and ROADMAP.md reference this doc for V1.5 detail.
 

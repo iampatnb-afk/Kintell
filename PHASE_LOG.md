@@ -1,3 +1,60 @@
+## 2026-05-12 — DEC-84 close: Centre v2 joint design pass (6-layer page architecture, content map ratified)
+
+**Session type:** Handover → orientation read (CLAUDE.md + PROJECT_STATUS + ROADMAP + memory) → probe (centre v3.31 surface inventory delegated to Explore agent in parallel with precedent-doc + DEC-83 schema reads) → design doc seed (`recon/centre_v2_design.md`, ~590 lines) → batched 12-decision design ratification → DEC-84 mint → Tier-2 doc refresh → v1 stake bundle prep.
+
+**Context entering session.** Centre v2 redesign sequencing memo (`project_centre_v2_redesign.md`, 2026-05-10 PM s3) had locked the 6-layer skeleton + 5 specific decisions (detail = side drawer, sparklines OK in matrix, histograms stay visible but redesigned, measurement tools → V2, cut order Centre v2 → Child Safety → Competition); waited on daily-rate substrate. 2026-05-11 DEC-83 Commercial Layer V1 ship landed daily-rate + regulatory + operator-group identity in `kintell.db` for 130 pilot centres; sequencing pulled v2 design pass next. Worktree `claude/trusting-lehmann-b31fa0` was stale (predates V1 + DEC-83) — flagged early; work proceeded against main repo absolute paths per project_state memory's direct-on-master workflow.
+
+**Work shipped this session.**
+
+**1. Surface inventory probe (DEC-65 discipline) delegated to Explore agent.** Read `centre_page.py` v23 + `docs/centre.html` v3.31 in full; produced structured inventory: 5 cards in render order, 32 metrics across `LAYER3_METRIC_META` registry, 22 entries in `LAYER3_METRIC_INTENT_COPY`, 21 entries in `LAYER3_METRIC_TRAJECTORY_SOURCE`, 4 entries in `LAYER3_METRIC_ABOUT_DATA`, 14 render helpers (`_renderFullRow`, `_renderLiteRow`, `_renderContextRow`, `_renderTrajectory`, `_renderIntentCopy`, `_renderIndustryBand`, `_renderDecileStrip`, `_renderBandChips`, `_renderCohortHistogram`, `_renderLiteDelta`, `_renderTrajectoryRangeBar`, `_renderWfsRangeBar`, `_renderAboutData`, `_renderTopNContext`), POSITION_CARD_ORDER for 5 cards. Parent agent read precedent design doc `recon/daily_rate_integration_design.md` for format + DEC-83 schema migration source-of-truth in parallel.
+
+**2. DEC-83 substrate read for placement.** 7 new tables (`service_fee` 8,220 rows / `service_regulatory_snapshot` 129 rows / `service_condition` 85 / `service_vacancy` 486 / `large_provider` 13 / `large_provider_provider_link` 92 / `service_external_capture` 130) + reused scaffold `regulatory_events` 9 rows + 1 column on `services` (`large_provider_id`, 37 services flagged into chains). Mapped each new field to its v2 layer placement before drafting the design doc.
+
+**3. Design doc seed `recon/centre_v2_design.md` written (~590 lines).** Structure: §0 what's already locked (don't re-litigate), §1 probe findings (current surface inventory + DEC-83 substrate + V1.5 pending out-of-scope), §2 strong opinion ("matrix as center of gravity" — surfaced for Patrick's react), §3 layer-by-layer content map (Layer 1 / Layer 2 / Layer 3 / Layer 4 / Layer 5 / Layer 6 each with tile-and-row specifics), §4 decision points D-1 through D-12 with single recommendation per item (per "brevity over explanation" memory feedback), §5 explicit non-decisions, §6 effort estimate (~3.9 sess from ratification), §7 risk register, §8 ratification checklist, §9 validation table mapping every v3.31 piece to its v2 layer placement (no orphans).
+
+**4. Patrick batch-ratified D-1 through D-12 with no objections.** Single-word ratification.
+
+**5. DEC-84 minted in canonical DECISIONS.md.** 12 numbered decisions matching the design doc: page architecture / Layer 2 signal count + flag triggers / Layer 3 chart count + headline daily-rate pair / Layer 4 accordion / Layer 5 matrix density + categories / Layer 6 drawer interaction / Layer 1 enrichments / Workforce card dissolution / Daily-rate matrix density + drawer / V1.5 pending-ingest stub treatment / Histogram + sparkline sizing / Excel export shape lock-in. Status: Active. Supersedes (additive): DEC-71 visual layer architecture (preserved; v2 layers on top).
+
+**6. RATIFIED SUMMARY populated in design doc.** Cross-effects unlocked listed (Group page deep-link entry / Child Safety + Competition deep-links / Excel export confirmed substrate / V1.5 ingest queue render landing now matrix-default / Centre v2 build sequence cleared).
+
+**7. Tier-2 doc refresh per STD-35.** PROJECT_STATUS.md / ROADMAP.md / CENTRE_PAGE_V1_5_ROADMAP.md / OPEN_ITEMS.md / PHASE_LOG.md (this entry) all updated. ROADMAP §11 "what next session should pick up" rewritten to reflect Centre v2 build kick-off (was stale at A10/C8). No new OIs minted — v2 build scope is captured in DEC-84 itself.
+
+**8. v1 stake bundle prep (PATRICK ACTION REQUIRED).** Bundle dir `recon/v1_final_stake_2026-05-12/` created with: `centre.html` v3.31 copy / `centre_page.py` v23 copy / `PAYLOAD_SCHEMA.md` notes / `ROLLBACK.md` recovery recipe (git-checkout-based, payload-schema downgrade notes). Patrick to run `git tag centre-v1-stake-2026-05-12 212b597` from main repo terminal before kicking off `centre_page.py` v24 — locked decision per `project_centre_v2_redesign.md` "v2 takes over `/centres/{id}` once verified" + DEC-84 #consequences.
+
+**Files touched / created:**
+- `recon/centre_v2_design.md` (new — design doc seed + RATIFIED SUMMARY post-batch)
+- `recon/Document and Status DB/DECISIONS.md` (DEC-84 minted; inserted above DEC-83)
+- `recon/v1_final_stake_2026-05-12/centre.html` (copy of v3.31)
+- `recon/v1_final_stake_2026-05-12/centre_page.py` (copy of v23)
+- `recon/v1_final_stake_2026-05-12/PAYLOAD_SCHEMA.md` (new notes file)
+- `recon/v1_final_stake_2026-05-12/ROLLBACK.md` (new recovery recipe)
+- `PROJECT_STATUS.md`, `ROADMAP.md`, `CENTRE_PAGE_V1_5_ROADMAP.md`, `OPEN_ITEMS.md`, `PHASE_LOG.md` (this entry — Tier-2 monolith refresh per STD-35)
+- Memory: `project_centre_v2_redesign.md` (design pass step closed), `project_state.md` (2026-05-12 bump)
+
+**audit_log:** unchanged (no DB mutations this session). 177 rows.
+
+**State at session end.** Centre v2 design pass DONE. DEC-84 ratified end-to-end. v2 build sequence cleared:
+1. v1 stake (Patrick: `git tag centre-v1-stake-2026-05-12 212b597`) — 0.1 sess
+2. `centre_page.py` v24 + payload schema `centre_payload_v7` — 1.0 sess
+3. `docs/centre_v2.html` parallel renderer at `/centre_v2/{id}` — 2.0 sess
+4. Verification capture (4 SA2s × 2-3 archetypes) — 0.3 sess
+5. Smoke test — 0.2 sess
+6. Cut-over `/centres/{id}` → centre v2 — 0.1 sess
+7. Monolith + commit — 0.1 sess
+**Total ~3.9 sess from this point** — within the 6-10 sess band locked in `project_centre_v2_redesign.md`.
+
+**Banked V2-of-v2 / follow-ups:**
+- Measurement tools (two-point delta picker, decile-movement readout) — V2 of v2 redesign
+- Layer 5 matrix sort by signal strength (V1 = fixed display order)
+- Layer 5 filter chips beyond category quick-jump (search + filter-by-decile)
+- Mobile/narrow-screen layout (<1024px breakpoint stack columns)
+- Hover-preview drawer interaction (V1 click-anywhere + ESC)
+- National commercial-layer scale-up (18,223 services × 1.5s ≈ 7-8h overnight; alternative pickup or bundled before v2 build kick-off — Patrick's call)
+- V1.5 ingest queue resumption (A5 / A6 / B1 / C2-other / C6) — render landing now defaults to Layer 5 matrix automatically per DEC-84 #10
+
+---
+
 ## 2026-05-11 — DEC-83 ship: Commercial Layer V1 (Starting Blocks daily-rate + regulatory + operator-group)
 
 **Session type:** Handover → probe (Starting Blocks pilot) → batched design decisions → DEC-83 mint → schema migration → extract+load port → 130-centre proof load → algolia reconcile → tier-2 doc refresh.

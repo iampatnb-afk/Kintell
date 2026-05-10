@@ -1,10 +1,44 @@
 # Project Status
 
-*Last updated: 2026-05-11 EOD — DEC-83 Commercial Layer V1 (Starting Blocks daily-rate + regulatory + operator-group identity) shipped end-to-end. Schema migration + 130-centre proof load + Algolia reconcile tool + Tier-2 doc refresh all landed in one session per session-density discipline. National scale-up to 18,223 services deferred to follow-up. Centre v2 joint design pass next major work — daily-rate data now in `kintell.db` as Layer 5 substrate. The on-disk version supersedes the project-knowledge monolith if they disagree.*
+*Last updated: 2026-05-12 — Centre v2 joint design pass closed; DEC-84 minted (6-layer page architecture, matrix-as-center-of-gravity). Design doc `recon/centre_v2_design.md` ratified. v1 stake bundle prep + git tag command queued for Patrick. v2 build sequence cleared to proceed (~3.9 sess). The on-disk version supersedes the project-knowledge monolith if they disagree.*
 
-> **NEXT-SESSION HEADLINE:** **Centre v2 joint design pass** — content map for the 6-layer structure (header / executive interpretation / primary historical trends / secondary historical trends / institutional signal matrix / detail side-drawer). Daily-rate data is now ingested for the 130 pilot centres; design pass decides which fields surface where. Effort ~1.5-2 sess. See `project_centre_v2_redesign.md` (memory) for the locked structure decisions. Alternative pickups: national commercial-layer scale-up (18,223 services × 1.5s ≈ 7-8h overnight, ~0.5-1 sess of script work + monitoring), OR resume V1.5 ingest queue (A5 subtype-correct denominators ~0.3 sess, A6 SALM extension ~0.2 sess, B1 / B3 / B4 / B5 banding ~0.5 sess).
+> **NEXT-SESSION HEADLINE:** **Centre v2 build kick-off** — v1 stake (git tag `centre-v1-stake-2026-05-12` on commit `212b597` + bundle dir `recon/v1_final_stake_2026-05-12/` + ROLLBACK.md), then `centre_page.py` v24 + payload schema `centre_payload_v7` (1.0 sess). After payload lands, parallel renderer `docs/centre_v2.html` at `/centre_v2/{id}` (2.0 sess), then verification capture (0.3 sess) + smoke test (0.2 sess) + cut-over (0.1 sess). Total ~3.9 sess. See `recon/centre_v2_design.md` for ratified content map and DEC-84 in canonical DECISIONS.md for the 12 layer-mechanic locks.
 
-## Headline (2026-05-11 — DEC-83 Commercial Layer V1 ship)
+## Headline (2026-05-12 — DEC-84 Centre v2 design pass closed)
+
+**Centre v2 joint design pass ratified end-to-end in one session.** Probe → surface inventory of v3.31 (32 metrics × 5 cards × 14 helpers) → DEC-83 substrate placement → 6-layer content map proposal → batched 12-decision design ratification → DEC-84 mint → Tier-2 doc refresh. Probe-first per DEC-65; surface inventory delegated to Explore agent for parallel execution while precedent-doc + DEC-83 schema were read directly.
+
+**Key architectural decisions (DEC-84 batch ratified):**
+- **Cards dissolve; matrix becomes center of gravity.** v1's 5 vertical cards replaced by 6-layer architecture (Header / Executive interpretation / Primary trends / Secondary trends accordion / Institutional signal matrix / Detail side-drawer)
+- **Layer 5 matrix ~52 rows V1, 9 categories** (Demand / Supply / Pricing & Fees NEW / Quality NEW / Workforce / Community / Education / Operator-Group NEW / Operations NEW / Population / Labour Market). Plus ~9 "Pending V1.5" status-pill stubs that auto-resolve as ingests land
+- **Layer 3 = 7 primary charts.** Daily-rate full_day × 36m-preschool with peer-cohort overlay is the new headline chart; OSHC services discriminate at render to before/after_school × school-age
+- **Layer 2 = 5 signal tiles + 0-2 flags.** Demand / Supply / Workforce / Quality / Community signal tiles. Flag severity hierarchy: RED for `ccs_revoked_by_ea` / closed; AMBER for active conditions / sub-Meeting NQS / recent enforcement; INFORMATIONAL for `no_vacancies_published`. Operator-group affiliation is a Layer 1 chip, not a flag
+- **Layer 6 drawer = slide-in side panel,** click-anywhere-row + ESC + URL fragment shareable. Single drawer at a time. `_renderAboutData` and `_renderTopNContext` migrate into drawer rendering
+- **Workforce Supply Context card dissolves** — JSA IVI rows absorb into Layer 5 Workforce + Layer 3 chart 6 third overlay when wired; ECEC Award + Three-Day-Guarantee become Layer 5 fact rows
+- **Old `/centres/{id}` preserved** via git tag `centre-v1-stake-2026-05-12` on commit `212b597` (pre-v2-build SHA) + `recon/v1_final_stake_2026-05-12/` bundle dir + ROLLBACK.md, created BEFORE v2 build's first edit
+
+**DEC-83 substrate fully placed.** Operator-group → Layer 1 chip + Layer 5 row + Layer 6 drawer. Daily-rate → Layer 3 chart 7 + Layer 5 5-row Pricing category + Layer 6 grid drawer. Regulatory snapshot → Layer 1 contact strip + Layer 1 hours + Layer 2 flags + Layer 5 Quality/Operations + Layer 6 NQS drawer. Conditions → Layer 2 flag + Layer 5 count + Layer 6 detail drawer. Vacancies → Layer 2 informational flag + Layer 5 row + Layer 6 drawer. Enforcement events → Layer 2 flag + Layer 5 count + Layer 6 chronological drawer.
+
+**Existing renderer inventory survives.** All 14 v3.31 helpers reused (`_renderFullRow`, `_renderLiteRow`, `_renderContextRow`, `_renderTrajectory`, `_renderIntentCopy`, `_renderIndustryBand`, `_renderDecileStrip`, `_renderBandChips`, `_renderCohortHistogram`, `_renderLiteDelta`, `_renderTrajectoryRangeBar`). Two new render primitives (`MatrixRow`, `DrawerPanel`) + one new helper (`_buildExecutiveHeadline`). `_renderWfsRangeBar` retires.
+
+**This session's deliverables (all on disk):**
+- `recon/centre_v2_design.md` — design doc seed + RATIFIED SUMMARY post-batch (the canonical content map)
+- `recon/Document and Status DB/DECISIONS.md` — DEC-84 minted (12 ratified decisions)
+- Tier-2 docs refreshed: `PROJECT_STATUS.md` (this), `ROADMAP.md`, `CENTRE_PAGE_V1_5_ROADMAP.md`, `OPEN_ITEMS.md`, `PHASE_LOG.md`
+- Memory updates: `project_centre_v2_redesign.md` (design pass step closed; build sequence next) + `project_state.md` (2026-05-12 bump)
+
+**v1 stake — created this session pending Patrick's git tag command:**
+- `recon/v1_final_stake_2026-05-12/` bundle dir with copies of `centre.html` v3.31, `centre_page.py` v23, `PAYLOAD_SCHEMA.md` notes
+- `recon/v1_final_stake_2026-05-12/ROLLBACK.md` — recovery recipe (git checkout `<tag> -- <files>` + payload-schema downgrade notes)
+- **PATRICK ACTION:** run `git tag centre-v1-stake-2026-05-12 212b597` from main repo terminal (worktree access not required) before kicking off `centre_page.py` v24
+
+**No DB mutations this session.** No audit_log rows. `kintell.db` 619.x MB, 43 user tables, audit_log 177 rows — unchanged from 2026-05-11 EOD.
+
+**Worktree note.** Session ran from stale worktree `claude/trusting-lehmann-b31fa0` (predates V1 + DEC-83); all edits targeted main repo absolute paths so worktree branch state is irrelevant. Work to be committed direct-on-master from main repo per Patrick's workflow.
+
+---
+
+## Headline (2026-05-11 — DEC-83 Commercial Layer V1 ship — preserved for traceability)
 
 **DEC-83 Commercial Layer V1 (daily-rate + regulatory + operator-group identity) shipped end-to-end in one session.** Probe → batched 9-decision design ratification → schema migration (7 new tables + 1 reused scaffold + 1 ALTER on services + 12 indexes) → extract module + pilot loader → 130-centre proof load → Algolia reconcile tool → Tier-2 doc refresh. Pre-build precedent check (DEC-65) caught existing scaffolds (`regulatory_events`, `nqs_history`); schema plan amended pre-build to reuse rather than duplicate. Source-payload re-inspection mid-design surfaced significant institutional-value fields (provider regulatory state, enforcement detail, conditions, large-provider operator-group identity, vacancies, fee-type classification, NQS area breakdown, operating hours); Patrick ratified scope expansion on capture-once-use-anywhere economics.
 

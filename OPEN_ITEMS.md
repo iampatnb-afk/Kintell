@@ -1,6 +1,6 @@
 # Open Items
 
-*Last updated: 2026-05-11 (DEC-83 Commercial Layer V1 ship; OI-NEW-4 Algolia portion CLOSED; OI-NEW-22 + OI-NEW-23 minted). The on-disk version supersedes the project-knowledge monolith if they disagree.*
+*Last updated: 2026-05-12 (DEC-84 Centre v2 design pass closed — no new OIs minted; v2 build scope captured in DEC-84 itself). Prior 2026-05-11 lock established DEC-83 Commercial Layer V1 ship + OI-NEW-4 Algolia portion CLOSED + OI-NEW-22 + OI-NEW-23 minted. The on-disk version supersedes the project-knowledge monolith if they disagree.*
 
 OI ID is global. Closed items kept for traceability. Severity tags: CRITICAL / Medium / Low / Cosmetic / Tracking.
 

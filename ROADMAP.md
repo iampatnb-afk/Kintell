@@ -1,6 +1,6 @@
 # Roadmap
 
-*Last updated: 2026-05-11 (DEC-83 Commercial Layer V1 ship — daily-rate parallel work CLOSED for V1 data purposes; A8 / B7 / C7 dependencies released; Centre v2 next major work). Earlier 2026-05-09 lock established V1 horizon (~Sept 2026 with five streams). The on-disk version supersedes the project-knowledge monolith if they disagree.*
+*Last updated: 2026-05-12 (DEC-84 Centre v2 design pass closed — 6-layer page architecture ratified, content map locked, build sequence cleared). Prior 2026-05-11 lock established DEC-83 Commercial Layer V1 ship; 2026-05-09 lock established V1 horizon (~Sept 2026 with five streams). The on-disk version supersedes the project-knowledge monolith if they disagree.*
 
 **Note 2026-05-09:** Up to and including 2026-05-05, "V1" referred to the original centre-page credit-decision tool (shipped at HEAD `bcdf84c` on 2026-05-03). With DEC-79 the product has been repositioned as Novara Intelligence — Patrick Bell's commercial product. V1 is now redefined to the broader institutional decision-support release targeting ~Sept 2026. The earlier-V1 milestone is preserved as **"V1.0 (centre-page credit tool)"** for traceability. New V1 = "V1.0-shipped + V1.5 ingests + Catchment page + Group page + 5 new streams + Excel export + brand identity rename".
 
@@ -224,22 +224,21 @@ The 2026-04-28 restructure produced the 12-doc set. As of 2026-05-09:
 
 ## 11. What the next session should pick up
 
-**Recommended first piece: A10 + C8 (Demographic Mix bundle, ~1.0 sess).** Per CENTRE_PAGE_V1_5_ROADMAP §"Recommended next session start":
+**Recommended first piece: Centre v2 build kick-off (~1.1 sess to first deliverable).** Per `recon/centre_v2_design.md` ratified summary + DEC-84:
 
-- **A10 ingest pass** — three TSP tables (T07 ATSI, T08 country of birth, T19 single-parent households) all from `2021_TSP_SA2_for_AUS_short-header.zip` already on disk. Same processing pattern. ~0.5 sess.
-- **B-pass for the three new metrics** — register in `layer3_apply.py` METRICS, run banding. ~0.1 sess each.
-- **C8 panel build** — new Community Profile panel on centre page. ~0.5 sess.
-- **End-of-session doc refresh.**
+- **v1 stake (0.1 sess)** — `git tag centre-v1-stake-2026-05-12 212b597` from main repo terminal; bundle dir `recon/v1_final_stake_2026-05-12/` + ROLLBACK.md already prepared on disk by this session. Created BEFORE first `centre_page.py` v24 edit per locked decision.
+- **`centre_page.py` v24 + payload schema `centre_payload_v7` (~1.0 sess)** — new `_build_matrix(centre)` returning Layer 5 row list (~52 rows V1, 9 categories per DEC-84 #5), new `_build_executive(centre)` returning Layer 2 signal tile + flag computation per DEC-84 #2 / #3, new `_build_drawer(centre)` returning Layer 6 detail payload sub-tree per DEC-84 #6, new `_buildExecutiveHeadline(payload)` rule-based composer. Existing `_build_layer3_position` etc. continue to populate the existing card structure for now (v1 renderer still served at `/centres/{id}` until cut-over). Smoke-test capture verifies payload shape before renderer build.
 
-**Pre-A10 housekeeping** (this session, 2026-05-09):
-- ✅ DEC-79 commercial repositioning — landed
-- ✅ CLAUDE.md — landed
-- ✅ Memory entries — landed
-- ✅ PRODUCT_VISION.md — landed
-- ✅ ROADMAP.md (this doc) — being landed now
-- ⏭ OPEN_ITEMS.md update with new OIs — next
-- ⏭ PROJECT_STATUS.md reframing entry — next
-- ⏭ CENTRE_PAGE_V1_5_ROADMAP.md cross-reference to new streams — next
-- ⏭ .gitignore fix (OI-13 + OI-NEW-9) — next
+**Then Centre v2 build sequence (~2.7 sess):**
+- `docs/centre_v2.html` parallel renderer at `/centre_v2/{id}` (~2.0 sess) — Layer 1-6 render with all v3.31 helpers reused; new MatrixRow + DrawerPanel primitives; new CSS for matrix layout + side-drawer slide-in
+- Verification capture (~0.3 sess) — 4 verifying SA2s × 2-3 service archetypes (large-provider chain, independent operator, OSHC, sub-Meeting NQS, CCS-revoked if any in pilot). Static-HTML capture pattern per `docs/a10_c8_review.html` precedent
+- Smoke test (~0.2 sess) — visual review of all 6 layers across archetypes
+- Cut-over (~0.1 sess) — `/centres/{id}` → centre v2 renderer; v1 route retired
+- Monolith STD-35 + commit (~0.1 sess)
 
-**After A10/C8 lands, evaluate Block 1 sequencing per §2.6.**
+**Total Centre v2 build remaining: ~3.8 sess.**
+
+**Alternative pickups (Patrick's choice):**
+- **National commercial-layer scale-up** — extend `commercial_layer_load_pilot.py` pattern to drive off `services` table (18,223 rows × 1.5s polite pacing ≈ 7-8 hours overnight). ~0.5-1 sess of script work + monitoring overnight run + post-run validation. Closes the V1 "we have daily-rate data" claim across the full national fleet
+- **V1.5 ingest queue resumption** — A5 + A6 + B1 + C2-other + C6 (~1.4 sess). Per DEC-84 #10 these now render as Layer 5 matrix rows automatically once ingest writes to existing tables; no v1 card-insertion render coupling
+- **OI-NEW-22** Provider-level enforcement + conditions extraction (~0.5 sess) — bridging table + reconciliation against `entities`
