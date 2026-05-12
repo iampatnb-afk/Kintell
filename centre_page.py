@@ -2649,6 +2649,67 @@ def _compute_cross_subtype_competition(conn, sa2_code: Optional[str],
         return out
     out["count"] = int(row[0] or 0)
     out["total_places"] = int(row[1] or 0)
+    # Per-service detail for the drawer (Bundle 2 rich-content drawer
+    # 2026-05-12 — Patrick: "when you click on OSHC services in catchment
+    # it should bring up the services underneath — names, places, daily
+    # rate etc."). Pulls latest fee from service_fee for the headline pair
+    # appropriate to the TARGET subtype (OSHC → before_school × school-age;
+    # LDC → full_day × 36m-preschool).
+    if "OSHC" in target_subtypes:
+        target_age, target_session = "school-age", "before_school"
+    else:
+        target_age, target_session = "36m-preschool", "full_day"
+    try:
+        service_rows = conn.execute(
+            f"""
+            SELECT
+              s.service_id,
+              s.service_name,
+              s.approved_places,
+              s.overall_nqs_rating,
+              s.service_sub_type,
+              s.large_provider_id,
+              lp.name AS large_provider_name,
+              (
+                SELECT AVG(sf.fee_aud)
+                  FROM service_fee sf
+                 WHERE sf.service_id = s.service_id
+                   AND sf.age_band = ?
+                   AND sf.session_type = ?
+                   AND sf.fee_aud IS NOT NULL
+                   AND sf.fee_aud > 0
+                   AND sf.as_of_date = (
+                         SELECT MAX(as_of_date) FROM service_fee sf2
+                          WHERE sf2.service_id = sf.service_id
+                            AND sf2.age_band = sf.age_band
+                            AND sf2.session_type = sf.session_type
+                       )
+              ) AS fee_aud
+              FROM services s
+              LEFT JOIN large_provider lp
+                     ON lp.large_provider_id = s.large_provider_id
+             WHERE s.sa2_code = ?
+               AND COALESCE(s.is_active, 1) = 1
+               AND s.service_sub_type IN ({placeholders})
+             ORDER BY s.approved_places DESC, s.service_name ASC
+            """,
+            (target_age, target_session, sa2_code, *target_subtypes),
+        ).fetchall()
+    except sqlite3.OperationalError:
+        service_rows = []
+    out["services"] = [
+        {
+            "service_id":          int(r[0]),
+            "service_name":        r[1],
+            "places":              int(r[2] or 0) or None,
+            "nqs_overall":         (r[3] or "").strip() or None,
+            "subtype":             r[4],
+            "large_provider_id":   r[5],
+            "large_provider_name": r[6],
+            "fee":                 round(float(r[7]), 2) if r[7] is not None else None,
+        }
+        for r in service_rows
+    ]
     return out
 
 
@@ -3762,13 +3823,11 @@ def _matrix_workforce_rows(workforce_supply: dict) -> list:
                     trend3y = ((latest_v - back_v) / back_v) * 100.0
             except (TypeError, ValueError):
                 trend3y = None
+        # Trend now surfaces in the value column below the period
+        # (relocated 2026-05-12 per Patrick) — keeps the commentary
+        # column focused on intent. trend3y_pct on the row payload is
+        # consumed by the frontend renderer.
         commentary = _truncate_sentence(entry.get("intent_copy")) or ""
-        if trend3y is not None:
-            sign = "+" if trend3y >= 0 else "−"
-            trend_str = f"{sign}{abs(trend3y):.0f}% over 3y"
-            # Prepend trend so it leads the commentary; reader sees "+X% over
-            # 3y · [intent copy]" — directional context first, framing after.
-            commentary = f"{trend_str} · {commentary}" if commentary else trend_str
         out.append({
             "category":      "workforce",
             "metric":        entry.get("metric"),

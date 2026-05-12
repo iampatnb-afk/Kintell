@@ -1303,6 +1303,20 @@
     margin-top: 2px;
     text-transform: lowercase;
   }
+  /* Trend stamp under the period — relocated workforce-trend / school-
+     enrolment-trend labels (Patrick 2026-05-12). Colour-coded for direction
+     where the row carries a `trend_direction` interpretation: green for
+     favourable, amber for unfavourable. */
+  .l5-value .trend-stamp {
+    display: block;
+    font-size: 10px;
+    margin-top: 3px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+  .l5-value .trend-stamp.up   { color: rgba(110, 200, 145, 0.95); }
+  .l5-value .trend-stamp.down { color: rgba(220, 140, 110, 0.95); }
+  .l5-value .trend-stamp.flat { color: var(--text-mute); }
   /* Workforce scope stamps — "state-level (NSW) — no SA2 peer cohort" etc.
      Italic, slightly muted, sits inside the signal column. Patrick queue #12. */
   .l5-signal.scope-stamp {
@@ -1618,6 +1632,39 @@
     font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
     color: var(--text-mute); margin-bottom: 6px;
   }
+  .drawer-section-head {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-mute); margin-bottom: 8px;
+    font-weight: 600;
+  }
+  /* Drawer list rows — used by cross-subtype care services list and
+     other rich-content drawer payloads. */
+  .drawer-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .drawer-list-row {
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--panel-2);
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .drawer-list-row:hover {
+    background: var(--panel-3);
+    border-color: var(--accent);
+  }
+  .drawer-kv-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .drawer-kv-row:last-child { border-bottom: none; }
+  .drawer-kv-row span:first-child { color: var(--text-mute); }
+  .drawer-kv-row b { color: var(--text); font-variant-numeric: tabular-nums; }
   .drawer-section-body {
     font-size: 13px; color: var(--text);
     line-height: 1.6;
@@ -3906,6 +3953,28 @@ function _findPosEntry(centre, metric) {
   const wfRows = (centre.workforce_supply || {}).rows || [];
   const wfHit = wfRows.find(r => r && r.metric === metric);
   if (wfHit) return wfHit;
+  // School enrolment trend — synthetic from top-level payload key.
+  // Patrick 2026-05-12: clicking the row should inline-expand the
+  // 18-year historical trajectory.
+  if (metric === "school_enrolment_3y_trend") {
+    const et = centre.school_enrolment_trend || {};
+    if (et.latest_value != null && Array.isArray(et.trajectory) && et.trajectory.length) {
+      return {
+        display:        "School enrolment (catchment SA2)",
+        trajectory:     et.trajectory.map(p => ({ period: p.year, value: p.value })),
+        trajectory_kind:"annual",
+        value_format:   "int",
+        raw_value:      et.latest_value,
+        year:           et.latest_year,
+        period_label:   String(et.latest_year),
+        source:         et.source || "ACARA School Profile 2008-2025",
+        intent_copy:    "Total catchment school enrolment over time. Rising school enrolment is a leading indicator for the under-5 cohort coming through into the local ECEC market.",
+        about_data:     "Sum of student enrolment across all schools located in this SA2 (ACARA School Profile, annual). Includes Government, Catholic, and Independent across primary, secondary, and combined sectors.",
+        decile:         null,
+        cohort_n:       null,
+      };
+    }
+  }
   return null;
 }
 
@@ -4301,7 +4370,33 @@ function _renderLfpUnempChart(centre) {
       },
       scales: {
         x: { ticks: { color: "#6b7684", font: { size: 10 }, maxTicksLimit: 6, autoSkip: true }, grid: { display: false } },
-        y: { ticks: { color: "#6b7684", font: { size: 10 }, callback: v => v + "%" }, grid: { color: "#232933" }, beginAtZero: haveUnemp },
+        y: (() => {
+          // Same statistical-bounds approach as catchment charts — data-
+          // anchored bounds with a minSpan floor so a tight unemployment
+          // range (2.8% to 3.5%) doesn't render as a flat ribbon against
+          // a 0-baseline axis. Patrick 2026-05-12: "scale needs to be
+          // sorted here in respect to that picture."
+          const dataMin = Math.min(...data);
+          const dataMax = Math.max(...data);
+          const dataMid = (dataMin + dataMax) / 2;
+          const dataSpan = Math.max(dataMax - dataMin, 1e-9);
+          // Percent-formatted axis: span at least 4× data range OR 3pp
+          // (whichever is larger). Smaller floor than the catchment 5pp
+          // because unemployment trajectories are typically tighter.
+          const minSpan = Math.max(dataSpan * 4, 3);
+          let yMin = dataMid - minSpan / 2;
+          let yMax = dataMid + minSpan / 2;
+          yMin = Math.min(yMin, dataMin);
+          yMax = Math.max(yMax, dataMax);
+          const pad = (yMax - yMin) * 0.08;
+          return {
+            ticks: { color: "#6b7684", font: { size: 10 }, callback: v => v + "%" },
+            grid: { color: "#232933" },
+            beginAtZero: false,
+            min: Math.max(0, yMin - pad),
+            max: yMax + pad,
+          };
+        })(),
       },
     },
   };
@@ -4753,17 +4848,16 @@ function renderL5Matrix(centre) {
   const enrolTrend = centre.school_enrolment_trend || {};
   if (enrolTrend.latest_value != null) {
     const pct = enrolTrend.change_3y_pct;
-    // Plain-text direction string (commentary is htmlEscape'd by the row
-    // renderer; inline colour markup would render as visible <span> tags).
-    const directionStr = pct == null ? "trend unavailable"
-      : pct > 0.5  ? `+${pct.toFixed(1)}% over 3y`
-      : pct < -0.5 ? `${pct.toFixed(1)}% over 3y`
-      : `flat over 3y`;
-    // Sparkline carries the 18-year trajectory so the row doesn't get
-    // wrongly tagged with "static snapshot" by the _l5RowAnnotation helper.
+    // Trend now surfaces as a trend-stamp under the period via
+    // trend3y_pct (relocated 2026-05-12 per Patrick). Commentary focuses
+    // on absolute values + analytical framing only.
+    // drawer_key uses metric:* prefix so handleRowClick routes the row-
+    // body click through toggleRowExpand → inline-expand showing the
+    // 18-year trajectory chart. _findPosEntry has been extended to
+    // surface this synthetic row for the inline-expand path.
     rows.push({
       metric:        "school_enrolment_3y_trend",
-      display:       "School enrolment trend (3y)",
+      display:       "School enrolment trend",
       category:      "education",
       current_value: enrolTrend.latest_value,
       value_format:  "int",
@@ -4772,9 +4866,10 @@ function renderL5Matrix(centre) {
       band:          pct == null ? null : pct > 0.5 ? "high" : pct < -0.5 ? "low" : "mid",
       cohort_n:      null,
       obs_der_com:   ["OBS", "DER"],
-      commentary:    `${directionStr} · Total catchment school enrolment (${Math.round(enrolTrend.latest_value).toLocaleString()} in ${enrolTrend.latest_year}${enrolTrend.value_3y_ago != null ? `, ${Math.round(enrolTrend.value_3y_ago).toLocaleString()} in ${enrolTrend.year_3y_ago}` : ""}). Rising school enrolment is a leading indicator for the under-5 cohort coming through.`,
+      trend3y_pct:   pct,
+      commentary:    `Total catchment school enrolment ${Math.round(enrolTrend.latest_value).toLocaleString()} in ${enrolTrend.latest_year}${enrolTrend.value_3y_ago != null ? `, ${Math.round(enrolTrend.value_3y_ago).toLocaleString()} in ${enrolTrend.year_3y_ago}` : ""}. Rising school enrolment is a leading indicator for the under-5 cohort coming through.`,
       sparkline:     (enrolTrend.trajectory || []).slice(-12).map(p => ({ period: p.year, value: p.value })),
-      drawer_key:    "school_enrolment_trend",
+      drawer_key:    "metric:school_enrolment_3y_trend",
     });
   }
 
@@ -4914,9 +5009,25 @@ function renderMatrixRow(row) {
   const annotationLabel = annotation === "census-3pt" ? "Census 3-pt"
                         : annotation === "static" ? "static snapshot"
                         : "";
+  // Trend stamp under period (relocated 2026-05-12 per Patrick):
+  // workforce JSA IVI rows carry trend3y_pct; school enrolment row carries
+  // a normalised trend pct. Direction interpretation depends on metric:
+  // workforce vacancies are inverse (falling = favourable for operator);
+  // school enrolment direct (rising = favourable for ECEC demand).
+  let trendStampHtml = "";
+  if (row.trend3y_pct != null) {
+    const pct = Number(row.trend3y_pct);
+    const sign = pct >= 0 ? "+" : "−";
+    const isVacancy = (row.metric || "").startsWith("jsa_ivi");
+    let dirClass;
+    if (Math.abs(pct) < 0.5) dirClass = "flat";
+    else if (isVacancy) dirClass = pct < 0 ? "up" : "down";  // vacancies easing = up=favourable
+    else                dirClass = pct > 0 ? "up" : "down";
+    trendStampHtml = `<span class="trend-stamp ${dirClass}">${sign}${Math.abs(pct).toFixed(0)}% over 3y</span>`;
+  }
   const periodHtml = row.period
-    ? `<span class="period">${htmlEscape(row.period)}${annotationLabel ? `<span class="period-stamp">${htmlEscape(annotationLabel)}</span>` : ""}</span>`
-    : "";
+    ? `<span class="period">${htmlEscape(row.period)}${annotationLabel ? `<span class="period-stamp">${htmlEscape(annotationLabel)}</span>` : ""}${trendStampHtml}</span>`
+    : (trendStampHtml ? `<span class="period">${trendStampHtml}</span>` : "");
   const decileHtml = renderDecileStrip(row.decile, row.band, row.cohort_n);
   // Detect workforce scope stamps so they render with the dashed-italic
   // scope-stamp style instead of the band signal pill.
@@ -5189,6 +5300,51 @@ function renderDrawerContent(drawerKey, centre) {
     const metric = drawerKey.slice(7);
     return renderMetricDrawer(metric, centre);
   }
+  // cross_subtype_oshc / cross_subtype_ldc → list services in catchment
+  // (transition pathway for LDC subject, feeder pipeline for OSHC subject).
+  // Patrick 2026-05-12: rich-content drawer showing names + places + daily
+  // rate + NQS per service.
+  if (drawerKey === "cross_subtype_oshc" || drawerKey === "cross_subtype_ldc") {
+    const xs = centre.cross_subtype_competition || {};
+    const services = xs.services || [];
+    const targetLabel = xs.target_label || "Comparable services";
+    const titleSubtype = drawerKey === "cross_subtype_oshc" ? "Outside School Hours Care" : "Long Day Care";
+    if (!services.length) {
+      return {
+        title: `${titleSubtype} in catchment`,
+        subtitle: targetLabel,
+        html: `<div class="state-msg">No ${xs.target_subtype || "comparable"} services currently active in this catchment SA2.</div>`,
+      };
+    }
+    const rows = services.map(s => `
+      <div class="drawer-list-row" onclick="window.location.href='centre_v2.html?id=${s.service_id}'" style="cursor:pointer;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:3px;">
+          <span style="color:var(--text);font-weight:500;font-size:13px;">${htmlEscape(s.service_name)}</span>
+          ${s.fee != null
+            ? `<span style="color:var(--text);font-variant-numeric:tabular-nums;font-size:12.5px;"><b>$${Math.round(s.fee)}</b><span style="color:var(--text-mute);font-size:11px;">/day</span></span>`
+            : `<span style="color:var(--text-mute);font-size:11px;font-style:italic;">fee pending</span>`}
+        </div>
+        <div style="display:flex;gap:14px;font-size:11.5px;color:var(--text-mute);flex-wrap:wrap;">
+          <span>${s.places != null ? `${s.places} places` : "places —"}</span>
+          <span>${s.nqs_overall ? htmlEscape(s.nqs_overall) : "Not yet rated"}</span>
+          ${s.large_provider_name ? `<span>${htmlEscape(s.large_provider_name)}</span>` : ""}
+        </div>
+      </div>
+    `).join("");
+    const framing = xs.framing || "";
+    return {
+      title: `${titleSubtype} in catchment`,
+      subtitle: `${xs.count} service${xs.count === 1 ? "" : "s"} · ${xs.total_places.toLocaleString()} total approved places`,
+      html: `
+        ${framing ? `<div class="drawer-section"><div style="font-size:12.5px;color:var(--text-dim);line-height:1.55;font-style:italic;">${htmlEscape(framing)}</div></div>` : ""}
+        <div class="drawer-section">
+          <div class="drawer-section-head">Services (click any to open its centre page)</div>
+          <div class="drawer-list">${rows}</div>
+        </div>
+      `,
+    };
+  }
+
   // ccs_coverage → derived from top-level payload.ccs_coverage block
   if (drawerKey === "ccs_coverage") {
     const ccs = centre.ccs_coverage || {};
