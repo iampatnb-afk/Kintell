@@ -1399,6 +1399,45 @@
     transition: color 0.1s;
   }
   .l5-row:hover .l5-trigger { color: var(--accent); }
+  /* Rich-content trigger variant — distinct icon when the drawer carries
+     deeper data than plain methodology (school names list, top-N detail,
+     enforcement events, conditions text, full daily-rate grid). Bundle 2
+     2026-05-12 per Patrick. Slightly more prominent + accent-tinted at rest. */
+  .l5-trigger.rich {
+    color: var(--accent);
+    opacity: 0.75;
+  }
+  .l5-trigger.rich:hover, .l5-row:hover .l5-trigger.rich {
+    opacity: 1;
+    color: var(--accent);
+  }
+  .l5-trigger.rich svg {
+    width: 16px; height: 16px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vertical-align: middle;
+  }
+  /* Caption above the matrix explaining the rich-content trigger.
+     One-line, soft palette so it sits as instruction not as content. */
+  .l5-trigger-caption {
+    margin: 0 0 12px 0;
+    padding: 6px 12px;
+    background: rgba(155, 89, 182, 0.04);
+    border-left: 2px solid rgba(155, 89, 182, 0.35);
+    border-radius: 2px;
+    font-size: 11px;
+    color: var(--text-mute);
+    line-height: 1.5;
+  }
+  .l5-trigger-caption .accent-icon {
+    color: var(--accent);
+    display: inline-block;
+    vertical-align: middle;
+    margin: 0 2px;
+  }
   .l5-row.expanded {
     background: var(--panel-3);
     border-left: 3px solid var(--accent);
@@ -4968,7 +5007,11 @@ function renderL5Matrix(centre) {
   return `
     <section class="l5-matrix">
       <h2>Signal Matrix</h2>
-      <p class="l5-matrix-sub">Every metric in tabular quick-scan form. Click any row to open its trend chart inline below; click the › icon for the full methodology drawer.</p>
+      <p class="l5-matrix-sub">Every metric in tabular quick-scan form. Click any row to open its trend chart inline below; click the right-hand icon for the full methodology drawer.</p>
+      <div class="l5-trigger-caption">
+        <span class="accent-icon"><svg viewBox="0 0 24 24" width="13" height="13" style="vertical-align:middle;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></span>
+        on the right-hand column indicates richer underlying data — school names, top-country / language detail, conditions text, enforcement log, full per-(age × session) fee grid, or service lists. Plain methodology drawer otherwise.
+      </div>
       <div class="l5-cat-bar">${catBar}</div>
       ${sections}
     </section>
@@ -5063,6 +5106,35 @@ function renderMatrixRow(row) {
   // trajectory). › trigger click = open the methodology side drawer
   // (always — its event handler stops propagation so it doesn't also
   // toggle the inline expand). Routing logic lives in handleRowClick.
+  // Rich-content drawer detection — Bundle 2 indicator 2026-05-12. Drawer
+  // keys that surface name lists / event logs / per-line detail get a
+  // distinct accent icon to signal "depth lives behind this row" vs the
+  // plain methodology drawers on most position metrics.
+  const richDrawerSet = new Set([
+    "dec83:daily_rate", "dec83:conditions", "dec83:enforcement",
+    "dec83:operator_group", "dec83:nqs", "dec83:vacancy",
+    "ccs_coverage",
+    "cross_subtype_oshc", "cross_subtype_ldc",
+    "schools_in_catchment",
+    "provider_approval_scale",
+  ]);
+  const richMetricSet = new Set([
+    // Metric drawers that resolve to rich content via renderMetricDrawer
+    "sa2_school_count_total",
+    "sa2_school_enrolment_total",
+    "sa2_nes_share",          // top-N languages preview
+    "sa2_overseas_born_share",// top-N countries of birth preview
+  ]);
+  const isRich = richDrawerSet.has(drawerKey) || richMetricSet.has(row.metric);
+  const triggerIcon = isRich
+    // Layers / list icon — visually distinct from the plain › chevron
+    ? `<svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>`
+    : `›`;
+  const triggerClass = isRich ? "l5-trigger rich" : "l5-trigger";
+  const triggerTitle = isRich
+    ? "Rich content drawer — names, list detail, or full breakdown"
+    : "Methodology + detail";
+
   return `
     <div class="l5-row" onclick="handleRowClick(event, '${htmlEscape(drawerKey)}')" data-metric="${htmlEscape(row.metric || '')}" data-category="${htmlEscape(row.category || '')}">
       <div></div>
@@ -5074,7 +5146,7 @@ function renderMatrixRow(row) {
       <div class="l5-decile">${decileHtml}</div>
       <div class="l5-signal ${signalClass}">${v15Pending ? htmlEscape(v15Pending) : htmlEscape(row.signal || "—")}</div>
       <div class="l5-comm">${commHtml}</div>
-      <div class="l5-trigger" onclick="event.stopPropagation(); openDrawer('${htmlEscape(drawerKey)}')">›</div>
+      <div class="${triggerClass}" title="${triggerTitle}" onclick="event.stopPropagation(); openDrawer('${htmlEscape(drawerKey)}')">${triggerIcon}</div>
     </div>
   `;
 }
@@ -5302,46 +5374,107 @@ function renderDrawerContent(drawerKey, centre) {
   }
   // cross_subtype_oshc / cross_subtype_ldc → list services in catchment
   // (transition pathway for LDC subject, feeder pipeline for OSHC subject).
-  // Patrick 2026-05-12: rich-content drawer showing names + places + daily
-  // rate + NQS per service.
+  // OSHC services include their nearest-school attachment status from
+  // _compute_cross_subtype_competition (proximity match against
+  // acara_schools, 300m threshold).
   if (drawerKey === "cross_subtype_oshc" || drawerKey === "cross_subtype_ldc") {
     const xs = centre.cross_subtype_competition || {};
     const services = xs.services || [];
-    const targetLabel = xs.target_label || "Comparable services";
     const titleSubtype = drawerKey === "cross_subtype_oshc" ? "Outside School Hours Care" : "Long Day Care";
     if (!services.length) {
       return {
         title: `${titleSubtype} in catchment`,
-        subtitle: targetLabel,
+        subtitle: xs.target_label || "Comparable services",
         html: `<div class="state-msg">No ${xs.target_subtype || "comparable"} services currently active in this catchment SA2.</div>`,
       };
     }
-    const rows = services.map(s => `
-      <div class="drawer-list-row" onclick="window.location.href='centre_v2.html?id=${s.service_id}'" style="cursor:pointer;">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:3px;">
-          <span style="color:var(--text);font-weight:500;font-size:13px;">${htmlEscape(s.service_name)}</span>
-          ${s.fee != null
-            ? `<span style="color:var(--text);font-variant-numeric:tabular-nums;font-size:12.5px;"><b>$${Math.round(s.fee)}</b><span style="color:var(--text-mute);font-size:11px;">/day</span></span>`
-            : `<span style="color:var(--text-mute);font-size:11px;font-style:italic;">fee pending</span>`}
+    const isOshc = drawerKey === "cross_subtype_oshc";
+    const rows = services.map(s => {
+      const schoolLine = isOshc && s.nearest_school
+        ? (s.school_attached
+            ? `<span style="color:rgba(110,200,145,0.95);">▣ At <b>${htmlEscape(s.nearest_school.school_name)}</b></span> <span style="color:var(--text-mute);font-size:10.5px;">(${s.nearest_school_distance_m}m · ${htmlEscape(s.nearest_school.sector || "—")})</span>`
+            : `<span style="color:var(--text-mute);">Stand-alone · nearest school ${htmlEscape(s.nearest_school.school_name)} ${s.nearest_school_distance_m != null ? `(${Math.round(s.nearest_school_distance_m)}m away)` : ""}</span>`)
+        : "";
+      return `
+        <div class="drawer-list-row" onclick="window.location.href='centre_v2.html?id=${s.service_id}'" style="cursor:pointer;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:3px;">
+            <span style="color:var(--text);font-weight:500;font-size:13px;">${htmlEscape(s.service_name)}</span>
+            ${s.fee != null
+              ? `<span style="color:var(--text);font-variant-numeric:tabular-nums;font-size:12.5px;"><b>$${Math.round(s.fee)}</b><span style="color:var(--text-mute);font-size:11px;">/day</span></span>`
+              : `<span style="color:var(--text-mute);font-size:11px;font-style:italic;">fee pending</span>`}
+          </div>
+          <div style="display:flex;gap:14px;font-size:11.5px;color:var(--text-mute);flex-wrap:wrap;">
+            <span>${s.places != null ? `${s.places} places` : "places —"}</span>
+            <span>${s.nqs_overall ? htmlEscape(s.nqs_overall) : "Not yet rated"}</span>
+            ${s.large_provider_name ? `<span>${htmlEscape(s.large_provider_name)}</span>` : ""}
+          </div>
+          ${schoolLine ? `<div style="margin-top:4px;font-size:11px;">${schoolLine}</div>` : ""}
         </div>
-        <div style="display:flex;gap:14px;font-size:11.5px;color:var(--text-mute);flex-wrap:wrap;">
-          <span>${s.places != null ? `${s.places} places` : "places —"}</span>
-          <span>${s.nqs_overall ? htmlEscape(s.nqs_overall) : "Not yet rated"}</span>
-          ${s.large_provider_name ? `<span>${htmlEscape(s.large_provider_name)}</span>` : ""}
-        </div>
-      </div>
-    `).join("");
+      `;
+    }).join("");
     const framing = xs.framing || "";
+    const attachedNote = (isOshc && xs.n_school_attached != null)
+      ? `<div style="font-size:11px;color:var(--text-mute);margin-top:6px;">School-attached detection: ${xs.n_school_attached} of ${xs.count} services co-located with a school within ${xs.attach_threshold_m}m (ACARA School Location 2025 proximity match).</div>`
+      : "";
     return {
       title: `${titleSubtype} in catchment`,
       subtitle: `${xs.count} service${xs.count === 1 ? "" : "s"} · ${xs.total_places.toLocaleString()} total approved places`,
       html: `
-        ${framing ? `<div class="drawer-section"><div style="font-size:12.5px;color:var(--text-dim);line-height:1.55;font-style:italic;">${htmlEscape(framing)}</div></div>` : ""}
+        ${framing ? `<div class="drawer-section"><div style="font-size:12.5px;color:var(--text-dim);line-height:1.55;font-style:italic;">${htmlEscape(framing)}</div>${attachedNote}</div>` : ""}
         <div class="drawer-section">
           <div class="drawer-section-head">Services (click any to open its centre page)</div>
           <div class="drawer-list">${rows}</div>
         </div>
       `,
+    };
+  }
+
+  // schools_in_catchment → Bundle 2 main item. Per-school list with
+  // names + sectors + types + enrolments + ICSEA. From the new
+  // acara_schools row-level table.
+  if (drawerKey === "schools_in_catchment") {
+    const sc = centre.schools_in_catchment || {};
+    const schools = sc.schools || [];
+    if (!schools.length) {
+      return {
+        title: "Schools in catchment",
+        subtitle: "",
+        html: `<div class="state-msg">No schools currently mapped to this SA2 in the ACARA School Location 2025 ingest.</div>`,
+      };
+    }
+    // Group by sector for skim-readability
+    const bySector = { Government: [], Catholic: [], Independent: [], Other: [] };
+    for (const s of schools) {
+      (bySector[s.sector] || bySector.Other).push(s);
+    }
+    const renderSchool = (s) => `
+      <div class="drawer-list-row" style="cursor:default;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:3px;">
+          <span style="color:var(--text);font-weight:500;font-size:13px;">${htmlEscape(s.school_name)}</span>
+          ${s.enrolments_total != null
+            ? `<span style="color:var(--text);font-variant-numeric:tabular-nums;font-size:12.5px;"><b>${s.enrolments_total.toLocaleString()}</b><span style="color:var(--text-mute);font-size:11px;"> students</span></span>`
+            : `<span style="color:var(--text-mute);font-size:11px;font-style:italic;">enrolment unavailable</span>`}
+        </div>
+        <div style="display:flex;gap:14px;font-size:11.5px;color:var(--text-mute);flex-wrap:wrap;">
+          <span>${htmlEscape(s.school_type || "—")}</span>
+          <span>${htmlEscape(s.sector || "—")}</span>
+          ${s.icsea != null ? `<span>ICSEA ${s.icsea}</span>` : ""}
+          <span>${htmlEscape(s.suburb || "")} ${htmlEscape(s.postcode || "")}</span>
+        </div>
+      </div>
+    `;
+    const sections = Object.keys(bySector)
+      .filter(sec => bySector[sec].length > 0)
+      .map(sec => `
+        <div class="drawer-section">
+          <div class="drawer-section-head">${htmlEscape(sec)} (${bySector[sec].length})</div>
+          <div class="drawer-list">${bySector[sec].map(renderSchool).join("")}</div>
+        </div>
+      `).join("");
+    return {
+      title: "Schools in catchment",
+      subtitle: `${schools.length} school${schools.length === 1 ? "" : "s"} located in this SA2 (ACARA School Location 2025)`,
+      html: sections,
     };
   }
 
@@ -5575,6 +5708,13 @@ function renderDec83Drawer(topic, data, centre) {
 }
 
 function renderMetricDrawer(metric, centre) {
+  // Schools-in-catchment metrics route to the rich-content schools drawer
+  // (Bundle 2 main item 2026-05-12) — per-school names + sector + type +
+  // enrolments + ICSEA from acara_schools row-level ingest. Same payload
+  // used by direct drawerKey 'schools_in_catchment'.
+  if (metric === "sa2_school_count_total" || metric === "sa2_school_enrolment_total") {
+    return renderDrawerContent("schools_in_catchment", centre);
+  }
   // First check if drawer payload has a special metric:* drawer (e.g. top-N preview)
   const special = (centre.drawer || {})[`metric:${metric}`];
   if (special) {

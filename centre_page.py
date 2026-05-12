@@ -2710,6 +2710,115 @@ def _compute_cross_subtype_competition(conn, sa2_code: Optional[str],
         }
         for r in service_rows
     ]
+    # School-attached detection for OSHC services (Patrick 2026-05-12).
+    # Now that acara_schools carries per-school lat/lng, do a proximity
+    # match: each OSHC service's lat/lng vs schools in the same SA2 plus a
+    # ~300m buffer. An OSHC service co-located with a school is the most
+    # common arrangement; standalone OSHC indicates a different ops model.
+    if "OSHC" in target_subtypes and out["services"]:
+        try:
+            # Pull every school's lat/lng in the SA2 + service lat/lngs
+            schools = conn.execute(
+                """
+                SELECT acara_sml_id, school_name, sector, school_type, lat, lng
+                  FROM acara_schools
+                 WHERE sa2_code = ?
+                   AND lat IS NOT NULL AND lng IS NOT NULL
+                """,
+                (sa2_code,),
+            ).fetchall()
+            svc_ids = [s["service_id"] for s in out["services"]]
+            placeholders_s = ",".join("?" * len(svc_ids))
+            svc_coords = conn.execute(
+                f"""
+                SELECT service_id, lat, lng FROM services
+                 WHERE service_id IN ({placeholders_s})
+                """,
+                svc_ids,
+            ).fetchall()
+            svc_latlng = {r[0]: (r[1], r[2]) for r in svc_coords if r[1] is not None and r[2] is not None}
+            # Cheap haversine approximation (small distances, equirectangular)
+            def _dist_m(lat1, lng1, lat2, lng2):
+                import math as _m
+                dlat = _m.radians(lat2 - lat1)
+                dlng = _m.radians(lng2 - lng1)
+                x = dlng * _m.cos(_m.radians((lat1 + lat2) / 2))
+                y = dlat
+                return _m.sqrt(x * x + y * y) * 6371000.0
+            ATTACH_THRESHOLD_M = 300.0
+            n_attached = 0
+            for svc in out["services"]:
+                ll = svc_latlng.get(svc["service_id"])
+                svc["school_attached"] = None
+                svc["nearest_school"] = None
+                svc["nearest_school_distance_m"] = None
+                if not ll:
+                    continue
+                best = None
+                best_dist = None
+                for sch in schools:
+                    d = _dist_m(ll[0], ll[1], sch[4], sch[5])
+                    if best_dist is None or d < best_dist:
+                        best_dist = d
+                        best = sch
+                if best is not None:
+                    svc["nearest_school"] = {
+                        "acara_sml_id":  best[0],
+                        "school_name":   best[1],
+                        "sector":        best[2],
+                        "school_type":   best[3],
+                    }
+                    svc["nearest_school_distance_m"] = round(best_dist, 1)
+                    if best_dist <= ATTACH_THRESHOLD_M:
+                        svc["school_attached"] = True
+                        n_attached += 1
+                    else:
+                        svc["school_attached"] = False
+            out["n_school_attached"] = n_attached
+            out["attach_threshold_m"] = ATTACH_THRESHOLD_M
+        except sqlite3.OperationalError:
+            # acara_schools table not present → skip detection silently.
+            pass
+    return out
+
+
+def _build_schools_in_catchment(conn, sa2_code: Optional[str]) -> dict:
+    """Returns per-school detail for every school in the SA2. Drives
+    Bundle 2 schools-in-catchment drawer enrichment (Patrick 2026-05-12).
+    Names + sector + type + enrolments + ICSEA per school. Sorted by
+    enrolment descending so the dominant schools head the list."""
+    out = {"sa2_code": sa2_code, "n_schools": 0, "schools": [], "tag": TAG_OBS}
+    if not sa2_code:
+        return out
+    try:
+        rows = conn.execute(
+            """
+            SELECT acara_sml_id, school_name, sector, school_type,
+                   suburb, postcode, enrolments_total, icsea, lat, lng
+              FROM acara_schools
+             WHERE sa2_code = ?
+             ORDER BY enrolments_total DESC NULLS LAST, school_name ASC
+            """,
+            (sa2_code,),
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return out
+    out["schools"] = [
+        {
+            "acara_sml_id":     int(r[0]),
+            "school_name":      r[1],
+            "sector":           r[2],
+            "school_type":      r[3],
+            "suburb":           r[4],
+            "postcode":         r[5],
+            "enrolments_total": int(r[6]) if r[6] is not None else None,
+            "icsea":            int(r[7]) if r[7] is not None else None,
+            "lat":              r[8],
+            "lng":              r[9],
+        }
+        for r in rows
+    ]
+    out["n_schools"] = len(out["schools"])
     return out
 
 
@@ -4484,6 +4593,9 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
         cross_subtype_competition = _compute_cross_subtype_competition(
             conn, r.get("sa2_code"), r.get("service_sub_type")
         )
+        schools_in_catchment = _build_schools_in_catchment(
+            conn, r.get("sa2_code")
+        )
 
         # --- COMPETITIVE POSITIONING (Layer 1.5 panel) ---
         # Every centre in the same SA2 on a daily-fee × NQS axis with
@@ -4534,6 +4646,7 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
             "competitive_positioning":   competitive_positioning,
             "school_enrolment_trend":    school_enrolment_trend,
             "cross_subtype_competition": cross_subtype_competition,
+            "schools_in_catchment":      schools_in_catchment,
         }
         return payload
     finally:
