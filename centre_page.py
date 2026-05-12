@@ -185,7 +185,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
-DB_PATH = "data/kintell.db"
+DB_PATH = str(Path(__file__).resolve().parent / "data" / "kintell.db")
 
 # OBS = observed (raw from source), DER = derived (computed),
 # COM = commentary (rule-based text). Same convention as operator_page.py.
@@ -591,7 +591,7 @@ LAYER3_METRIC_META = {
         "direction": "high_is_concerning",
         "row_weight": "full",  # v15 (Layer 4.2-A.3c): trajectory from sa2_history.json + centre_events overlay
         "industry_thresholds": True,  # v10
-        "source": "service_catchment_cache (places / under-5 pop)",
+        "source": "ACECQA approved places ÷ ABS ERP under-5 population",
         # v16 (Layer 4.2-A.3c amendment to DEC-74): perspective toggle removed.
         # Inverse view (children per place) is shown as a separate row in
         # the same card; toggling here would just swap to data already visible.
@@ -608,7 +608,7 @@ LAYER3_METRIC_META = {
         "direction": "high_is_positive",
         "row_weight": "full",  # v15 (Layer 4.2-A.3c): trajectory from sa2_history.json (1/supply_ratio per quarter)
         "industry_thresholds": True,  # v10
-        "source": "service_catchment_cache (under-5 pop / places)",
+        "source": "ABS ERP under-5 population ÷ ACECQA approved places",
         # v16 (Layer 4.2-A.3c amendment to DEC-74): perspective toggle removed.
         # Inverse view (supply ratio) is shown as a separate row in the
         # same card; toggling here would just swap to data already visible.
@@ -624,7 +624,7 @@ LAYER3_METRIC_META = {
         "value_format": "int",
         "direction": "high_is_positive",
         "row_weight": "full",  # v15 (Layer 4.2-A.3c): trajectory = pop_0_4 × current_calibrated_rate × 0.6 per quarter
-        "source": "service_catchment_cache (u5 × calibrated_rate × 0.6)",
+        "source": "ABS ERP under-5 × calibrated participation rate × 0.6 attendance factor",
         "uses_calibration": True,  # v13 — opts in to STD-34 metadata
         "band_copy": {
             "low":  "thin calibrated demand",
@@ -639,7 +639,7 @@ LAYER3_METRIC_META = {
         "direction": "high_is_positive",
         "row_weight": "full",  # v15 (Layer 4.2-A.3c): trajectory = adjusted_demand_per_quarter / places_per_quarter
         "industry_thresholds": True,  # v10
-        "source": "service_catchment_cache (adjusted_demand / places)",
+        "source": "Adjusted demand estimate ÷ ACECQA approved places",
         "uses_calibration": True,  # v13 — derives transitively via adjusted_demand
         # v16 (Layer 4.2-A.3c amendment to DEC-74): perspective toggle removed.
         # The natural "fill" framing (high = strong demand vs supply) is
@@ -657,7 +657,7 @@ LAYER3_METRIC_META = {
         "value_format": "percent_share",
         "direction": "high_is_positive",
         "row_weight": "context",  # rank-by-construction; no banding
-        "source": "service_catchment_cache (this SA2's adjusted_demand / state total)",
+        "source": "This SA2's adjusted demand ÷ state-wide adjusted demand",
         "uses_calibration": True,  # v13 — derives transitively via adjusted_demand
         "band_copy": {
             "low": "—", "mid": "—", "high": "—",
@@ -1058,7 +1058,7 @@ LAYER3_METRIC_INTENT_COPY = {
         "deeper natural demand pool for ECEC services in this catchment.",
     "sa2_partnered_25_44_share":
         "Share of 25-44 year-olds in a registered or de-facto partnership — "
-        "an institutional context signal alongside the parent cohort. "
+        "a community-structure context signal alongside the parent cohort. "
         "Catchments with lower partnered shares often correlate with "
         "later-fertility profiles and shifted ECEC demand timing.",
     "sa2_women_35_44_with_child_share":
@@ -2299,7 +2299,9 @@ def _build_dec83_state(conn, service_id: int) -> dict:
     except sqlite3.OperationalError:
         pass
 
-    # 6. Fee rows: latest year median per (age_band, session_type)
+    # 6. Fee rows: latest year median per (age_band, session_type) +
+    #    annual trajectory for the headline pair (full_day × 36m-preschool
+    #    or service-subtype-discriminated equivalent — Layer 3 chart 7).
     try:
         # Find latest as_of_date year for this service
         latest_year_row = conn.execute("""
@@ -2321,6 +2323,21 @@ def _build_dec83_state(conn, service_id: int) -> dict:
                  GROUP BY age_band, session_type
                  ORDER BY age_band, session_type
             """, (service_id, latest_year)).fetchall()
+            # Annual trajectory for the headline pair: median per (year)
+            # for the most-populated (age_band, session_type) cell. Layer 3
+            # chart 7 reads this; sparkline in matrix continues to use the
+            # last-N-points compressed view.
+            traj_rows = conn.execute("""
+                SELECT substr(as_of_date, 1, 4) AS yr,
+                       age_band, session_type,
+                       AVG(fee_aud) AS median_fee_aud,
+                       COUNT(*) AS n_obs
+                  FROM service_fee
+                 WHERE service_id = ?
+                 GROUP BY yr, age_band, session_type
+                 ORDER BY yr, age_band, session_type
+            """, (service_id,)).fetchall()
+            traj_dicts = [_row_to_dict(r) for r in traj_rows]
             out["fees"] = {
                 "by_age_band_session": [
                     {
@@ -2334,6 +2351,16 @@ def _build_dec83_state(conn, service_id: int) -> dict:
                 ],
                 "latest_as_of_date": latest_dt,
                 "year":              latest_year,
+                "annual_trajectory": [
+                    {
+                        "year":         t.get("yr"),
+                        "age_band":     t.get("age_band"),
+                        "session_type": t.get("session_type"),
+                        "median_fee":   round(float(t["median_fee_aud"]), 2) if t.get("median_fee_aud") is not None else None,
+                        "n_obs":        int(t.get("n_obs") or 0),
+                    }
+                    for t in traj_dicts
+                ],
             }
     except sqlite3.OperationalError:
         pass
@@ -2352,6 +2379,370 @@ def _build_dec83_state(conn, service_id: int) -> dict:
     except sqlite3.OperationalError:
         pass
 
+    return out
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Peer-cohort helpers (Centre v2 Bundle B #1 — within-SA2 cohort viz)
+# ─────────────────────────────────────────────────────────────────────
+
+
+def _percentile(sorted_values, q: float):
+    """Linear-interpolation percentile of an already-sorted numeric list."""
+    if not sorted_values:
+        return None
+    n = len(sorted_values)
+    if n == 1:
+        return sorted_values[0]
+    pos = q * (n - 1)
+    lo = int(pos)
+    hi = min(lo + 1, n - 1)
+    frac = pos - lo
+    return sorted_values[lo] + frac * (sorted_values[hi] - sorted_values[lo])
+
+
+def _comparable_subtype_group(subject_subtype: Optional[str]) -> tuple:
+    """Returns the SQL IN-list of subtype strings that count as comparable
+    market peers for the subject. Patrick refinement 2026-05-12: like-for-
+    like only — OSHC competes only with OSHC, LDC + Preschool cluster,
+    FDC separate. Used by Layer 1 places + daily-rate cohorts AND by
+    Layer 1.5 competitive positioning (single source of truth)."""
+    s = (subject_subtype or "").upper()
+    if "OSHC" in s or "OUTSIDE" in s:
+        return ("OSHC",)
+    if "FAMILY" in s:
+        return ("FDC", "Family Day Care", "FAMILY DAY CARE")
+    return ("LDC", "Long Day Care", "LONG DAY CARE", "Preschool", "PRESCHOOL", "PS")
+
+
+def _cohort_for_places(conn, sa2_code: Optional[str],
+                       subject_subtype: Optional[str] = None) -> dict:
+    """Approved-places peer cohort within the same SA2, filtered to the
+    subject's comparable subtype group (Patrick 2026-05-12: "Layer 1
+    should obviously just compare to like for like at the top there.").
+    Includes the subject centre so the marker sits naturally within
+    the distribution.
+
+    Returns {"n", "min", "p25", "median", "p75", "max", "values", "meaningful"}
+    where meaningful=False when n<3 or all values identical — the renderer
+    should drop the range bar in that case.
+    """
+    out = {"n": 0, "min": None, "p25": None, "median": None,
+           "p75": None, "max": None, "values": [], "meaningful": False}
+    if not sa2_code:
+        return out
+    comparable = _comparable_subtype_group(subject_subtype)
+    placeholders = ",".join("?" * len(comparable))
+    try:
+        rows = conn.execute(
+            f"""
+            SELECT approved_places
+              FROM services
+             WHERE sa2_code = ?
+               AND COALESCE(is_active, 1) = 1
+               AND approved_places IS NOT NULL
+               AND approved_places > 0
+               AND service_sub_type IN ({placeholders})
+            """,
+            (sa2_code, *comparable),
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return out
+    values = sorted(int(r[0]) for r in rows)
+    if not values:
+        return out
+    out["n"] = len(values)
+    out["values"] = values
+    out["min"] = values[0]
+    out["max"] = values[-1]
+    out["median"] = round(_percentile(values, 0.5), 1)
+    out["p25"] = round(_percentile(values, 0.25), 1)
+    out["p75"] = round(_percentile(values, 0.75), 1)
+    out["meaningful"] = (len(values) >= 3) and (values[-1] > values[0])
+    return out
+
+
+def _cohort_for_daily_rate(conn, sa2_code: Optional[str],
+                           subject_subtype: Optional[str] = None) -> dict:
+    """Daily-rate peer cohort within the same SA2 by (age_band, session_type),
+    filtered to comparable subtype group (Patrick refinement 2026-05-12).
+    Reads each service's latest snapshot per cell from `service_fee` and
+    groups by cell. Returns dict keyed "{age_band}|{session_type}" with the
+    same shape as _cohort_for_places.
+
+    Pilot small-n caveat: 130 services across 3 SA2s — per-SA2 cohorts run
+    3-40 services depending on density. Renderer surfaces cohort n in the
+    range-bar caption so the reader sees the sample size.
+    """
+    by_cell: dict = {}
+    if not sa2_code:
+        return by_cell
+    comparable = _comparable_subtype_group(subject_subtype)
+    placeholders = ",".join("?" * len(comparable))
+    try:
+        rows = conn.execute(
+            f"""
+            SELECT sf.service_id, sf.age_band, sf.session_type, sf.fee_aud
+              FROM service_fee sf
+              JOIN services s ON s.service_id = sf.service_id
+             WHERE s.sa2_code = ?
+               AND COALESCE(s.is_active, 1) = 1
+               AND s.service_sub_type IN ({placeholders})
+               AND sf.fee_aud IS NOT NULL
+               AND sf.fee_aud > 0
+               AND sf.as_of_date = (
+                     SELECT MAX(as_of_date) FROM service_fee sf2
+                      WHERE sf2.service_id = sf.service_id
+                        AND sf2.age_band = sf.age_band
+                        AND sf2.session_type = sf.session_type
+                   )
+            """,
+            (sa2_code, *comparable),
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return by_cell
+    # Aggregate per service in case the latest-as_of_date filter still
+    # yields multiple rows (different fee_type variants).
+    from collections import defaultdict
+    per_service = defaultdict(list)
+    for r in rows:
+        per_service[(int(r[0]), r[1], r[2])].append(float(r[3]))
+    cells = defaultdict(list)
+    for (_svc, age_band, session_type), vals in per_service.items():
+        cells[(age_band, session_type)].append(sum(vals) / len(vals))
+    for (age_band, session_type), vals in cells.items():
+        v = sorted(vals)
+        cell = {
+            "age_band":     age_band,
+            "session_type": session_type,
+            "n":            len(v),
+            "min":          round(v[0], 2),
+            "max":          round(v[-1], 2),
+            "median":       round(_percentile(v, 0.5), 2),
+            "p25":          round(_percentile(v, 0.25), 2),
+            "p75":          round(_percentile(v, 0.75), 2),
+            "values":       [round(x, 2) for x in v],
+            "meaningful":   (len(v) >= 3) and (v[-1] > v[0]),
+        }
+        by_cell[f"{age_band}|{session_type}"] = cell
+    return by_cell
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Competitive positioning — Layer 1.5 panel showing every centre in the
+# same SA2 on a daily-fee × NQS axis with subject centre emphasised.
+# Patrick 2026-05-12: "shows commercial + operational positioning within
+# the competitive ecosystem at a glance". Lives between Layer 1 (identity)
+# and Layer 2 (intelligence). Data shape per centre: name, fee, places,
+# nqs, last assessment date, operator group, is_subject flag.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def _build_competitive_positioning(conn, subject_service_id: int,
+                                   sa2_code: Optional[str],
+                                   subject_subtype: Optional[str]) -> dict:
+    """Returns competitive-positioning payload for the subject centre's SA2.
+    Includes only services with a usable headline daily fee in the same
+    age × session pair the subject centre uses (LDC/Preschool/FDC →
+    full_day × 36m-preschool; OSHC → before_school × school-age).
+
+    Shape:
+      {
+        "sa2_code": str,
+        "subject_service_id": int,
+        "n_centres": int,
+        "headline_pair": {"age_band", "session_type"},
+        "ccs_hourly_cap_aud": float,
+        "operating_hours_assumed": int,
+        "ccs_daily_cap_aud": float,
+        "centres": [
+          {
+            "service_id", "service_name", "fee", "places",
+            "nqs_overall", "last_assessed_at", "large_provider_id",
+            "large_provider_name", "subtype", "is_subject"
+          },
+          ...
+        ]
+      }
+    """
+    out = {
+        "sa2_code":               sa2_code,
+        "subject_service_id":     subject_service_id,
+        "n_centres":              0,
+        "headline_pair":          None,
+        "subject_subtype":        subject_subtype,
+        "comparable_group_label": None,
+        "ccs_hourly_cap_aud":     13.73,   # July 2024-25 Centre-Based Day Care cap
+        "operating_hours_assumed": 10,
+        "ccs_daily_cap_aud":      137.30,  # 13.73 × 10
+        "centres":                [],
+    }
+    if not sa2_code:
+        return out
+    subtype_uc = (subject_subtype or "").upper()
+    is_oshc = ("OSHC" in subtype_uc) or ("OUTSIDE" in subtype_uc)
+    is_fdc = "FAMILY" in subtype_uc
+    age_band = "school-age" if is_oshc else "36m-preschool"
+    session_type = "before_school" if is_oshc else "full_day"
+    out["headline_pair"] = {"age_band": age_band, "session_type": session_type}
+
+    # Comparable-subtype group — Patrick 2026-05-12 framing: only compare
+    # apples with apples. Single source of truth in
+    # `_comparable_subtype_group`; this builder just attaches the human
+    # label for the methodology line in the renderer.
+    comparable_subtypes = _comparable_subtype_group(subject_subtype)
+    if is_oshc:
+        out["comparable_group_label"] = "Outside School Hours Care (school-age)"
+    elif is_fdc:
+        out["comparable_group_label"] = "Family Day Care (in-home, all ages)"
+    else:
+        out["comparable_group_label"] = "Comparable long day care centres (0–5 years)"
+
+    # SQL IN-list placeholder
+    placeholders = ",".join("?" * len(comparable_subtypes))
+    try:
+        rows = conn.execute(
+            f"""
+            SELECT
+              s.service_id,
+              s.service_name,
+              s.approved_places,
+              s.overall_nqs_rating,
+              s.large_provider_id,
+              s.service_sub_type,
+              lp.name AS large_provider_name,
+              (
+                SELECT AVG(sf.fee_aud)
+                  FROM service_fee sf
+                 WHERE sf.service_id = s.service_id
+                   AND sf.age_band = ?
+                   AND sf.session_type = ?
+                   AND sf.fee_aud IS NOT NULL
+                   AND sf.fee_aud > 0
+                   AND sf.as_of_date = (
+                         SELECT MAX(as_of_date) FROM service_fee sf2
+                          WHERE sf2.service_id = sf.service_id
+                            AND sf2.age_band = sf.age_band
+                            AND sf2.session_type = sf.session_type
+                       )
+              ) AS fee_aud,
+              (
+                SELECT srs.last_regulatory_visit
+                  FROM service_regulatory_snapshot srs
+                 WHERE srs.service_id = s.service_id
+                 ORDER BY srs.snapshot_date DESC
+                 LIMIT 1
+              ) AS last_assessed_at
+              FROM services s
+              LEFT JOIN large_provider lp
+                     ON lp.large_provider_id = s.large_provider_id
+             WHERE s.sa2_code = ?
+               AND COALESCE(s.is_active, 1) = 1
+               AND s.service_sub_type IN ({placeholders})
+            """,
+            (age_band, session_type, sa2_code, *comparable_subtypes),
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return out
+
+    centres = []
+    for row in rows:
+        d = _row_to_dict(row)
+        fee = d.get("fee_aud")
+        if fee is None or fee <= 0:
+            continue  # only include centres with a usable headline fee
+        centres.append({
+            "service_id":          d.get("service_id"),
+            "service_name":        d.get("service_name"),
+            "fee":                 round(float(fee), 2),
+            "places":              int(d.get("approved_places") or 0) or None,
+            "nqs_overall":         (d.get("overall_nqs_rating") or "").strip() or None,
+            "last_assessed_at":    d.get("last_assessed_at"),
+            "large_provider_id":   d.get("large_provider_id"),
+            "large_provider_name": d.get("large_provider_name"),
+            "subtype":             d.get("service_sub_type"),
+            "is_subject":          int(d.get("service_id") or -1) == subject_service_id,
+        })
+    centres.sort(key=lambda c: c["fee"])
+    out["n_centres"] = len(centres)
+    out["centres"] = centres
+    return out
+
+
+# ─────────────────────────────────────────────────────────────────────
+# CCS Coverage Ratio — % of catchment households estimated to receive
+# the full CCS benefit, derived from SA2 median household income.
+# Lognormal-distribution model on the income side (empirically reasonable
+# for AU household income, σ≈0.5 nationally). V1 single-threshold against
+# the current ~$80K full-benefit cutoff; bands surface methodology
+# transparency in about_data per DEC-69 OBS/DER discipline.
+# ─────────────────────────────────────────────────────────────────────
+
+import math as _math
+
+_CCS_FULL_BENEFIT_THRESHOLD = 80000   # AU dollars, annual family income (~2026 figure)
+_CCS_INCOME_SIGMA = 0.5               # σ of lognormal on annual AU household income; nationally typical
+_CCS_WEEKLY_TO_ANNUAL = 52            # ABS publishes household income weekly; convert for threshold compare
+
+
+def _normal_cdf(z: float) -> float:
+    """Standard normal CDF via erf — sufficient precision for percentile output."""
+    return 0.5 * (1.0 + _math.erf(z / _math.sqrt(2.0)))
+
+
+def _compute_ccs_coverage(median_weekly_household_income: Optional[float]) -> dict:
+    """Estimate the fraction of households below the CCS full-benefit threshold.
+    Returns a payload-shaped dict:
+      {
+        "value_pct":  float|None,  # 0..100 (or None when median absent)
+        "band":       str,         # qualitative band for matrix Signal column
+        "methodology": str,        # rendered in drawer about_data
+        "threshold_aud": int,      # the threshold used (transparency)
+        "median_weekly_aud": float,
+        "median_annual_aud": float,
+        "tag": "DER",
+      }
+    """
+    out = {
+        "value_pct":          None,
+        "band":               None,
+        "methodology":        ("CCS Coverage Ratio = estimated share of catchment households below the "
+                                f"CCS full-benefit family income threshold (~A${_CCS_FULL_BENEFIT_THRESHOLD:,}/yr; "
+                                "current Australian Childcare Subsidy income test). Derived from ABS Census "
+                                "SA2 median weekly household income via a lognormal model with σ≈0.5 (AU "
+                                "household income distribution shape, nationally calibrated). Three Day "
+                                "Guarantee (Jan 2026) overlays minimum 3-day subsidised access regardless of "
+                                "activity test, so this ratio reads as fee-headroom signal, not access cap."),
+        "threshold_aud":      _CCS_FULL_BENEFIT_THRESHOLD,
+        "median_weekly_aud":  None,
+        "median_annual_aud":  None,
+        "tag":                TAG_DER,
+    }
+    if median_weekly_household_income is None or median_weekly_household_income <= 0:
+        return out
+    mwk = float(median_weekly_household_income)
+    mann = mwk * _CCS_WEEKLY_TO_ANNUAL
+    out["median_weekly_aud"] = round(mwk, 2)
+    out["median_annual_aud"] = round(mann, 2)
+    # Lognormal CDF at threshold: P(income < T) where median = exp(μ).
+    mu = _math.log(mann)
+    z = (_math.log(_CCS_FULL_BENEFIT_THRESHOLD) - mu) / _CCS_INCOME_SIGMA
+    pct = _normal_cdf(z) * 100.0
+    # Pin to plausible 0-100 range against numerical edges
+    pct = max(0.0, min(100.0, pct))
+    out["value_pct"] = round(pct, 1)
+    # Banding mirrors signal-matrix shape — high / mid / low (no industry band
+    # because this is catchment affordability, not a centre-level metric).
+    if pct >= 75:
+        out["band"] = "high"
+    elif pct >= 50:
+        out["band"] = "mid-high"
+    elif pct >= 30:
+        out["band"] = "mid"
+    elif pct > 0:
+        out["band"] = "low"
+    else:
+        out["band"] = None
     return out
 
 
@@ -2427,11 +2818,13 @@ def _to_bool(v) -> Optional[bool]:
 # ─────────────────────────────────────────────────────────────────────
 
 
-def _build_executive(r: dict, position: dict, dec83_state: dict) -> dict:
+def _build_executive(r: dict, position: dict, dec83_state: dict,
+                     community_profile: Optional[dict] = None) -> dict:
     """Returns Layer 2 payload: 5 signal tiles + flag bar (max 2 + spillover)
     + composed headline. Each signal tile has a links_to pointer to the
     relevant Layer 5 matrix category for click-through. Flag triggers per
-    DEC-84 #3 severity hierarchy.
+    DEC-84 #3 severity hierarchy. community_profile (added Turn 3 polish)
+    feeds the Community signal with top-2 languages alongside the NES band.
     """
     catchment = position.get("catchment_position", {}) or {}
     pop = position.get("population", {}) or {}
@@ -2456,7 +2849,42 @@ def _build_executive(r: dict, position: dict, dec83_state: dict) -> dict:
     nqs_overall = (r.get("overall_nqs_rating") or "").strip() or None
     nqs_prev = ((dec83_state.get("regulatory_snapshot") or {}).get("nqs_prev_overall") or "").strip() or None
     lfp_f = _summarise(lab, "sa2_lfp_females")
+    unemp = _summarise(lab, "sa2_unemployment_rate")
     nes = _summarise(catchment, "sa2_nes_share")
+
+    # ── Sub-metric depth (Layer 2 upgrade 2026-05-13) ───────────────
+    # Each tile carries 2-3 sub-metric rows beneath the headline summary.
+    # Sub-rows surface the composition of the signal at a glance so the
+    # reader sees the underlying drivers without scrolling to the matrix.
+    pop = position.get("population", {}) or {}
+    submetrics = {
+        "demand": [
+            _submetric_row(catchment, "sa2_adjusted_demand", "Adjusted demand"),
+            _submetric_row(catchment, "sa2_demand_supply",   "Demand vs supply"),
+            _submetric_row(catchment, "sa2_child_to_place",  "Children per place"),
+        ],
+        "supply": [
+            _submetric_row(catchment, "sa2_supply_ratio",    "Supply ratio"),
+            _submetric_row(catchment, "sa2_demand_share_state", "State demand share"),
+            _submetric_row(pop,       "sa2_under5_count",    "Under-5 catchment"),
+        ],
+        "workforce": [
+            _submetric_row(lab, "sa2_lfp_females",     "Female LFP"),
+            _submetric_row(lab, "sa2_unemployment_rate", "Unemployment"),
+            _submetric_row(lab, "sa2_lfp_persons",     "LFP persons"),
+        ],
+        "quality": _quality_submetrics(nqs_overall, dec83_state),
+        "community": [
+            _submetric_row(catchment, "sa2_nes_share",   "NES share"),
+            _submetric_row(catchment, "sa2_atsi_share",  "ATSI share"),
+            _submetric_row(catchment, "sa2_overseas_born_share", "Overseas-born"),
+        ],
+        "population": [
+            _submetric_row(pop, "sa2_under5_count",          "Under-5 count"),
+            _submetric_row(pop, "sa2_births_count",          "Annual births"),
+            _submetric_row(catchment, "sa2_parent_cohort_25_44_share", "Parents 25-44"),
+        ],
+    }
 
     signals = [
         {
@@ -2465,6 +2893,7 @@ def _build_executive(r: dict, position: dict, dec83_state: dict) -> dict:
             "summary": _signal_summary_demand(demand_src),
             "links_to": "matrix:demand",
             "source":  demand_src,
+            "sub_metrics": [s for s in submetrics["demand"] if s],
         },
         {
             "id":      "supply",
@@ -2472,27 +2901,39 @@ def _build_executive(r: dict, position: dict, dec83_state: dict) -> dict:
             "summary": _signal_summary_supply(supply_src),
             "links_to": "matrix:supply",
             "source":  supply_src,
+            "sub_metrics": [s for s in submetrics["supply"] if s],
+        },
+        {
+            "id":      "population",
+            "label":   "Population",
+            "summary": _signal_summary_population(pop),
+            "links_to": "matrix:population",
+            "source":  pop.get("sa2_under5_count") or {},
+            "sub_metrics": [s for s in submetrics["population"] if s],
         },
         {
             "id":      "workforce",
             "label":   "Workforce",
-            "summary": _signal_summary_workforce(lfp_f),
+            "summary": _signal_summary_workforce(lfp_f, unemp),
             "links_to": "matrix:workforce",
-            "source":  lfp_f,
+            "source":  {"lfp_females": lfp_f, "unemployment": unemp},
+            "sub_metrics": [s for s in submetrics["workforce"] if s],
         },
         {
             "id":      "quality",
             "label":   "Quality",
-            "summary": _signal_summary_quality(nqs_overall, nqs_prev),
+            "summary": _signal_summary_quality(nqs_overall, nqs_prev, dec83_state),
             "links_to": "matrix:quality",
             "source":  {"nqs_overall": nqs_overall, "nqs_prev": nqs_prev},
+            "sub_metrics": [s for s in submetrics["quality"] if s],
         },
         {
             "id":      "community",
             "label":   "Community",
-            "summary": _signal_summary_community(nes, catchment, dec83_state),
+            "summary": _signal_summary_community(nes, catchment, dec83_state, community_profile),
             "links_to": "matrix:community",
             "source":  nes,
+            "sub_metrics": [s for s in submetrics["community"] if s],
         },
     ]
 
@@ -2507,6 +2948,108 @@ def _build_executive(r: dict, position: dict, dec83_state: dict) -> dict:
         "signals":  signals,
         "flags":    flags,  # may include _spillover key when >2 triggered
     }
+
+
+def _submetric_row(card_dict: dict, metric_key: str, display_name: str) -> Optional[dict]:
+    """Build a Layer 2 sub-metric row for a position entry. Returns None
+    when the entry is absent or has no usable value — caller filters Nones."""
+    e = (card_dict or {}).get(metric_key) or {}
+    raw = e.get("raw_value")
+    if raw is None:
+        return None
+    fmt = e.get("value_format")
+    # Compact value display — Layer 2 prefers terse numerics with units
+    if fmt == "percent" or fmt == "percent_share":
+        v_display = f"{raw:.1f}%"
+    elif fmt == "ratio_x":
+        v_display = f"{raw:.2f}×"
+    elif fmt == "int":
+        v_display = f"{int(round(raw)):,}"
+    elif fmt == "currency_annual":
+        v_display = f"${int(round(raw)):,}"
+    elif fmt == "currency_weekly":
+        v_display = f"${int(round(raw)):,}/wk"
+    else:
+        v_display = f"{raw:.2f}" if isinstance(raw, float) else str(raw)
+    # Band class for the pill — collapse industry_band and band to canonical
+    # high/mid/low/no_rating tier used by the frontend CSS pill classes.
+    band_raw = (e.get("industry_band_label") or e.get("band") or "").lower()
+    if not band_raw:
+        band_class = "no-rating"
+    elif any(k in band_raw for k in ("high", "above", "elevated", "tight", "premium", "strong")):
+        band_class = "high"
+    elif any(k in band_raw for k in ("low", "below", "soft", "loose", "cheaper")):
+        band_class = "low"
+    else:
+        band_class = "mid"
+    return {
+        "name":         display_name,
+        "metric":       metric_key,
+        "value_display": v_display,
+        "band":         e.get("band"),
+        "band_class":   band_class,
+        "decile":       e.get("decile"),
+    }
+
+
+def _signal_summary_population(pop_card: dict) -> str:
+    """Quick descriptive summary for the Population signal tile — under-5
+    count (catchment scale) + growth direction if available."""
+    u5 = (pop_card or {}).get("sa2_under5_count") or {}
+    u5_raw = u5.get("raw_value")
+    if u5_raw is None:
+        return "Pending demographic ingest"
+    u5_int = int(round(u5_raw))
+    band = u5.get("band") or "mid"
+    return f"{u5_int:,} under-5 · {band}"
+
+
+def _quality_submetrics(nqs_overall: Optional[str], dec83_state: dict) -> list:
+    """Sub-metric rows for the Quality tile — NQS rating + active conditions
+    count + recent enforcement count. Hand-assembled because these aren't
+    standard position-card metrics, they live across r + dec83_state."""
+    rows = []
+    if nqs_overall:
+        rating_lc = nqs_overall.lower()
+        # Map full NQS rating into short band labels so the pill doesn't
+        # duplicate the value column.
+        if "exceeding" in rating_lc:
+            band_class, band_label = "high", "above"
+        elif "meeting" in rating_lc:
+            band_class, band_label = "mid", "at"
+        elif "working" in rating_lc or "significant" in rating_lc:
+            band_class, band_label = "low", "below"
+        else:
+            band_class, band_label = "mid", "—"
+        rows.append({
+            "name":         "NQS overall",
+            "metric":       "nqs_overall",
+            "value_display": nqs_overall,
+            "band":         band_label,
+            "band_class":   band_class,
+            "decile":       None,
+        })
+    cond_active = (dec83_state.get("conditions") or {}).get("active_count")
+    if cond_active is not None:
+        rows.append({
+            "name":         "Active conditions",
+            "metric":       "service_conditions",
+            "value_display": str(int(cond_active)),
+            "band":         "amber" if cond_active > 0 else "clear",
+            "band_class":   "low" if cond_active > 0 else "no-rating",
+            "decile":       None,
+        })
+    enf_recent = (dec83_state.get("enforcement") or {}).get("recent_24mo_count")
+    if enf_recent is not None:
+        rows.append({
+            "name":         "Recent enforcement (24mo)",
+            "metric":       "enforcement_recent",
+            "value_display": str(int(enf_recent)),
+            "band":         "amber" if enf_recent > 0 else "clear",
+            "band_class":   "low" if enf_recent > 0 else "no-rating",
+            "decile":       None,
+        })
+    return rows[:3]  # cap at 3 per Patrick's 2-3 guidance
 
 
 def _signal_summary_demand(s):
@@ -2525,24 +3068,52 @@ def _signal_summary_supply(s):
     return f"{band.capitalize()} · decile {dec}"
 
 
-def _signal_summary_workforce(s):
-    if s.get("confidence") in (None, "unavailable", "deferred") or s.get("decile") is None:
-        return "Pending V1.5 A6/A7 wire-up"
-    band = s.get("band") or "mid"
-    return f"Female LFP {band} · decile {s.get('decile')}"
+def _signal_summary_workforce(lfp_f, unemp=None):
+    """Female LFP band + decile, plus inline unemployment value when populated
+    (Bundle B #2 enrichment 2026-05-13). Unemployment is a demand-pool signal
+    for the workforce supply lens — high unemployment means more potential
+    labour pool, low unemployment means tight labour competition."""
+    if lfp_f.get("confidence") in (None, "unavailable", "deferred") or lfp_f.get("decile") is None:
+        base = "Pending V1.5 A6/A7 wire-up"
+    else:
+        band = lfp_f.get("band") or "mid"
+        base = f"Female LFP {band} · D{lfp_f.get('decile')}"
+    if unemp and unemp.get("confidence") not in (None, "unavailable", "deferred"):
+        u_raw = unemp.get("raw_value")
+        if isinstance(u_raw, (int, float)):
+            base = f"{base} · Unemp {u_raw:.1f}%"
+    return base
 
 
-def _signal_summary_quality(nqs_overall, nqs_prev):
+def _signal_summary_quality(nqs_overall, nqs_prev, dec83_state=None):
+    """NQS rating with prev-overall qualifier, plus conditions / recent
+    enforcement count when triggered (Bundle B #2 enrichment 2026-05-13).
+    Mirrors flag-bar severity hierarchy in tile copy: conditions and
+    enforcement are already AMBER flags per DEC-84 #3, but surfacing
+    counts inline gives the reader instant scale of the regulatory
+    exposure without needing the flag-pill spillover view."""
     if not nqs_overall:
-        return "Not yet rated"
-    # Suppress (prev X) when prev is null/empty, only surface when meaningfully different
-    prev_clean = (nqs_prev or "").strip()
-    if prev_clean and prev_clean.upper() not in ("NONE", "NULL", "—") and prev_clean != nqs_overall:
-        return f"{nqs_overall} (prev {prev_clean})"
-    return nqs_overall
+        base = "Not yet rated"
+    else:
+        prev_clean = (nqs_prev or "").strip()
+        if prev_clean and prev_clean.upper() not in ("NONE", "NULL", "—") and prev_clean != nqs_overall:
+            base = f"{nqs_overall} (prev {prev_clean})"
+        else:
+            base = nqs_overall
+    if dec83_state:
+        cond = (dec83_state.get("conditions") or {}).get("active_count") or 0
+        enf_recent = (dec83_state.get("enforcement") or {}).get("recent_24mo_count") or 0
+        extras = []
+        if cond > 0:
+            extras.append(f"{cond} active cond")
+        if enf_recent > 0:
+            extras.append(f"{enf_recent} recent enforcement")
+        if extras:
+            base = f"{base} · {' · '.join(extras)}"
+    return base
 
 
-def _signal_summary_community(nes_src, catchment, dec83_state):
+def _signal_summary_community(nes_src, catchment, dec83_state, community_profile=None):
     # Quick descriptive flavour; rule-based, no scoring.
     nes_v = nes_src.get("raw_value") if isinstance(nes_src, dict) else None
     nes_dec = nes_src.get("decile") if isinstance(nes_src, dict) else None
@@ -2561,7 +3132,21 @@ def _signal_summary_community(nes_src, catchment, dec83_state):
         parts.append("high ATSI")
     if nes_dec and nes_dec >= 8:
         parts.append("culturally diverse")
-    return " / ".join(parts) if parts else "Standard catchment mix"
+    base = " / ".join(parts) if parts else "Standard catchment mix"
+    # Top-2 languages spoken at home for additional community context per
+    # Turn 3 polish — surfaces actual languages instead of a generic
+    # "culturally diverse" descriptor so the reader sees which languages
+    # are present without scrolling to the matrix.
+    if community_profile:
+        langs = community_profile.get("language_at_home_top_n") or []
+        names = []
+        for item in langs[:2]:
+            name = item.get("language") if isinstance(item, dict) else None
+            if name:
+                names.append(name)
+        if names:
+            return f"{base} · {', '.join(names)}"
+    return base
 
 
 def _compute_flags(dec83_state: dict, nqs_overall: Optional[str]) -> dict:
@@ -2785,7 +3370,9 @@ def _matrix_rows_from_position(card_dict: dict, metric_keys: list, category: str
 
 
 def _matrix_stub_row(metric: str, category: str, display: str, status_pill: str) -> dict:
-    """V1.5 pending-ingest stub row per DEC-84 #10."""
+    """V1.5 pending-ingest stub row per DEC-84 #10. The commentary line
+    explains what the row will become once the ingest pass lands so the
+    reader isn't left with an empty descriptor cell next to a status pill."""
     return {
         "category":      category,
         "metric":        metric,
@@ -2799,12 +3386,39 @@ def _matrix_stub_row(metric: str, category: str, display: str, status_pill: str)
         "band":          None,
         "industry_band": None,
         "signal":        status_pill,
-        "commentary":    None,
+        "commentary":    f"Awaiting ingest ({status_pill}). This row will populate with a peer-banded value, decile, and trajectory once the data pass lands.",
         "drawer_key":    f"metric:{metric}",
         "obs_der_com":   [],
         "v15_pending":   status_pill,
         "confidence":    "deferred",
     }
+
+
+def _seifa_decile_description(decile) -> Optional[str]:
+    """Short plain-English descriptor for the SEIFA IRSD decile so the
+    "5/10" tile in Layer 1 communicates what the score means without
+    forcing the reader to look up the index. Index of Relative Socio-
+    Economic Disadvantage — lower decile = more disadvantaged area;
+    higher decile = more advantaged."""
+    if decile is None:
+        return None
+    try:
+        d = int(decile)
+    except (TypeError, ValueError):
+        return None
+    table = {
+        1:  "Bottom 10% — most disadvantaged",
+        2:  "Lower band — disadvantaged",
+        3:  "Lower-middle band",
+        4:  "Lower-middle band",
+        5:  "Mid-band — national midpoint",
+        6:  "Upper-middle band",
+        7:  "Upper-middle band",
+        8:  "Upper band — advantaged",
+        9:  "Highly advantaged",
+        10: "Top 10% — most advantaged",
+    }
+    return table.get(d)
 
 
 def _matrix_dec83_vacancy_row(dec83_state: dict) -> dict:
@@ -2986,24 +3600,51 @@ def _matrix_workforce_rows(workforce_supply: dict) -> list:
     for entry in rows:
         if not isinstance(entry, dict):
             continue
+        # JSA IVI rows carry r.latest = {period, value}; Three-Day Guarantee
+        # carries r.fact = "policy statement". v3.31's _renderWorkforceSupplyRow
+        # surfaces these as the value column — matrix must do the same to
+        # avoid a regression where Workforce rows render "—".
+        latest = entry.get("latest") or {}
+        current_value = (
+            entry.get("raw_value")
+            or entry.get("value")
+            or latest.get("value")
+            or entry.get("fact")
+        )
+        period = (
+            entry.get("period_label")
+            or entry.get("period")
+            or latest.get("period")
+        )
+        # Three-Day Guarantee's "value" is a sentence, format as text rather
+        # than numeric so the renderer doesn't try to apply percent/int formatting.
+        value_format = entry.get("value_format")
+        if value_format is None and entry.get("fact"):
+            value_format = "text"
         out.append({
             "category":      "workforce",
             "metric":        entry.get("metric"),
             "display":       entry.get("display"),
-            "current_value": entry.get("raw_value") or entry.get("value"),
-            "value_format":  entry.get("value_format"),
-            "period":        entry.get("period_label") or entry.get("period"),
+            "current_value": current_value,
+            "value_format":  value_format,
+            "period":        period,
             "sparkline":     (entry.get("trajectory") or [])[-12:],
             "decile":        None,
             "cohort_n":      None,
             "band":          None,
             "industry_band": None,
-            "signal":        entry.get("status_note") or entry.get("scope_stamp") or "—",
+            "signal":        entry.get("scope_stamp") or "—",
             "commentary":    _truncate_sentence(entry.get("intent_copy")),
             "drawer_key":    f"metric:{entry.get('metric')}",
             "obs_der_com":   [TAG_OBS],
-            "v15_pending":   "Pending V1.5 A7 wire-up" if entry.get("confidence") == "deferred" else None,
+            "v15_pending":   ("Pending V1.5 A7 wire-up"
+                              if entry.get("confidence") == "deferred"
+                              else None),
             "confidence":    entry.get("confidence"),
+            # Surface status_note (e.g. "Awaits Fair Work rates ingest")
+            # below the value column for deferred rows; v3.31 had a
+            # dedicated status_note line.
+            "status_note":   entry.get("status_note"),
         })
     return out
 
@@ -3127,30 +3768,42 @@ def _badges_for(entry: dict) -> list:
 
 
 def _format_top_n(top_n_list: Optional[list], label_prefix: str) -> Optional[str]:
-    """Format top-3 list for matrix Commentary preview per DEC-84 #6."""
+    """Format top-3 list for matrix Commentary preview per DEC-84 #6.
+    Includes share_pct alongside each name so the reader sees the actual
+    distribution, e.g. "Mandarin 7.2% · Cantonese 2.2% · Indonesian 2.1%"."""
     if not top_n_list:
         return None
     items = []
     for item in (top_n_list or [])[:3]:
         name = item.get("country") or item.get("language")
-        if name:
+        if not name:
+            continue
+        share = item.get("share_pct")
+        if share is not None:
+            items.append(f"{name} {float(share):.1f}%")
+        else:
             items.append(name)
     if not items:
         return None
-    return f"{label_prefix}: {', '.join(items)}"
+    return f"{label_prefix}: {' · '.join(items)}"
 
 
 def _truncate_sentence(text: Optional[str]) -> Optional[str]:
-    """First sentence (or first 120 chars) for matrix Commentary column."""
+    """First ~2 sentences (or first 240 chars) for matrix Commentary column.
+    Widened from 120 chars in Turn 1 of Centre v2 rebuild — descriptor column
+    grew when 24px sparklines were retired."""
     if not text:
         return None
     s = str(text).strip()
-    # First sentence end
+    if len(s) <= 240:
+        return s
+    # Try to break on the 2nd sentence
+    cut = s[:240]
     for sep in (". ", "; "):
-        i = s.find(sep)
-        if 0 < i < 200:
+        i = cut.rfind(sep)
+        if i > 80:
             return s[:i + 1]
-    return s if len(s) <= 120 else s[:117].rstrip() + "…"
+    return cut.rstrip() + "…"
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -3461,10 +4114,19 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
             kinder_headline = "Not flagged"
             kinder_state = "not_flagged"
 
+        # Approved-places peer cohort within the same SA2, filtered to the
+        # subject's comparable subtype (Patrick 2026-05-12: Layer 1 should
+        # compare like-for-like only). Subject centre included; renderer
+        # drops bar when cohort.meaningful=False.
+        approved_places_cohort = _cohort_for_places(
+            conn, r.get("sa2_code"), r.get("service_sub_type")
+        )
+
         places = {
             "approved_places": {
                 "tag": TAG_OBS,
                 "value": r.get("approved_places"),
+                "cohort": approved_places_cohort,
             },
             "service_sub_type": subtype,
             "long_day_care_flag": bool(r.get("long_day_care")) if r.get("long_day_care") is not None else None,
@@ -3499,6 +4161,7 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
             "seifa_decile": {
                 "tag": TAG_OBS,
                 "value": r.get("seifa_decile"),
+                "description": _seifa_decile_description(r.get("seifa_decile")),
             },
             "remoteness": _compute_remoteness(r.get("aria_plus")),
             "sa2": {
@@ -3514,6 +4177,26 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
 
         # --- POSITION block (Layer 3 banding) ---
         position = _layer3_position(conn, r.get("sa2_code"), r.get("service_sub_type"))
+
+        # Propagate centre_events from catchment metrics onto population
+        # entries so the v2 chart 5 (under-5 + births) and the inline-
+        # expand on population matrix rows show the same supply-change
+        # overlay (vertical dashed lines) that the catchment charts do.
+        # Events are per-SA2-per-subtype; one shared array applies across
+        # all population entries since they share the SA2 + subtype scope.
+        _catch = position.get("catchment_position") or {}
+        _shared_events = None
+        for _m in ("sa2_supply_ratio", "sa2_demand_supply",
+                   "sa2_child_to_place", "sa2_adjusted_demand"):
+            _e = _catch.get(_m)
+            if isinstance(_e, dict) and _e.get("centre_events"):
+                _shared_events = _e["centre_events"]
+                break
+        if _shared_events:
+            _pop = position.get("population") or {}
+            for _k, _entry in _pop.items():
+                if isinstance(_entry, dict) and "centre_events" not in _entry:
+                    _entry["centre_events"] = _shared_events
 
         # --- QA SCORES block ---
         qa_scores = _qa_scores(r)
@@ -3535,12 +4218,79 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
         # Single fetch; used by all three v2 builders below + Layer 1 enrichments.
         dec83_state = _build_dec83_state(conn, service_id)
 
+        # Daily-rate peer cohort within the same SA2 (Bundle B #1). Attached
+        # to dec83.fees as cohort_by_age_band_session; renderer uses the
+        # headline pair cell (full_day × 36m-preschool default) for the
+        # Layer 1 daily-rate tile range bar and per-row matrix bars.
+        try:
+            dec83_state["fees"]["cohort_by_age_band_session"] = (
+                _cohort_for_daily_rate(
+                    conn, r.get("sa2_code"), r.get("service_sub_type")
+                )
+            )
+        except KeyError:
+            # _build_dec83_state always populates fees as a dict; this guards
+            # against a future shape change without crashing payload assembly.
+            pass
+
+        # --- PROVIDER APPROVAL SCALE (operator-level rollup) ---
+        # Count of OTHER active services operating under the same ACECQA
+        # provider approval number. Patrick correction 2026-05-12:
+        # service_approval_number is 1:1 with a service (each service has
+        # its own SAN); the meaningful operator-scale signal is the
+        # provider approval (PR-XXXX) — one approved provider can run
+        # many services. Surfaced in Layer 5 Operations matrix row.
+        pan = r.get("provider_approval_number")
+        shared_pan_others = 0
+        shared_pan_names: list = []
+        if pan:
+            try:
+                shared_rows = conn.execute(
+                    """
+                    SELECT service_id, service_name
+                      FROM services
+                     WHERE provider_approval_number = ?
+                       AND service_id != ?
+                       AND COALESCE(is_active, 1) = 1
+                    """,
+                    (pan, service_id),
+                ).fetchall()
+                shared_pan_others = len(shared_rows)
+                shared_pan_names = [
+                    {"service_id": x[0], "service_name": x[1]}
+                    for x in shared_rows
+                ]
+            except sqlite3.OperationalError:
+                pass
+        provider_scale = {
+            "tag":           TAG_OBS,
+            "provider_approval_number": pan,
+            "other_count":   shared_pan_others,
+            "other_services": shared_pan_names,
+        }
+
+        # --- COMPETITIVE POSITIONING (Layer 1.5 panel) ---
+        # Every centre in the same SA2 on a daily-fee × NQS axis with
+        # subject centre emphasised. Patrick 2026-05-12 framing.
+        competitive_positioning = _build_competitive_positioning(
+            conn, service_id, r.get("sa2_code"), r.get("service_sub_type")
+        )
+
+        # --- CCS COVERAGE RATIO (catchment affordability signal) ---
+        # Estimated % of households in catchment receiving the CCS full
+        # benefit; derived from SA2 median weekly household income via a
+        # lognormal model. Rendered in Layer 1 (percentage tile) and Layer 5
+        # matrix Pricing & Fees category per Patrick's framing 2026-05-13.
+        _hh_inc_entry = (position.get("labour_market") or {}).get("sa2_median_household_income") or {}
+        _median_weekly_hh = _hh_inc_entry.get("raw_value")
+        ccs_coverage = _compute_ccs_coverage(_median_weekly_hh)
+
         # --- CENTRE V2 BUILDERS (DEC-84 — payload schema v7) ---
         # Additive overlay (DEC-11): v6 keys preserved unchanged; v7 adds
         # dec83 / executive / matrix / drawer top-level keys. Existing
         # /centres/{id} renderer continues to consume v6; new
         # /centre_v2/{id} renderer (centre_v2.html, future) consumes v7.
-        executive_block = _build_executive(r, position, dec83_state)
+        executive_block = _build_executive(r, position, dec83_state, community_profile)
         matrix_block = _build_matrix(r, position, workforce_supply, community_profile, dec83_state)
         drawer_block = _build_drawer(r, position, workforce_supply, community_profile, dec83_state)
 
@@ -3559,10 +4309,13 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
             "tenure": tenure,
             "commentary": _commentary_lines(header, nqs, places, tenure, subtype),
             # Centre v2 (DEC-84) — additive top-level keys
-            "dec83":     dec83_state,
-            "executive": executive_block,
-            "matrix":    matrix_block,
-            "drawer":    drawer_block,
+            "dec83":         dec83_state,
+            "executive":     executive_block,
+            "matrix":        matrix_block,
+            "drawer":        drawer_block,
+            "ccs_coverage":             ccs_coverage,
+            "provider_scale":           provider_scale,
+            "competitive_positioning":  competitive_positioning,
         }
         return payload
     finally:

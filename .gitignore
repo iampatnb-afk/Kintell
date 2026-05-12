@@ -25,3 +25,12 @@ docs/operator.html.v?_backup_*
 
 # A10 + C8 review-capture artifact (regeneratable from build_a10_c8_review_capture.py)
 docs/a10_c8_review.html
+
+# PDF reading copies of source documents — large binaries (~23MB) backed up
+# separately to Drive, not appropriate for git. Tier-1/Tier-2 markdown lives
+# in recon/Document and Status DB/ (canonical) and repo root (versioned).
+Project Folder Docs/
+
+# Centre-page review-capture artefacts — regeneratable from build scripts
+docs/centre_single_*.html
+docs/centre_a4_review_*.html

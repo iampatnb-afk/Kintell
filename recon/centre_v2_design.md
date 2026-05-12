@@ -593,3 +593,146 @@ Validation table: every metric / panel / helper from v1 has a placement in v2.
 ---
 
 *End of design doc. Patrick: please ratify D-1 to D-12 (or object to specific items) so we can mint DEC-84 and proceed to v1-stake + v2 build sequence.*
+
+---
+
+## Post-v0.1 review queue (2026-05-12)
+
+*Items surfaced during Patrick's first visual review of centre_v2.html v0.1 + v0.2 (carryover block landed). Banked here pending the complete sheet (Layer 3 + Layer 4 charts) which Patrick wants in BEFORE further structural changes — "put layer three and layer four in, and then assess from there." Order below is the queued sequence; items 1-2 are this turn's work, 3-9 land in subsequent turns.*
+
+### Doing this turn (Layer 3 + Layer 4 charts)
+1. **Layer 3 primary historical trends** — 7 charts per DEC-84 #4 with full v1 chart infrastructure ported (Chart.js, trajectory range bar, cohort histograms, centre-events overlay on catchment metrics). Chart list: supply ratio quarterly / demand vs supply quarterly / adjusted demand / children-per-place / under-5 + births overlay / female LFP + unemployment dual-axis / daily-rate full_day × 36m-preschool annual (NEW DEC-83 trajectory backend extension required).
+2. **Layer 4 secondary historical trends accordion** — 5 chart groups (population context / income context / workforce context / demographic trend / education infrastructure), default-collapsed, half-width 2-column grid pairs when expanded.
+
+### Banked for next turn (top-of-page restructure)
+3. **Layer 1 = rich identity block** — restructure header to carry: service name (large) + parent-group deep link (subtle, top-right; centre→group→industry hierarchical navigation principle) + fact chip strip (approved_places, daily rate single-figure, SEIFA decile, remoteness, SA2 name, kinder summary, subtype) + hours + contact. Absorbs the v1 Catchment-meta card content currently sitting in carryover block.
+4. **Layer 2 (executive) shrunk to compact right-side panel** inside the Layer 1 block — no longer a full-width prominent section. 2-column internal grid: identity left, intelligence right.
+5. **Matrix category reorder per analytical priority** — demand → supply → pricing → population → community → labour market → education → workforce → quality → operator → operations. Replaces the current arbitrary order (population currently at bottom; per `feedback_analytical_panel_order.md` that's wrong because population is a load-bearing demand fundamental).
+6. **Carryover card reorder** — analytical priority, not code-emission order.
+
+### Banked for turn after that (interaction patterns + drawer enrichment)
+7. **Pricing inline-collapse** — Layer 5 Pricing matrix row shows single average daily rate; click expands inline to per-(age × session) breakdowns. Hybrid with side drawer: drawer for methodology, inline collapse for "show me the breakdown that lives behind this number."
+8. **Schools-in-catchment drawer enrichment** — when user clicks the Education matrix row, drawer should list the actual school names + sectors + enrolments (currently just shows methodology). Backend extension to `_build_drawer` for sa2_school_count_total drawer with school list query against the ACARA tables.
+
+### Banked for V2 of v2 (peer-cohort context infrastructure)
+9. **Daily rate + places peer-cohort range visualisation** — show where this centre sits on the SA2 distribution at a glance. Needs backend cohort SQL: aggregate medians + range bands across all services in the same SA2 + remoteness band. Currently small-n (130-pilot only); land in earnest when national commercial-layer scale-up runs.
+
+### Added 2026-05-12 (post Layer 3 + Layer 4 review)
+10. **Chart polish — restore v1's hover register** (this turn): external readout above each chart + crosshair vertical line at hovered point. v0.2 simplified to native Chart.js tooltips; Patrick: "should have nice arrows for exact measurements." Port `_kintellExternalReadout` + `_kintellCrosshair` plugins from v3.31.
+11. **Centre events overlay** (this turn): vertical dashed lines on catchment trajectory charts (and daily-rate where applicable) marking quarters when new centres opened / closed. Payload `centre_events` already populated by `_layer3_position` for the 4 catchment metrics (`sa2_supply_ratio` / `sa2_child_to_place` / `sa2_demand_supply` / `sa2_adjusted_demand`). Port `_kintellEventAnnotation` plugin from v3.31.
+12. **Sticky trend window selector** (this turn): trend window bar should remain accessible as user scrolls down through Layer 3 charts. CSS `position: sticky` + scroll padding.
+13. **Per-chart decile explanation caption** (this turn): small text below each Layer 3 chart explaining what the decile / cohort means in plain language ("Decile 5: this SA2 sits in the middle of the cohort of [definition]"). Replaces the bare D5 · n=347 stamp with a one-line explainer.
+14. **Layer 4 → inline-row-click chart pattern (NEXT TURN)** — Patrick's structural reframing: remove the Layer 4 accordion entirely; instead, clicking a matrix row inline-expands a panel below the row containing the chart for that metric (plus optionally the row's drawer-content). Side drawer remains for "deep methodology" but the chart goes inline. Pattern extends to Pricing inline-collapse too (queue item 7). This consolidates: Layer 4 accordion goes away; matrix becomes the canonical home for "click to drill into history"; primary trends (Layer 3) remain at top for the 7 highest-priority decision-critical charts.
+15. **Customisable matrix view (banked, V2 of v2)** — operator can select/deselect individual measures to show/hide in the matrix. Persistence via sessionStorage initially; per-user preference state lands later when multi-tenancy ships. Patrick: "is this a complex build?" — moderate. State management + persistence pattern; not blocking V1.
+16. **"More info available" right-column indicator** — Layer 5 matrix right column renders a richer drawer-trigger icon when underlying data opportunity exists (top countries of birth, languages at home, school name list, full per-(age × session) fee grid, conditions list, enforcement event log). Distinguish from "generic methodology drawer" with a different icon or chip. Pairs with the schools drawer enrichment (queue item 8).
+17. **"Click for more info" caption at top of matrix** — explanatory text above Layer 5 explaining that clicking the right-hand button on any row reveals deeper information.
+
+### Other items raised
+- "Institutional signal matrix" terminology rename pending (alternative names TBD; raised before v0.2 review)
+- Visual softness pass (rounded panels, prose interleaved) — partial via carryover block in v0.2; full pass after Layer 3 + 4 land and the page rhythm is judgable
+
+*This queue is the working list for centre_v2.html iteration. Items move from "queued" → "doing" → "done"; Patrick can re-order or de-queue at any time.*
+
+---
+
+## Comprehensive outstanding queue (refreshed 2026-05-13 — post-Turns-1-3 doc-refresh)
+
+*Patrick: "I want you to look back in our chat here and see where there are any ideas that I put forward that we agreed to do that we got sidetracked on, to make sure they're in the list. That list should be confirmed back to me at the start of the next session." Section reset every session start. The 2026-05-12 EOD list was the baseline; Turns 1-3 (the first three visual-iteration turns post-build-kick-off) closed five items and added a sixteen-sub-decision DEC-84 amendment block in canonical DECISIONS.md. This refreshed list carries the eleven remaining items forward verbatim so banked context survives the session boundary.*
+
+### ✅ Done by end of Turn 3 (2026-05-13 doc refresh closing out)
+
+**From 2026-05-12 (DEC-84 design pass + v0.1-v0.5 build):**
+- DEC-84 minted; v1 stake bundle (`recon/v1_final_stake_2026-05-12/` + git tag `centre-v1-stake-2026-05-12 212b597`)
+- `centre_page.py` v24 + payload schema v7 (4 new top-level keys: `dec83` / `executive` / `matrix` / `drawer`); 4 new builders + 9 helpers
+- `docs/centre_v2.html` v0.1 → v0.5 with: Layer 1 header / Layer 2 executive / Layer 3 primary trends (7 charts) / Layer 4 secondary trends accordion (17 charts) / Layer 5 institutional matrix (54 rows × 11 categories) / Layer 6 side-drawer
+- v1-style chart polish: external readout + crosshair + centre-events overlay + sticky trend window selector
+- Carryover block: NQS / Places+Kinder / Catchment-meta / Tenure / QA / Commentary
+- Methodology legend bar (OBS / DER / COM explainer at top)
+- Identity tiles row in Layer 1 (places / subtype / SEIFA / remoteness)
+- Tag chips strip (acecqa SAN / abr legal name / google search lookup)
+- Operator deep-link + ownership badge (Government / Private (for profit) / NFP) + brand badge + entity attribution
+- Layer 3 full register (cohort histogram + caption + decile strip + band chips with descriptive text + INDUSTRY badge with note + intent_copy + ABOUT THIS MEASURE + source line + DER+COM badges)
+- Cohort histogram presentation matches v1 exactly (full-width proportional bars + italic centred caption + small cohort meta)
+- ABOUT panel lighter (left-border accent only, no full background fill, 11.5px font)
+- OBS/DER/COM hover with richer methodology content (cohort, source, calibration, formula)
+- Under-5+births dual-line chart with full register + combined source attribution
+- Female LFP+unemployment dual-axis chart with full register + combined source attribution
+- Daily-rate chart with full register + intent + ABOUT + source ("Starting Blocks daily fee schedule (DEC-83 Commercial Layer V1; service_fee table; weekly refresh cadence)")
+- Combined trend label "−X% since Y · +N places · +M centres" using centre_events overlay
+- Layer 4 secondary charts: trend label + decile snapshot + source line per chart
+
+**Closed during Turns 1-3 (sixteen sub-decisions ratified; captured in DECISIONS.md DEC-84 AMENDMENT 2026-05-13):**
+- ✅ **#11 closed — Matrix terminology rename:** "Institutional signal matrix" → **Signal Matrix** (D-1 confirmed; user-facing copy only — internal `matrix` payload key unchanged)
+- ✅ **#1 closed — Inline-row-click expand on Layer 5 matrix:** trajectory chart + per-metric local trend-window state via `_INLINE_RANGE_BY_METRIC`; drawer reserved for deep methodology + rich-content panels
+- ✅ **#4 closed — Matrix category reorder per analytical priority:** Turn 1 rewrote display order to credit-analytical flow (demand → supply → pricing → population → community → labour market → education → workforce → quality → operator → operations)
+- ✅ **#9 closed — Top-N inline context lines on demographic-mix rows:** preview text back inline in Commentary column (top-2 or top-3 with share %); full top-10 + methodology stays in drawer
+- ✅ **#2 de-queued — Layer 4 accordion removal reversed:** accordion retained as an overview-by-chart-group surface, co-existing with #1 inline-row-click drill from matrix. Layer 4 also gains its own trend-window selector independent of Layer 3
+- ✅ Sparkline column retired from Layer 5 matrix rows (D-11 partially reversed; chart-below 80px histograms preserved); reclaimed width reflowed into Commentary column (minmax 280px 5fr); `_truncate_sentence` widened 120 → 240 chars
+- ✅ Value-in-commentary pattern (leading bold value+period in Commentary column)
+- ✅ Centre-events overlay extended from 4 catchment metrics to under-5/births + population/cohort charts
+- ✅ Edge-event visibility nudge (~6px inward) for first/last-quarter annotations
+- ✅ Event-line annotation badge with type abbreviation (+1/−1) + quarter year above chart top axis
+- ✅ DER badge colour-coding (OBS blue / DER purple / COM amber; was uniform grey)
+- ✅ SEIFA descriptor word alongside decile in Layer 1 identity tile (D7-D8 "advantaged" etc.)
+- ✅ Layer 2 Community signal enrichment via top-2 languages substrate (extends DEC-84 #2 composer)
+- ✅ Quality category transitional note (italic caption — Starting Blocks pilot coverage only until national scale-up)
+- ✅ Explicit SA2 fact chip in Layer 1 identity row
+- ✅ Source-attribution hygiene sweep across all Layer 3 + Layer 4 + Layer 5 source lines
+
+### 🔴 Outstanding queue (eleven items carried forward from 2026-05-12 EOD list)
+
+*Five items closed by Turns 1-3 (#1, #2, #4, #9, #11). Item numbers preserved from the 2026-05-12 list so cross-references in DECISIONS / memory stay stable.*
+
+**Bigger structural items (highest priority):**
+- ~~#1 Inline-row-click expand on Layer 5 matrix~~ ✅ closed Turn 2-3
+- ~~#2 Layer 4 accordion removal~~ ✅ de-queued via reversal Turn 2
+3. **Layer 1 rich-identity restructure: Layer 2 executive shrunk to compact top-right sidebar inside Layer 1** — Patrick's earlier feedback: "the intelligence cell, which is the next one, you I think it should be smaller and more subtle. It should be up the top right next to the information about the Service Centre." Currently Layer 2 is full-width below Layer 1.
+- ~~#4 Matrix category reorder per analytical priority~~ ✅ closed Turn 1
+5. **Carryover card reorder** per analytical priority (similarly).
+
+**Drawer / interaction enrichments:**
+6. **Pricing inline-collapse** — Patrick: "the pricing and fees should just have the single average daily rate, and then you click on it and collapse those individual room rates open." Single avg daily rate row in matrix; click expands inline to per-(age × session) breakdown. Hybrid with side drawer for full grid. *Pattern overlaps with #1 inline-row-click expand now landed; revisit whether the Pricing single-row collapse rides the same handler or stays distinct.*
+7. **Schools-in-catchment drawer enrichment** — Patrick: "Down in education, when you click Schools in catchment, it should say what the schools are, their names, when you click on the detail arrow." Backend: query ACARA tables for school list per SA2 + sector + enrolment.
+8. **Right-column "rich-content" indicator** — Patrick: "in the signal matrix, in the furthest right-hand column, wherever there's an underlying data opportunity such as the country of birth or the language they speak, or if the schools can fit, or any other information, it can be gracefully dragged to the front. Then that layer should be available again at the top. It should explain that there may be further information and that it can be clicked by the furthest right-hand access button you've set up." Distinguish rich-content drawer trigger from generic methodology trigger via different icon / chip + add caption above matrix explaining the right-button.
+
+**Layer 5 matrix detail:**
+- ~~#9 Top-N inline context lines on matrix demographic rows~~ ✅ closed Turn 3
+10. **Lite row "as at YYYY · static snapshot, no trajectory" stamps** — for matrix rows with non-trajectory data (Census 3-point series). v1 has this stamp; v2 currently doesn't.
+- ~~#11 "Institutional signal matrix" terminology rename~~ ✅ closed Turn 1 ("Signal Matrix")
+
+**Workforce specific:**
+12. **Workforce separate window selector** (6M / 1Y / 2Y / 5Y / All) + scope stamps ("state-level (NSW) — no SA2 peer cohort" / "national — no SA2 peer cohort") — v1 has these per `renderWorkforceSupplyCard`. v2's matrix Workforce category currently uses page-level trend window only and doesn't carry scope stamps prominently. *Inline-row-click expand (#1 closed) now carries per-metric `_INLINE_RANGE_BY_METRIC` state; pattern likely reusable for the workforce sub-window.*
+
+**Customisable view:**
+13. **Customisable matrix view (operator selects/deselects measures)** — Patrick: "in the signal matrix, it would be excellent if the operator could select or deselect individual measures to disappear or show up in the matrix below, allowing them to customise their view. Is this a complex build?" Moderate complexity; sessionStorage persistence first, per-user state later. *Pairs with page-top show/hide selector (below) — same persistence pattern.*
+
+**Banked V2 of v2 (longer-horizon):**
+14. **Daily rate + places peer-cohort range visualisation** — Patrick: "that figure and the places... should be sitting on a range of its competitors. In other words, we can see where the daily rate sits on the scale or the range of daily rates within that SA2... Also, the size of the centre should do the same." Needs backend cohort SQL across SA2 + remoteness band; currently small-n (130-pilot only). Land in earnest after national commercial-layer scale-up runs.
+15. **Centre → Group → Industry hierarchical navigation** — Patrick: "the link back to the group that it's a part of. Remember, it's going to be part of all architecture here of centres up to groups and groups up to industry." Group page (OI-NEW-17) when it ships uses the same v2 patterns; navigation already partial via Layer 1 operator deep-link to `operator.html?id=N`. Industry-level lens further out.
+16. **Visual softness pass (full)** — partial via carryover block + Layer 3 register; further refinement after structural items #3-#5 settle and the page rhythm is judgable.
+
+### Banked from previous session opener (newly captured 2026-05-13 — for confirmation)
+
+These items were named in the next-session-opener handoff alongside the Turns 1-3 list; they are not yet on the numbered queue above. Patrick to ratify if they remain target or de-queue.
+
+**Bundle B — top-of-page strategic (banked candidate):**
+- Peer-cohort range viz on places + daily rate (overlaps with #14 longer-horizon item — Patrick to confirm whether Bundle B advances this earlier than originally banked)
+- Tenure relocation (carryover block tenure card → ? — placement TBD; pairs with #5 carryover reorder)
+- Layer 2 enrichments: ratings exposure / unemployment exposure / community detail
+- Stream E shorter version: SA2 border exposure proxy
+
+**Small polish bundle (banked candidate):**
+- Hover-info / drawer enrichment for event lines (full centre names propagating from the centre_events badge readout)
+- Cosmetic SA2 name cleanup (formatting / case)
+- Ratio chart reference line
+- Unemployment axis fix
+
+**Closer-to-V1 timeline (queued behind):**
+- N21 Room mix / age cohort (probe needed first)
+- Schools-with-attached-OSHC (new ingest; pairs with OI-NEW-19 OSHC-school adjacency from DEC-82 consequences)
+- User-customisable matrix view (queue #13 / Doc-#10 banked)
+- Page-top show/hide selector (Doc-#10 banked; pairs with #13)
+
+### How next session opens
+Per Patrick's request: confirm the queue list above at session start, identify which 2-3 items to bundle, then proceed line-by-line in the same back-and-forth iteration mode that worked this session.
+

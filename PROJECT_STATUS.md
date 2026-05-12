@@ -1,10 +1,55 @@
 # Project Status
 
-*Last updated: 2026-05-12 — Centre v2 joint design pass closed; DEC-84 minted (6-layer page architecture, matrix-as-center-of-gravity). Design doc `recon/centre_v2_design.md` ratified. v1 stake bundle prep + git tag command queued for Patrick. v2 build sequence cleared to proceed (~3.9 sess). The on-disk version supersedes the project-knowledge monolith if they disagree.*
+*Last updated: 2026-05-13 — Centre v2 build in progress; Turns 1-3 visual-iteration ratifications captured as DEC-84 amendment block. `centre_page.py` v24 + `docs/centre_v2.html` v0.5+ on disk; dev server running on :8001 for line-by-line iteration. Five queue items closed (#1 inline-row-click expand, #2 Layer 4 accordion-removal de-queued via reversal, #4 matrix category reorder, #9 top-N inline context, #11 matrix rename). The on-disk version supersedes the project-knowledge monolith if they disagree.*
 
-> **NEXT-SESSION HEADLINE:** **Centre v2 build kick-off** — v1 stake (git tag `centre-v1-stake-2026-05-12` on commit `212b597` + bundle dir `recon/v1_final_stake_2026-05-12/` + ROLLBACK.md), then `centre_page.py` v24 + payload schema `centre_payload_v7` (1.0 sess). After payload lands, parallel renderer `docs/centre_v2.html` at `/centre_v2/{id}` (2.0 sess), then verification capture (0.3 sess) + smoke test (0.2 sess) + cut-over (0.1 sess). Total ~3.9 sess. See `recon/centre_v2_design.md` for ratified content map and DEC-84 in canonical DECISIONS.md for the 12 layer-mechanic locks.
+> **NEXT-SESSION HEADLINE:** **Centre v2 build continues — line-by-line polish via banked queue.** Doc refresh done this session (DEC-84 amendment + PROJECT_STATUS + design-doc queue + memory bumps); no UI changes yet. Two strong bundle candidates ready for confirmation: **Bundle B (top-of-page strategic)** — peer-cohort range viz on places + daily rate / tenure relocation / Layer 2 ratings + unemployment + community detail / Stream E shorter version (SA2 border exposure proxy); **Small polish bundle** — hover-info / drawer enrichment for event lines (full centre names) / cosmetic SA2 name cleanup / ratio chart reference line / unemployment axis fix. Closer-to-v1-timeline items (N21 room mix probe; OSHC-school adjacency new ingest; user-customisable matrix queue #13; page-top show/hide selector) queued behind these. See `recon/centre_v2_design.md` outstanding queue for the full list and DEC-84 amendment in canonical DECISIONS.md for the 16 Turns 1-3 ratifications.
 
-## Headline (2026-05-12 — DEC-84 Centre v2 design pass closed)
+## Headline (2026-05-13 — Centre v2 Turns 1-3 doc refresh; banked queue carried forward)
+
+**Doc refresh closes the Turns 1-3 paper trail.** Sixteen sub-decisions from the first three visual-iteration turns on `docs/centre_v2.html` ratified line-by-line by Patrick are now captured as a DEC-84 amendment block in canonical DECISIONS.md (refines — does not overturn — the 12 numbered locks from 2026-05-12). Five queue items close. PROJECT_STATUS + design-doc queue + memory all bumped. No UI changes this session; dev server still on :8001 with v0.5+ build state ready for next-bundle iteration.
+
+**Sixteen Turns 1-3 sub-decisions captured (refer DECISIONS.md DEC-84 AMENDMENT 2026-05-13):**
+1. Matrix terminology rename — "Institutional signal matrix" → **Signal Matrix** (D-1 confirmed; queue #11 closed)
+2. Sparkline column retired from Layer 5 matrix (D-11 partially reversed; chart-below 80px histograms keep their size; reclaimed width reflows into Commentary)
+3. Layer 4 accordion retained (queue #2 de-queued — earlier proposed removal reversed; accordion co-exists with inline-row-click expand)
+4. Layer 4 acquires its own trend-window selector independent of Layer 3
+5. Inline-row-click expand on Layer 5 matrix rows (queue #1 closed; trajectory chart + per-metric local window state)
+6. Value-in-commentary pattern (leading bold value+period in Commentary column after sparkline retired)
+7. Top-N percentages on demographic-mix rows inline in Commentary (queue #9 closed; full top-10 stays in drawer)
+8. Centre-events overlay extends from 4 catchment metrics to under-5/births and population/cohort charts
+9. Edge-event visibility nudge (~6px inward) so first/last-quarter annotations don't get clipped
+10. Event-line annotation badge with type abbreviation (+1/−1) + quarter year above chart top axis
+11. DER badge colour-coding (OBS blue / DER purple / COM amber — was uniform grey)
+12. SEIFA descriptor word alongside decile in Layer 1 identity tile (D7-D8 "advantaged" etc.)
+13. Layer 2 Community signal enrichment via top-2 languages substrate (DEC-84 #2 composer extended)
+14. Quality category transitional note (italic caption — Starting Blocks pilot coverage only until national scale-up)
+15. Explicit SA2 fact chip in Layer 1 identity row (was implicit-only through chart source attribution)
+16. Source-attribution hygiene sweep across all Layer 3 + Layer 4 + Layer 5 source lines
+
+**Queue items closed by Turns 1-3:** #1 inline-row-click expand · #2 Layer 4 accordion removal (de-queued via reversal) · #4 matrix category reorder (via Turn 1's credit-analytical flow display-order rewrite) · #9 Top-N inline context lines · #11 matrix terminology rename. Five of sixteen outstanding-queue items closed; eleven carried forward.
+
+**Next-session bundle candidates** (Patrick to ratify which to pull first):
+- **Bundle B — top-of-page strategic:** peer-cohort range visualisation on places + daily rate · tenure relocation · Layer 2 enrichments (ratings + unemployment + community detail) · Stream E shorter version (SA2 border exposure proxy)
+- **Small polish bundle:** hover-info / drawer enrichment for event lines (full centre names propagating from the badge readout) · cosmetic SA2 name cleanup · ratio chart reference line · unemployment axis fix
+- **Closer to V1 timeline** (queued behind): N21 Room mix / age cohort (probe needed first) · schools-with-attached-OSHC new ingest · user-customisable matrix view (queue #13) · page-top show/hide selector
+
+**This session's deliverables (all on disk):**
+- `recon/Document and Status DB/DECISIONS.md` — DEC-84 AMENDMENT 2026-05-13 block (16 sub-decisions + consequences)
+- `PROJECT_STATUS.md` — this section
+- `recon/centre_v2_design.md` — outstanding queue updated (Turns 1-3 items moved to ✅ Done; banked items restated for visibility)
+- Memory: `project_state.md` bump to 2026-05-13; `project_centre_v2_redesign.md` updated to reflect build-step-2 mid-iteration state
+
+**File state:**
+- `centre_page.py` v24 (Turn 1 + Turn 3 patches: `_truncate_sentence` widened 120 → 240 chars; `community_profile` substrate via top-2 language extraction in `_build_drawer`; `_build_executive` extended with `community_profile` param)
+- `docs/centre_v2.html` v0.5+ on disk (Signal Matrix rename + category reorder + sparkline column retired + commentary widened + inline-row-click expand wiring + edge-event nudge + event-line badge + DER colour palette + SEIFA descriptor + SA2 fact chip + Quality category caption + source-attribution sweep). Version numbering stays informal until first verification capture per DEC-84 effort breakdown.
+
+**No DB mutations.** No `audit_log` rows. `kintell.db` unchanged.
+
+**Worktree note.** Session ran from worktree `claude/jovial-kepler-0f9167` (predates DEC-83 + DEC-84 + Centre v2 build); all edits targeted main repo absolute paths per established Patrick workflow. Doc-only changes; no commits this session unless Patrick instructs.
+
+---
+
+## Headline (2026-05-12 — DEC-84 Centre v2 design pass closed — preserved for traceability)
 
 **Centre v2 joint design pass ratified end-to-end in one session.** Probe → surface inventory of v3.31 (32 metrics × 5 cards × 14 helpers) → DEC-83 substrate placement → 6-layer content map proposal → batched 12-decision design ratification → DEC-84 mint → Tier-2 doc refresh. Probe-first per DEC-65; surface inventory delegated to Explore agent for parallel execution while precedent-doc + DEC-83 schema were read directly.
 
