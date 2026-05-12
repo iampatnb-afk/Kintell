@@ -1676,7 +1676,43 @@ def _catchment_trajectory(sa2_code,
         return arr[i] if i < len(arr) else None
 
     points = []
-    events = bs.get("centre_events", []) or []
+    raw_events = bs.get("centre_events", []) or []
+
+    # Name-rename dedup (Patrick 2026-05-12: same centres appearing in
+    # both +new and -closed lists). build_sa2_history.py identifies
+    # churn via set-difference on service_id keys, but NQAITS rotates
+    # service_id keys across quarters even when the physical centre is
+    # unchanged. When a name appears in BOTH new_names and removed_names
+    # of the same event it's a key-rename, not an open/close — strip it
+    # from both lists and adjust the centre counts. Net_centres stays
+    # correct (same name on both sides cancels) but places_change is
+    # left as-is since per-centre place attribution isn't carried here.
+    events: list = []
+    for ev in raw_events:
+        new_names = list(ev.get("new_names") or [])
+        removed_names = list(ev.get("removed_names") or [])
+        # Case-fold + collapse whitespace for matching; preserve original
+        # casing in the output.
+        def _norm(s):
+            return " ".join(str(s).split()).casefold()
+        new_norm_to_name = {_norm(n): n for n in new_names}
+        removed_norm_to_name = {_norm(n): n for n in removed_names}
+        overlap = set(new_norm_to_name.keys()) & set(removed_norm_to_name.keys())
+        if overlap:
+            new_names = [n for n in new_names if _norm(n) not in overlap]
+            removed_names = [n for n in removed_names if _norm(n) not in overlap]
+        new_n = len(new_names)
+        removed_n = len(removed_names)
+        if new_n == 0 and removed_n == 0:
+            continue  # pure-rename event — no real open/close, drop entirely
+        events.append({
+            **ev,
+            "new_names":       new_names,
+            "removed_names":   removed_names,
+            "new_centres":     new_n,
+            "removed_centres": removed_n,
+            "net_centres":     new_n - removed_n,
+        })
 
     if metric_name == "sa2_supply_ratio":
         for i, q in enumerate(quarters):
