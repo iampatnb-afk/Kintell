@@ -3994,7 +3994,8 @@ function _findPosEntry(centre, metric) {
   if (wfHit) return wfHit;
   // School enrolment trend — synthetic from top-level payload key.
   // Patrick 2026-05-12: clicking the row should inline-expand the
-  // 18-year historical trajectory.
+  // 18-year historical trajectory; centre_events overlay carries the
+  // supply-change vertical dashed lines for new schools / OSHC arrivals.
   if (metric === "school_enrolment_3y_trend") {
     const et = centre.school_enrolment_trend || {};
     if (et.latest_value != null && Array.isArray(et.trajectory) && et.trajectory.length) {
@@ -4007,10 +4008,11 @@ function _findPosEntry(centre, metric) {
         year:           et.latest_year,
         period_label:   String(et.latest_year),
         source:         et.source || "ACARA School Profile 2008-2025",
-        intent_copy:    "Total catchment school enrolment over time. Rising school enrolment is a leading indicator for the under-5 cohort coming through into the local ECEC market.",
-        about_data:     "Sum of student enrolment across all schools located in this SA2 (ACARA School Profile, annual). Includes Government, Catholic, and Independent across primary, secondary, and combined sectors.",
+        intent_copy:    "Total catchment school enrolment over time. Rising school enrolment is a leading indicator for the under-5 cohort coming through into the local ECEC market. Vertical dashed lines mark years when new schools or OSHC services arrived in the catchment.",
+        about_data:     "Sum of student enrolment across all schools located in this SA2 (ACARA School Profile, annual). Includes Government, Catholic, and Independent across primary, secondary, and combined sectors.\n\nSupply-change overlay: new schools derived from YoY count delta in acara_school_count_total; new OSHC services from services.approval_granted_date in that year + SA2 match.",
         decile:         null,
         cohort_n:       null,
+        centre_events:  et.centre_events || [],
       };
     }
   }

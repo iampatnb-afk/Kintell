@@ -2782,6 +2782,117 @@ def _compute_cross_subtype_competition(conn, sa2_code: Optional[str],
     return out
 
 
+def _compute_education_supply_events(conn, sa2_code: Optional[str]) -> list:
+    """Build a centre_events-shaped list for the school enrolment chart
+    showing 'new education environments arriving' per year (Patrick
+    2026-05-12). Two event sources:
+      1. New schools — YoY delta in acara_school_count_total
+      2. New OSHC services — services.approval_granted_date in that year
+         + sa2_code match + subtype=OSHC
+    Returns the same shape as catchment centre_events (quarter, net_centres,
+    places_change, new_names, removed_names) so the existing
+    _kintellEventAnnotation plugin can render it. `quarter` is the year as
+    a string (e.g. "2019") since school data is annual cadence.
+    """
+    if not sa2_code:
+        return []
+    events_by_year: dict = {}
+
+    # 1. New schools per year — derived from YoY count delta in long-format
+    #    abs_sa2_education_employment_annual.
+    try:
+        rows = conn.execute(
+            """
+            SELECT year, value FROM abs_sa2_education_employment_annual
+             WHERE sa2_code = ? AND metric_name = 'acara_school_count_total'
+               AND value IS NOT NULL
+             ORDER BY year ASC
+            """,
+            (sa2_code,),
+        ).fetchall()
+        prev = None
+        for r in rows:
+            yr = int(r[0])
+            cur_count = int(r[1])
+            if prev is not None and cur_count > prev:
+                added = cur_count - prev
+                events_by_year.setdefault(str(yr), {
+                    "quarter": str(yr),
+                    "net_centres": 0,
+                    "new_centres": 0,
+                    "places_change": 0,
+                    "new_names": [],
+                    "removed_centres": 0,
+                    "removed_names": [],
+                })
+                events_by_year[str(yr)]["net_centres"] += added
+                events_by_year[str(yr)]["new_centres"] += added
+                events_by_year[str(yr)]["new_names"].append(
+                    f"{added} new school{'s' if added != 1 else ''} (ACARA count delta)"
+                )
+            elif prev is not None and cur_count < prev:
+                removed = prev - cur_count
+                events_by_year.setdefault(str(yr), {
+                    "quarter": str(yr),
+                    "net_centres": 0,
+                    "new_centres": 0,
+                    "places_change": 0,
+                    "new_names": [],
+                    "removed_centres": 0,
+                    "removed_names": [],
+                })
+                events_by_year[str(yr)]["net_centres"] -= removed
+                events_by_year[str(yr)]["removed_centres"] += removed
+                events_by_year[str(yr)]["removed_names"].append(
+                    f"{removed} school{'s' if removed != 1 else ''} closed (ACARA count delta)"
+                )
+            prev = cur_count
+    except sqlite3.OperationalError:
+        pass
+
+    # 2. New OSHC services per year — from services.approval_granted_date.
+    #    Date format is DD/MM/YYYY per ACECQA convention.
+    try:
+        rows = conn.execute(
+            """
+            SELECT service_name, approval_granted_date, approved_places
+              FROM services
+             WHERE sa2_code = ?
+               AND COALESCE(is_active, 1) = 1
+               AND service_sub_type = 'OSHC'
+               AND approval_granted_date IS NOT NULL
+            """,
+            (sa2_code,),
+        ).fetchall()
+        for r in rows:
+            raw = r[1] or ""
+            m = re.match(r"^\d{1,2}/\d{1,2}/(\d{4})$", raw)
+            if not m:
+                m = re.search(r"(\d{4})", raw)
+            if not m:
+                continue
+            yr = m.group(1)
+            events_by_year.setdefault(yr, {
+                "quarter": yr,
+                "net_centres": 0,
+                "new_centres": 0,
+                "places_change": 0,
+                "new_names": [],
+                "removed_centres": 0,
+                "removed_names": [],
+            })
+            events_by_year[yr]["net_centres"] += 1
+            events_by_year[yr]["new_centres"] += 1
+            events_by_year[yr]["places_change"] += int(r[2] or 0)
+            events_by_year[yr]["new_names"].append(
+                f"{r[0]} (OSHC, {int(r[2] or 0)} places)"
+            )
+    except sqlite3.OperationalError:
+        pass
+
+    return sorted(events_by_year.values(), key=lambda e: e["quarter"])
+
+
 def _build_schools_in_catchment(conn, sa2_code: Optional[str]) -> dict:
     """Returns per-school detail for every school in the SA2. Drives
     Bundle 2 schools-in-catchment drawer enrichment (Patrick 2026-05-12).
@@ -4589,6 +4700,14 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
         # competition / transition; OSHC subject sees LDC feeder pipeline).
         school_enrolment_trend = _compute_school_enrolment_trend(
             conn, r.get("sa2_code")
+        )
+        # Supply-change overlay events for the school enrolment chart —
+        # Patrick 2026-05-12: "supply change horizontal lines there as
+        # well for new education environments arriving, OSH or the
+        # others." Same payload shape as catchment centre_events so the
+        # existing _kintellEventAnnotation plugin can render it.
+        school_enrolment_trend["centre_events"] = (
+            _compute_education_supply_events(conn, r.get("sa2_code"))
         )
         cross_subtype_competition = _compute_cross_subtype_competition(
             conn, r.get("sa2_code"), r.get("service_sub_type")
