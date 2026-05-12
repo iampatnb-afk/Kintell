@@ -115,6 +115,101 @@
     padding: 22px 26px;
     margin-bottom: 18px;
   }
+  /* 2026-05-12 — Layer 1 + Layer 2 merge per Patrick queue #3. Identity
+     LEFT, intelligence sidebar RIGHT. Below 1100px, intelligence drops
+     under identity (single column stack) so the sidebar doesn't crowd
+     small screens. */
+  .l1-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+  @media (max-width: 1100px) {
+    .l1-grid { grid-template-columns: 1fr; gap: 18px; }
+  }
+  .l1-identity {
+    min-width: 0;
+  }
+  /* Layer 2 sidebar — compact intelligence read inside Layer 1. Headline
+     composer at top, then 6 signal tiles in a stacked list (headline-only,
+     no sub-metric stack — sub-metric depth lives in the matrix below).
+     Flag bar at bottom. Click any tile to scroll to its matrix category. */
+  .l2-sidebar {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 14px 12px;
+  }
+  .l2-sidebar-head {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-mute);
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .l2-sidebar-headline {
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--text);
+    font-weight: 500;
+    margin-bottom: 12px;
+    padding: 8px 10px;
+    background: rgba(155, 89, 182, 0.06);
+    border-left: 2px solid var(--accent);
+    border-radius: 2px;
+  }
+  .l2-sidebar-tiles {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .l2-sidebar-tile {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 7px 10px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .l2-sidebar-tile:hover {
+    background: var(--panel-3);
+    border-color: var(--accent);
+  }
+  .l2-sidebar-tile-label {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-mute);
+    font-weight: 600;
+    min-width: 80px;
+    flex-shrink: 0;
+  }
+  .l2-sidebar-tile-summary {
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.35;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .l2-sidebar-flags {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .l2-sidebar-flags .l2-flag {
+    font-size: 10px;
+    padding: 2px 8px;
+  }
   .l1-name {
     font-size: 26px; font-weight: 600; line-height: 1.2;
     margin: 0;
@@ -1248,6 +1343,15 @@
     line-height: 1.4;
     font-style: italic;
   }
+  /* Analytical-lens intro for each category — soft prose breaking up the
+     tabular matrix density. Visual softness pass 2026-05-12. */
+  .l5-cat-intro {
+    font-size: 11.5px;
+    color: var(--text-mute);
+    padding: 4px 8px 8px;
+    line-height: 1.5;
+    font-style: italic;
+  }
   .l5-row {
     display: grid;
     grid-template-columns:
@@ -2185,37 +2289,83 @@ function renderL1Header(centre) {
     <div class="l1-contact">${contactItems.join(' <span class="sep">·</span> ')}</div>
   ` : "";
 
+  // Layer 1 + Layer 2 merge (Patrick queue #3, 2026-05-12). Identity
+  // content sits in the left column of l1-grid; the compact intelligence
+  // sidebar sits in the right column via renderL2Sidebar(centre).
   return `
     <section class="l1-header">
-      <h2 class="l1-name">${htmlEscape(h.service_name || "Centre")}</h2>
-      <div style="color:var(--text-dim);font-size:13px;margin-top:6px;">
-        ${addressParts.length ? htmlEscape(addressParts.join(', ')) : ""}
+      <div class="l1-grid">
+        <div class="l1-identity">
+          <h2 class="l1-name">${htmlEscape(h.service_name || "Centre")}</h2>
+          <div style="color:var(--text-dim);font-size:13px;margin-top:6px;">
+            ${addressParts.length ? htmlEscape(addressParts.join(', ')) : ""}
+          </div>
+          <div class="l1-provider">
+            <span class="label">operator:</span> ${operatorLink}
+            ${ownershipBadge}
+            ${brandBadge}
+            ${entity ? `<span class="label" style="margin-left:8px;">entity:</span> <span style="color:var(--text);">${htmlEscape(entity)}</span>` : ""}
+            ${lpChip}
+          </div>
+          ${tilesHtml}
+          ${(() => {
+            // Explicit SA2 attribution — makes it unambiguous which catchment
+            // area drives every metric below. Pulls from the catchment.sa2
+            // sub-block populated server-side.
+            const sa2 = catchment.sa2 || {};
+            if (sa2.code || sa2.name) {
+              const parts = [];
+              if (sa2.code) parts.push(`<b>${htmlEscape(sa2.code)}</b>`);
+              if (sa2.name) parts.push(htmlEscape(sa2.name));
+              return `<div class="l1-sa2"><span class="label">Catchment SA2:</span> ${parts.join(' — ')}</div>`;
+            }
+            return "";
+          })()}
+          ${tagsHtml}
+          ${hoursLine}
+          ${contactLine}
+        </div>
+        ${renderL2Sidebar(centre)}
       </div>
-      <div class="l1-provider">
-        <span class="label">operator:</span> ${operatorLink}
-        ${ownershipBadge}
-        ${brandBadge}
-        ${entity ? `<span class="label" style="margin-left:8px;">entity:</span> <span style="color:var(--text);">${htmlEscape(entity)}</span>` : ""}
-        ${lpChip}
-      </div>
-      ${tilesHtml}
-      ${(() => {
-        // Explicit SA2 attribution — makes it unambiguous which catchment
-        // area drives every metric below (doc item #1). Pulls from the
-        // catchment.sa2 sub-block populated server-side.
-        const sa2 = catchment.sa2 || {};
-        if (sa2.code || sa2.name) {
-          const parts = [];
-          if (sa2.code) parts.push(`<b>${htmlEscape(sa2.code)}</b>`);
-          if (sa2.name) parts.push(htmlEscape(sa2.name));
-          return `<div class="l1-sa2"><span class="label">Catchment SA2:</span> ${parts.join(' — ')}</div>`;
-        }
-        return "";
-      })()}
-      ${tagsHtml}
-      ${hoursLine}
-      ${contactLine}
     </section>
+  `;
+}
+
+// Layer 2 intelligence — compact sidebar variant for embedding in Layer 1
+// (Patrick queue #3 2026-05-12). Renders the same payload as
+// renderL2Executive but in a vertically-stacked tile list with only the
+// headline summary per tile (sub-metric depth lives in the matrix below).
+// Click any tile to scroll to its matrix category. Flag bar sits at the
+// bottom of the sidebar. When executive payload is missing, returns an
+// empty string so the grid collapses to identity-only gracefully.
+function renderL2Sidebar(centre) {
+  const exec = centre.executive || {};
+  if (!exec.signals && !exec.headline) return "";
+  const tilesHtml = (exec.signals || []).map(s => `
+    <div class="l2-sidebar-tile" onclick="handleSignalClick('${htmlEscape(s.links_to || '')}')" title="${htmlEscape(s.label)} — click to scroll to matrix category">
+      <span class="l2-sidebar-tile-label">${htmlEscape(s.label)}</span>
+      <span class="l2-sidebar-tile-summary">${htmlEscape(s.summary || "—")}</span>
+    </div>
+  `).join('');
+  const flags = exec.flags || {visible: [], spillover_count: 0};
+  const flagsHtml = (flags.visible || []).map(f => `
+    <span class="l2-flag ${f.severity}" onclick="handleFlagClick('${htmlEscape(f.links_to || '')}')" title="${htmlEscape(f.label)}">
+      ${htmlEscape(f.label)}
+    </span>
+  `).join('');
+  const spilloverHtml = (flags.spillover_count > 0)
+    ? `<span class="l2-flag-spillover" onclick="scrollToCategory('quality')">+${flags.spillover_count} more</span>`
+    : "";
+  const flagsBlock = (flags.visible.length || flags.spillover_count)
+    ? `<div class="l2-sidebar-flags">${flagsHtml}${spilloverHtml}</div>`
+    : "";
+  return `
+    <aside class="l2-sidebar">
+      <div class="l2-sidebar-head">Intelligence</div>
+      ${exec.headline ? `<div class="l2-sidebar-headline">${htmlEscape(exec.headline)}</div>` : ""}
+      <div class="l2-sidebar-tiles">${tilesHtml}</div>
+      ${flagsBlock}
+    </aside>
   `;
 }
 
@@ -4216,7 +4366,7 @@ function renderL3Charts(centre) {
   return `
     <section class="l3-block">
       <h2>Primary historical trends</h2>
-      <p class="subtitle">Seven primary trajectory charts. Hover any chart for values; use the trend-window selector below to clip the time horizon.</p>
+      <p class="subtitle">Seven decision-critical trajectories on a shared trend window — catchment supply, demand, demographic context, workforce and pricing. Each chart carries its own peer-cohort histogram, 1–10 decile strip and band interpretation. Hover any line for period values; vertical dashed lines mark supply-change events in the catchment.</p>
       ${_renderTrajectoryRangeBar()}
       ${chart1}
       ${chart2}
@@ -4990,6 +5140,24 @@ function renderL5Matrix(centre) {
     quality: `This section will be restructured when the Child Safety &amp; Wellbeing page ships. Current content is provisional and may move or expand.`,
   };
 
+  // Per-category analytical intros — soft prose lens explaining what
+  // each category surfaces. Adds reading rhythm to the otherwise-tabular
+  // matrix (visual softness pass 2026-05-12). Kept very brief so the
+  // matrix density doesn't get diluted.
+  const CATEGORY_INTRO = {
+    demand:        "Catchment demand fundamentals: place-to-child ratios, demand-side reads against industry benchmarks.",
+    supply:        "Place capacity and supply build-up in the catchment over time.",
+    population:    "Demographic substrate driving the under-5 demand pool.",
+    pricing:       "Daily-rate position, CCS coverage and family-affordability context.",
+    community:     "Cultural and demographic mix shaping family-relationship demand.",
+    labour_market: "Income, participation and unemployment within the catchment.",
+    education:     "Schools and after-school environments operating around this centre.",
+    workforce:     "Educator-supply pressure, vacancy intensity and award context.",
+    quality:       "NQS rating, conditions on approval and enforcement history.",
+    operator:      "Provider-group identity and operator-chain affiliation.",
+    operations:    "Service operational integrity — hours, vacancies, status, CCS data state.",
+  };
+
   // Sections per category
   const sections = CATEGORY_ORDER
     .filter(c => byCat[c])
@@ -4997,9 +5165,13 @@ function renderL5Matrix(centre) {
       const note = CATEGORY_NOTE[c]
         ? `<div class="l5-cat-note">${CATEGORY_NOTE[c]}</div>`
         : "";
+      const intro = CATEGORY_INTRO[c]
+        ? `<div class="l5-cat-intro">${CATEGORY_INTRO[c]}</div>`
+        : "";
       return `
         <div class="l5-cat-section" id="cat-${c}">
           <div class="l5-cat-header">${CATEGORY_LABELS[c]}</div>
+          ${intro}
           ${note}
           ${byCat[c].map(renderMatrixRow).join('')}
         </div>
@@ -5009,7 +5181,7 @@ function renderL5Matrix(centre) {
   return `
     <section class="l5-matrix">
       <h2>Signal Matrix</h2>
-      <p class="l5-matrix-sub">Every metric in tabular quick-scan form. Click any row to open its trend chart inline below; click the right-hand icon for the full methodology drawer.</p>
+      <p class="l5-matrix-sub">Every signal in tabular quick-scan form, grouped by analytical lens. Inline-expand any trajectory metric for its historical chart in place. The right-hand icon opens the methodology drawer — or, where flagged, the richer underlying detail (school names, top-N countries / languages, conditions text, enforcement log, full per-(age × session) fee grid).</p>
       <div class="l5-trigger-caption">
         <span class="accent-icon"><svg viewBox="0 0 24 24" width="13" height="13" style="vertical-align:middle;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></span>
         on the right-hand column indicates richer underlying data — school names, top-country / language detail, conditions text, enforcement log, full per-(age × session) fee grid, or service lists. Plain methodology drawer otherwise.
@@ -5827,11 +5999,13 @@ function render(centre) {
   }
 
   const main = document.getElementById("main");
+  // Layer 2 intelligence is now embedded as a sidebar inside renderL1Header
+  // (Patrick queue #3 2026-05-12). renderL2Executive remains defined below
+  // for backward compatibility but is no longer invoked in the main flow.
   main.innerHTML = `
     ${renderL1Header(centre)}
     ${renderL15CompetitivePositioning(centre)}
     ${renderMethodologyLegend()}
-    ${renderL2Executive(centre)}
     ${renderL3Charts(centre)}
     ${renderL5Matrix(centre)}
     ${renderL4Accordion(centre)}
