@@ -2348,17 +2348,28 @@ def _build_dec83_state(conn, service_id: int) -> dict:
         latest_dt = latest_year_row[0] if latest_year_row else None
         if latest_dt:
             latest_year = (latest_dt or "")[:4]
+            # Patrick 2026-05-12: align the L1 daily-rate tile value with
+            # the L1.5 competitive-positioning chart. Both must use the
+            # most-recent snapshot per (age × session) — previously this
+            # query averaged across the whole latest YEAR, which produced
+            # a different value to the L1.5 chart's latest-snapshot-only
+            # aggregation. Now consistent.
             fee_rows = conn.execute("""
-                SELECT age_band, session_type,
-                       AVG(fee_aud) AS median_fee_aud,
+                SELECT sf.age_band, sf.session_type,
+                       AVG(sf.fee_aud) AS median_fee_aud,
                        COUNT(*) AS n_obs,
-                       MAX(as_of_date) AS most_recent
-                  FROM service_fee
-                 WHERE service_id = ?
-                   AND substr(as_of_date, 1, 4) = ?
-                 GROUP BY age_band, session_type
-                 ORDER BY age_band, session_type
-            """, (service_id, latest_year)).fetchall()
+                       MAX(sf.as_of_date) AS most_recent
+                  FROM service_fee sf
+                 WHERE sf.service_id = ?
+                   AND sf.as_of_date = (
+                         SELECT MAX(as_of_date) FROM service_fee sf2
+                          WHERE sf2.service_id = sf.service_id
+                            AND sf2.age_band = sf.age_band
+                            AND sf2.session_type = sf.session_type
+                       )
+                 GROUP BY sf.age_band, sf.session_type
+                 ORDER BY sf.age_band, sf.session_type
+            """, (service_id,)).fetchall()
             # Annual trajectory for the headline pair: median per (year)
             # for the most-populated (age_band, session_type) cell. Layer 3
             # chart 7 reads this; sparkline in matrix continues to use the
