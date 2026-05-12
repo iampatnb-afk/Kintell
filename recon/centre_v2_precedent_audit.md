@@ -94,6 +94,18 @@ Lives between L1 identity row and L2 intelligence bar. SVG bubble chart on daily
 - Headline pair derived from subject subtype (LDC/Preschool/FDC → full_day × 36m-preschool; OSHC → before_school × school-age)
 - Subject service excluded only if it has no fee in `service_fee` for the headline pair
 
+### Layer 5 — Bundle 1 polish (2026-05-12)
+- **Category order updated**: `demand → supply → population → pricing → community → labour_market → education → workforce → quality → operator → operations`. Population moved between Supply and Pricing & Fees per Patrick's framing (demand fundamental).
+- **Static-snapshot stamps**: matrix rows with sparkline length ≤ 1 → "static snapshot" italic stamp under the period column. Rows with 3-point Census pattern (decade-class intervals around 2011/2016/2021) → "Census 3-pt" stamp. Detection in `_l5RowAnnotation` helper. CSS class `.l5-value .period-stamp`.
+- **Workforce scope stamps**: matrix rows with `signal` text matching `/no SA2 peer cohort/i` and category=workforce render with dashed-italic `.l5-signal.scope-stamp` styling instead of the band signal pill — surfaces the "state-level (NSW) — no SA2 peer cohort" caveat prominently rather than as plain text in the signal column.
+
+### Carryover block — analytical-priority reorder 2026-05-12
+- Order: **Places & service type → Catchment meta → NQS rating → QA scores**. Was: NQS → Places → Catchment-meta → QA. Patrick queue #5: credit-analytical priority, operational identity leads, quality items cluster at the end.
+
+### Chart 6 — refactored from dual-axis (2026-05-12)
+- **Before:** Female LFP (Census, 3 points at 2011/2016/2021) + SALM unemployment (quarterly, 2024+ only for most SA2s) on a dual-axis chart. Unemployment line was always null because the period labels never matched and the underlying temporal coverage didn't overlap.
+- **After:** Chart primarily plots SALM unemployment quarterly trajectory. Female LFP surfaced as a dated Census reference value in the chart head ("Female LFP {value}% (Census 2021)"). When SALM is missing for the SA2, falls back to LFP-only series. Title: "Unemployment rate (SALM quarterly)" or "Female labour-force participation" depending on which is primary.
+
 ### Layer 3 — Chart 7 (Daily rate) multi-age-band refactor 2026-05-12
 Replaces the prior single-line headline-pair chart with a multi-line view showing all relevant age bands grouped by subject's care type:
 - LDC / Preschool / FDC → 4 lines (0-12m / 13-24m / 25-35m / 36m-preschool) all full_day

@@ -1291,6 +1291,29 @@
   .l5-value .period {
     color: var(--text-mute); font-size: 11px; display: block;
   }
+  /* Annotation chip under the period for non-trajectory rows — explicit
+     "Census 3-pt" / "static snapshot" stamps so the reader doesn't expect
+     a continuous trajectory where there isn't one. Patrick queue #10. */
+  .l5-value .period-stamp {
+    display: inline-block;
+    font-size: 9.5px;
+    color: rgba(180, 180, 200, 0.65);
+    letter-spacing: 0.04em;
+    font-style: italic;
+    margin-top: 2px;
+    text-transform: lowercase;
+  }
+  /* Workforce scope stamps — "state-level (NSW) — no SA2 peer cohort" etc.
+     Italic, slightly muted, sits inside the signal column. Patrick queue #12. */
+  .l5-signal.scope-stamp {
+    background: transparent;
+    border: 1px dashed rgba(180, 180, 200, 0.25);
+    color: var(--text-mute);
+    font-style: italic;
+    font-size: 10.5px;
+    padding: 4px 8px;
+    line-height: 1.35;
+  }
   .l5-decile {
     display: flex; flex-direction: column; gap: 2px;
     align-items: flex-start;
@@ -4065,8 +4088,12 @@ function renderL3Charts(centre) {
   // Chart 2: Demand vs supply
   // Chart 3 + 4: Adjusted demand / Children-per-place pair
   // Chart 5: Under-5 + births overlay (single chart, two lines)
-  // Chart 6: Female LFP + unemployment dual-axis (single chart)
-  // Chart 7: Daily-rate (DEC-83)
+  // Chart 6: Unemployment trajectory (SALM quarterly) + Female LFP
+  //         Census reference line in chart head (refactored 2026-05-12
+  //         from dual-axis; Census LFP and SALM unemployment had no
+  //         temporal overlap so dual-axis comparison was structurally
+  //         broken — see _renderLfpUnempChart docstring).
+  // Chart 7: Daily-rate multi-age-band (DEC-83)
 
   const chart1 = _renderChartPanel("sa2_supply_ratio", _findPosEntry(c, "sa2_supply_ratio"));
   const chart2 = _renderChartPanel("sa2_demand_supply", _findPosEntry(c, "sa2_demand_supply"));
@@ -4200,103 +4227,126 @@ function _renderUnderFiveBirthsChart(centre) {
   `;
 }
 
+// Chart 6 — Unemployment trajectory with Female LFP as Census-dated reference.
+// Originally a dual-axis chart attempting to show Census Female LFP and SALM
+// quarterly unemployment together. Patrick 2026-05-12 flagged that the
+// unemployment line was always null. Root cause: per-SA2 data has Census LFP
+// at decade-class points (2011/2016/2021) and SALM unemployment only at
+// recent quarters (2024-2025+) — temporal coverage doesn't overlap, so the
+// dual-axis comparison was structurally broken.
+//
+// Fix: chart now primarily plots SALM unemployment (quarterly trajectory,
+// current signal). Female LFP from Census is surfaced as a dated reference
+// value in the chart head + carried in the full register below. When SALM
+// unemployment is unavailable, falls back to LFP-only series.
 function _renderLfpUnempChart(centre) {
   const lfpF = _findPosEntry(centre, "sa2_lfp_females");
   const unemp = _findPosEntry(centre, "sa2_unemployment_rate");
-  if (!lfpF || !lfpF.trajectory || lfpF.trajectory.length < 2) {
-    return `<div class="chart-panel"><div class="pending-chart">LFP + unemployment trajectory unavailable</div></div>`;
+  // Prefer unemployment trajectory (current quarterly signal). Fall back
+  // to LFP when SALM ingest hasn't covered this SA2.
+  const haveUnemp = unemp && Array.isArray(unemp.trajectory) && unemp.trajectory.length >= 2;
+  const haveLfp = lfpF && Array.isArray(lfpF.trajectory) && lfpF.trajectory.length >= 1;
+  if (!haveUnemp && !haveLfp) {
+    return `<div class="chart-panel"><div class="pending-chart">Labour-market trajectory unavailable</div></div>`;
   }
-  const lPoints = _filterTrajectoryByRange(lfpF.trajectory || [], _TRAJECTORY_RANGE_YEARS);
-  const uPoints = _filterTrajectoryByRange(unemp?.trajectory || [], _TRAJECTORY_RANGE_YEARS);
-  const labels = lPoints.map(p => p.period);
-  const lData = lPoints.map(p => Number(p.value));
-  const uByPeriod = new Map((uPoints || []).map(p => [String(p.period), Number(p.value)]));
-  const uData = labels.map(l => uByPeriod.get(String(l)) ?? null);
-  const lStartV = lData.length ? lData[0] : null;
-  const uStartV = (uData.find(v => v != null)) ?? null;
-  const lStartYear = _yearOfPeriod(labels[0]);
+
+  const primary = haveUnemp ? unemp : lfpF;
+  const primaryMetric = haveUnemp ? "sa2_unemployment_rate" : "sa2_lfp_females";
+  const points = _filterTrajectoryByRange(primary.trajectory || [], _TRAJECTORY_RANGE_YEARS);
+  if (points.length < 2) {
+    return `<div class="chart-panel"><div class="pending-chart">Trajectory window contains insufficient points</div></div>`;
+  }
+  const labels = points.map(p => p.period);
+  const data = points.map(p => Number(p.value));
+  const startV = data.length ? data[0] : null;
+  const startYear = _yearOfPeriod(labels[0]);
   const canvasId = `chart-lfpu-${Math.random().toString(36).slice(2,8)}`;
+  const color = haveUnemp ? "#e05c3a" : _strokeFor("sa2_lfp_females");
+  const fill = haveUnemp ? "rgba(224,92,58,0.10)" : _fillFor("sa2_lfp_females");
+  const seriesLabel = haveUnemp ? "Unemployment %" : "Female LFP %";
+
   const config = {
     type: "line",
     data: {
       labels,
-      datasets: [
-        {
-          label: "Female LFP %", data: lData,
-          borderColor: _strokeFor("sa2_lfp_females"),
-          backgroundColor: _fillFor("sa2_lfp_females"),
-          borderWidth: 2, fill: true,
-          pointRadius: 2, pointHoverRadius: 5, tension: 0,
-          yAxisID: "y",
-        },
-        {
-          label: "Unemployment %", data: uData,
-          borderColor: "#e05c3a",
-          backgroundColor: "rgba(224,92,58,0.08)",
-          borderWidth: 2, fill: false, borderDash: [4,3],
-          pointRadius: 2, pointHoverRadius: 5, tension: 0,
-          yAxisID: "y2", spanGaps: true,
-        },
-      ],
+      datasets: [{
+        label: seriesLabel,
+        data,
+        borderColor: color,
+        backgroundColor: fill,
+        borderWidth: 2, fill: true,
+        pointRadius: 2, pointHoverRadius: 5, tension: 0,
+        spanGaps: true,
+      }],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       interaction: { mode: "index", intersect: false },
       plugins: {
-        legend: { display: true, position: "top", labels: { color: "#9aa4b1", font: { size: 10 }, boxWidth: 10 } },
+        legend: { display: false },
         tooltip: {
           enabled: false,
           external: _kintellExternalReadout,
           callbacks: {
             label: (ctx) => `${ctx.dataset.label}: ${Number(ctx.parsed.y).toFixed(1)}%`,
             afterLabel: (ctx) => {
-              const isLfp = ctx.dataset.yAxisID === "y";
-              const startV = isLfp ? lStartV : uStartV;
               if (startV == null || startV === 0) return null;
               const here = Number(ctx.parsed.y);
               if (!isFinite(here)) return null;
               const pct = ((here - startV) / startV) * 100;
-              return `${_formatTrendPct(pct)} since ${lStartYear}`;
+              return `${_formatTrendPct(pct)} since ${startYear}`;
             },
           },
         },
       },
       scales: {
         x: { ticks: { color: "#6b7684", font: { size: 10 }, maxTicksLimit: 6, autoSkip: true }, grid: { display: false } },
-        y:  { position: "left",  ticks: { color: "#9b59b6", font: { size: 10 }, callback: v => v + "%" }, grid: { color: "#232933" } },
-        // y2 (unemployment) pinned to start at 0 so dual-axis comparison
-        // is honest — auto-scale on a tight unemployment range (3-10%)
-        // visually overstates the trajectory by zooming in. LFP (y) is
-        // left to auto-scale because Female LFP at SA2 always sits in
-        // the 40-80% band so the zoom is informative there.
-        y2: { position: "right", min: 0, ticks: { color: "#e05c3a", font: { size: 10 }, callback: v => v + "%" }, grid: { display: false } },
+        y: { ticks: { color: "#6b7684", font: { size: 10 }, callback: v => v + "%" }, grid: { color: "#232933" }, beginAtZero: haveUnemp },
       },
     },
   };
   _CHART_PENDING.push({ canvasId, config });
-  // Full register based on the primary metric (Female LFP); composed
-  // source line carries both underlying datasets.
-  const lSource = lfpF.source || "ABS Census Labour Force Participation at SA2";
+
+  // Reference line: surface Female LFP as a dated context line when
+  // unemployment is the primary series (Census Female LFP serves as the
+  // workforce-supply context against which unemployment reads).
+  let lfpReferenceLine = "";
+  if (haveUnemp && haveLfp && lfpF.raw_value != null) {
+    lfpReferenceLine = `
+      <div style="margin-top:2px;text-align:right;font-size:11px;color:var(--text-mute);">
+        <span style="color:var(--text-dim);">Female LFP</span>
+        <b style="color:var(--text);font-weight:500;font-variant-numeric:tabular-nums;margin:0 4px;">${Number(lfpF.raw_value).toFixed(1)}%</b>
+        <span style="color:var(--text-mute);font-style:italic;">(${htmlEscape(lfpF.period_label || lfpF.year || 'Census')})</span>
+      </div>
+    `;
+  }
+
+  // Chart head + full register based on the primary metric
+  const lSource = lfpF?.source || "ABS Census Labour Force Participation at SA2";
   const uSource = (unemp && unemp.source) || "ABS SALM unemployment rate at SA2 (quarterly)";
-  const combinedSource = `Female LFP: ${lSource} · Unemployment: ${uSource}`;
-  const enrichedLfp = { ...lfpF, source: combinedSource };
-  const obsTooltip = `Source: ${combinedSource}\nAs at: ${lfpF.period_label || lfpF.year || ''}`.replace(/"/g, '&quot;');
-  const valueStr = lfpF.raw_value != null ? Number(lfpF.raw_value).toFixed(1) + '%' : '';
-  const periodStr = lfpF.period_label || (lfpF.year != null ? String(lfpF.year) : '');
+  const combinedSource = haveUnemp && haveLfp
+    ? `${primary.source || (haveUnemp ? uSource : lSource)} · context: ${haveUnemp ? lSource : uSource}`
+    : (primary.source || (haveUnemp ? uSource : lSource));
+  const enrichedPrimary = { ...primary, source: combinedSource };
+  const obsTooltip = `Source: ${combinedSource}\nAs at: ${primary.period_label || primary.year || ''}`.replace(/"/g, '&quot;');
+  const valueStr = primary.raw_value != null ? Number(primary.raw_value).toFixed(1) + '%' : '';
+  const periodStr = primary.period_label || (primary.year != null ? String(primary.year) : '');
+  const chartTitle = haveUnemp ? "Unemployment rate (SALM quarterly)" : "Female labour-force participation";
   return `
     <div class="chart-panel">
       <div class="chart-head">
-        <span class="chart-title">Female LFP &amp; unemployment rate</span>
+        <span class="chart-title">${chartTitle}</span>
         <span style="display:inline-flex;align-items:baseline;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
           ${valueStr ? `<b style="color:var(--text);font-weight:500;font-variant-numeric:tabular-nums;">${htmlEscape(valueStr)}</b>` : ''}
           ${periodStr ? `<span style="color:var(--text-mute);font-size:11px;">(${htmlEscape(periodStr)})</span>` : ''}
           <span class="fr-badge obs" title="${obsTooltip}">OBS</span>
         </span>
       </div>
+      ${lfpReferenceLine}
       <div class="chart-readout" id="readout-${canvasId}"><span class="placeholder">hover the line to read values</span></div>
       <div class="chart-canvas-wrap"><canvas id="${canvasId}"></canvas></div>
-      ${_renderChartCohort(lfpF)}
-      ${_renderFullRegister(enrichedLfp)}
+      ${_renderChartCohort(primary)}
+      ${_renderFullRegister(enrichedPrimary)}
     </div>
   `;
 }
@@ -4355,11 +4405,19 @@ function renderCarryover(centre) {
   // Tenure card relocated to Layer 1 tile (Bundle B #3 / DEC-84 amendment
   // 2026-05-13 successor work). renderTenureCard kept defined below for any
   // ad-hoc future re-use but no longer invoked from the carryover block.
+  //
+  // Card order follows credit-analytical priority (Patrick queue #5,
+  // applied 2026-05-12). Operational identity (Places & service type)
+  // leads — matches the L1 places-tile framing. Catchment context (SEIFA
+  // / kinder / catchment meta) sits next as the demand-lens identity.
+  // Quality items (NQS rating + QA-area scores) cluster at the end since
+  // they're already surfaced more comprehensively in the L5 Quality
+  // matrix category + L2 Quality signal tile.
   return `
     <div class="carryover">
-      ${renderNqsCard(centre)}
       ${renderPlacesCard(centre)}
       ${renderCatchmentMetaCard(centre)}
+      ${renderNqsCard(centre)}
       ${renderQaCard(centre)}
     </div>
     ${renderCommentary(centre)}
@@ -4635,8 +4693,12 @@ function formatMonYYYY(s) {
 //   demand → supply → pricing → population → community → labour market
 //   → education → workforce → quality → operator → operations
 const CATEGORY_ORDER = [
-  "demand", "supply", "pricing",
-  "population", "community", "labour_market",
+  // Patrick 2026-05-12: Population moved between Supply and Pricing &
+  // Fees — pop is a demand fundamental, belongs adjacent to supply/demand
+  // before economic-pricing reads. Same instinct as the L2 intelligence
+  // bar Population tile placement.
+  "demand", "supply", "population", "pricing",
+  "community", "labour_market",
   "education", "workforce", "quality",
   "operator", "operations"
 ];
@@ -4760,12 +4822,45 @@ function renderL5Matrix(centre) {
   `;
 }
 
+// Detect non-trajectory matrix rows so we can stamp them honestly.
+// Returns "" (no annotation) | "census-3pt" | "static" | "monthly-state".
+// Patrick queue #10 + the workforce scope stamp polish in #12.
+function _l5RowAnnotation(row) {
+  const spark = row.sparkline || [];
+  if (spark.length <= 1) return "static";
+  // Census 3-pt pattern — exactly 3 points at decade-class intervals
+  // (2011/2016/2021 typical for Australian Census).
+  if (spark.length === 3) {
+    const years = spark.map(p => Number(String(p.period).match(/(\d{4})/)?.[1])).filter(Boolean);
+    if (years.length === 3) {
+      const sorted = years.slice().sort((a, b) => a - b);
+      const g1 = sorted[1] - sorted[0];
+      const g2 = sorted[2] - sorted[1];
+      if (g1 >= 4 && g1 <= 6 && g2 >= 4 && g2 <= 6) return "census-3pt";
+    }
+  }
+  return "";
+}
+
 function renderMatrixRow(row) {
   const drawerKey = row.drawer_key || `metric:${row.metric}`;
   const valueDisplay = fmtValue(row.current_value, row.value_format);
-  const periodHtml = row.period ? `<span class="period">${htmlEscape(row.period)}</span>` : "";
+  // Period column gets an annotation stamp for static-snapshot / Census
+  // 3-pt rows so readers don't expect a continuous trajectory.
+  const annotation = _l5RowAnnotation(row);
+  const annotationLabel = annotation === "census-3pt" ? "Census 3-pt"
+                        : annotation === "static" ? "static snapshot"
+                        : "";
+  const periodHtml = row.period
+    ? `<span class="period">${htmlEscape(row.period)}${annotationLabel ? `<span class="period-stamp">${htmlEscape(annotationLabel)}</span>` : ""}</span>`
+    : "";
   const decileHtml = renderDecileStrip(row.decile, row.band, row.cohort_n);
-  const signalClass = signalClassForRow(row);
+  // Detect workforce scope stamps so they render with the dashed-italic
+  // scope-stamp style instead of the band signal pill.
+  const isScopeStamp = row.category === "workforce"
+                       && typeof row.signal === "string"
+                       && /no SA2 peer cohort/i.test(row.signal);
+  const signalClass = isScopeStamp ? "scope-stamp" : signalClassForRow(row);
   // OBS / DER / COM badges colour-coded per tag (mirrors L3 register).
   // The title attribute carries the methodology shorthand — explicit
   // hover-enrichment with cohort + source + calibration detail is queued
