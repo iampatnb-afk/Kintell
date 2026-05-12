@@ -99,6 +99,14 @@ Lives between L1 identity row and L2 intelligence bar. SVG bubble chart on daily
 - **Static-snapshot stamps**: matrix rows with sparkline length ≤ 1 → "static snapshot" italic stamp under the period column. Rows with 3-point Census pattern (decade-class intervals around 2011/2016/2021) → "Census 3-pt" stamp. Detection in `_l5RowAnnotation` helper. CSS class `.l5-value .period-stamp`.
 - **Workforce scope stamps**: matrix rows with `signal` text matching `/no SA2 peer cohort/i` and category=workforce render with dashed-italic `.l5-signal.scope-stamp` styling instead of the band signal pill — surfaces the "state-level (NSW) — no SA2 peer cohort" caveat prominently rather than as plain text in the signal column.
 
+### Layer 5 — Bundle 2-prep additions (2026-05-12)
+- **Category rename**: "Education" → **"Learning environment"** in `CATEGORY_LABELS`. Captures what learning ecosystem operates around the centre (schools + after-school care + transitions) rather than just education infrastructure.
+- **Workforce 3y trend in commentary**: JSA IVI matrix rows now prepend `+X% over 3y` / `−X% over 3y` to the commentary so the reader sees direction + magnitude of vacancy-pressure change without needing the chart. Computed in `_matrix_workforce_rows` from the latest 37 monthly points. Stored on the row as `trend3y_pct` for downstream use.
+- **School enrolment 3y trend row**: new matrix row in Learning environment category. Backend helper `_compute_school_enrolment_trend` reads `acara_school_enrolment_total` from `abs_sa2_education_employment_annual`. Surfaces latest value + 3y delta + 18-year sparkline. Commentary prefix "+X% over 3y" reads as ECEC demand leading indicator.
+- **Cross-subtype care competition row**: asymmetric per subject subtype. LDC/Preschool subject → "OSHC services in catchment (transition pathway)" with count + total places. OSHC subject → "LDC services in catchment (feeder pipeline)". FDC subject → no row (low cross-subtype relevance). Backend helper `_compute_cross_subtype_competition`. The school-attached spatial check is deferred to OI-NEW-19 (needs per-school lat/lng table not yet ingested).
+
+**`current` period sentinel**: synthetic count rows that aren't trajectory snapshots (provider scale / OSHC count / similar) carry `period: "current"`. The `_l5RowAnnotation` helper short-circuits on this sentinel so the row doesn't pick up the "static snapshot" stamp.
+
 ### Carryover block — analytical-priority reorder 2026-05-12
 - Order: **Places & service type → Catchment meta → NQS rating → QA scores**. Was: NQS → Places → Catchment-meta → QA. Patrick queue #5: credit-analytical priority, operational identity leads, quality items cluster at the end.
 

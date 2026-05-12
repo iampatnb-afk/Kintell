@@ -2529,6 +2529,130 @@ def _cohort_for_daily_rate(conn, sa2_code: Optional[str],
 
 
 # ─────────────────────────────────────────────────────────────────────
+# Learning environment substrate — Bundle 2-prep additions 2026-05-12.
+# Patrick: rename Education category and add (a) school enrolment YoY
+# leading indicator for ECEC demand, (b) asymmetric cross-subtype care
+# counts (LDC subject sees OSHC competition, OSHC subject sees LDC feeder
+# pipeline). Spatial OSHC-school-attached check deferred to OI-NEW-19
+# pending ACARA per-school location ingest at table level.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def _compute_school_enrolment_trend(conn, sa2_code: Optional[str]) -> dict:
+    """Returns the latest annual school enrolment for the SA2 plus the
+    3-year change vs that latest year. Smoother than YoY for a leading-
+    indicator read (year-on-year noise can swing a lot at SA2 scale).
+    Reads `abs_sa2_education_employment_annual` long-format table for
+    `acara_school_enrolment_total` metric."""
+    out = {
+        "latest_year":   None,
+        "latest_value":  None,
+        "value_3y_ago":  None,
+        "year_3y_ago":   None,
+        "change_3y_pct": None,
+        "trajectory":    [],
+        "tag":           TAG_OBS,
+        "source":        "ACARA School Profile 2008-2025 (acara_school_enrolment_total)",
+    }
+    if not sa2_code:
+        return out
+    try:
+        rows = conn.execute(
+            """
+            SELECT year, value
+              FROM abs_sa2_education_employment_annual
+             WHERE sa2_code = ?
+               AND metric_name = 'acara_school_enrolment_total'
+               AND value IS NOT NULL
+             ORDER BY year ASC
+            """,
+            (sa2_code,),
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return out
+    if not rows:
+        return out
+    points = [{"year": int(r[0]), "value": float(r[1])} for r in rows]
+    out["trajectory"] = points
+    out["latest_year"] = points[-1]["year"]
+    out["latest_value"] = points[-1]["value"]
+    # 3-year change — find the year exactly 3 years prior to latest if
+    # present; fallback to closest available point >= 3 years back.
+    target_year = out["latest_year"] - 3
+    historic = [p for p in points if p["year"] <= target_year]
+    if historic:
+        ref = historic[-1]  # closest to target_year from below
+        out["value_3y_ago"] = ref["value"]
+        out["year_3y_ago"] = ref["year"]
+        if ref["value"] > 0:
+            out["change_3y_pct"] = ((out["latest_value"] - ref["value"]) / ref["value"]) * 100.0
+    return out
+
+
+def _compute_cross_subtype_competition(conn, sa2_code: Optional[str],
+                                       subject_subtype: Optional[str]) -> dict:
+    """Asymmetric cross-subtype care counts per Patrick 2026-05-12: an LDC
+    subject wants to see OSHC competition (transition pathway signal); an
+    OSHC subject wants to see LDC feeder pipeline (where its kids come
+    from). FDC subject sees both as low-relevance.
+
+    Returns a dict with `target_subtype` (OSHC|LDC|None), `count`,
+    `total_places`, and a one-line `framing` string for the matrix row
+    commentary. Empty dict shape when subject subtype isn't recognised."""
+    out = {
+        "subject_subtype":   subject_subtype,
+        "target_subtype":    None,
+        "target_label":      None,
+        "count":             0,
+        "total_places":      0,
+        "framing":           None,
+        "tag":               TAG_OBS,
+    }
+    if not sa2_code:
+        return out
+    subtype_uc = (subject_subtype or "").upper()
+    if "OSHC" in subtype_uc or "OUTSIDE" in subtype_uc:
+        # OSHC subject → show LDC feeder pipeline
+        out["target_subtype"] = "LDC"
+        out["target_label"] = "Long Day Care (feeder pipeline)"
+        out["framing"] = ("Long Day Care services in this catchment — the "
+                          "feeder pipeline for school-age transition. "
+                          "Higher counts indicate a stronger upstream "
+                          "cohort entering school age.")
+        target_subtypes = ("LDC", "Long Day Care", "LONG DAY CARE")
+    elif "FAMILY" in subtype_uc:
+        # FDC: low cross-subtype relevance; surface nothing
+        return out
+    else:
+        # LDC / Preschool subject → show OSHC competition / transition pathway
+        out["target_subtype"] = "OSHC"
+        out["target_label"] = "OSHC (transition pathway)"
+        out["framing"] = ("Outside School Hours Care services in this "
+                          "catchment — the transition destination once "
+                          "this centre's children enter school age. "
+                          "Stronger OSHC supply supports retained "
+                          "family-relationship value at the school transition.")
+        target_subtypes = ("OSHC",)
+    placeholders = ",".join("?" * len(target_subtypes))
+    try:
+        row = conn.execute(
+            f"""
+            SELECT COUNT(*), COALESCE(SUM(approved_places), 0)
+              FROM services
+             WHERE sa2_code = ?
+               AND COALESCE(is_active, 1) = 1
+               AND service_sub_type IN ({placeholders})
+            """,
+            (sa2_code, *target_subtypes),
+        ).fetchone()
+    except sqlite3.OperationalError:
+        return out
+    out["count"] = int(row[0] or 0)
+    out["total_places"] = int(row[1] or 0)
+    return out
+
+
+# ─────────────────────────────────────────────────────────────────────
 # Competitive positioning — Layer 1.5 panel showing every centre in the
 # same SA2 on a daily-fee × NQS axis with subject centre emphasised.
 # Patrick 2026-05-12: "shows commercial + operational positioning within
@@ -3621,6 +3745,30 @@ def _matrix_workforce_rows(workforce_supply: dict) -> list:
         value_format = entry.get("value_format")
         if value_format is None and entry.get("fact"):
             value_format = "text"
+        # 3-year trend % for JSA IVI rows — Patrick 2026-05-12: "difficult
+        # to know if those numbers... are historically high or low. Probably
+        # changed in the last three years in percentages, could be one way
+        # of doing it." Appended to commentary so the reader sees direction
+        # + magnitude of change without a chart.
+        traj = entry.get("trajectory") or []
+        trend3y = None
+        if len(traj) >= 36:
+            try:
+                latest_v = float(traj[-1].get("value"))
+                # 36 monthly points back = 3 years; clip to start if shorter
+                back_idx = max(0, len(traj) - 37)
+                back_v = float(traj[back_idx].get("value"))
+                if back_v > 0:
+                    trend3y = ((latest_v - back_v) / back_v) * 100.0
+            except (TypeError, ValueError):
+                trend3y = None
+        commentary = _truncate_sentence(entry.get("intent_copy")) or ""
+        if trend3y is not None:
+            sign = "+" if trend3y >= 0 else "−"
+            trend_str = f"{sign}{abs(trend3y):.0f}% over 3y"
+            # Prepend trend so it leads the commentary; reader sees "+X% over
+            # 3y · [intent copy]" — directional context first, framing after.
+            commentary = f"{trend_str} · {commentary}" if commentary else trend_str
         out.append({
             "category":      "workforce",
             "metric":        entry.get("metric"),
@@ -3634,17 +3782,15 @@ def _matrix_workforce_rows(workforce_supply: dict) -> list:
             "band":          None,
             "industry_band": None,
             "signal":        entry.get("scope_stamp") or "—",
-            "commentary":    _truncate_sentence(entry.get("intent_copy")),
+            "commentary":    commentary,
             "drawer_key":    f"metric:{entry.get('metric')}",
             "obs_der_com":   [TAG_OBS],
             "v15_pending":   ("Pending V1.5 A7 wire-up"
                               if entry.get("confidence") == "deferred"
                               else None),
             "confidence":    entry.get("confidence"),
-            # Surface status_note (e.g. "Awaits Fair Work rates ingest")
-            # below the value column for deferred rows; v3.31 had a
-            # dedicated status_note line.
             "status_note":   entry.get("status_note"),
+            "trend3y_pct":   trend3y,
         })
     return out
 
@@ -4269,6 +4415,17 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
             "other_services": shared_pan_names,
         }
 
+        # --- LEARNING ENVIRONMENT additions (Bundle 2-prep 2026-05-12) ---
+        # School enrolment 3y trend (ECEC demand leading indicator) +
+        # asymmetric cross-subtype care counts (LDC subject sees OSHC
+        # competition / transition; OSHC subject sees LDC feeder pipeline).
+        school_enrolment_trend = _compute_school_enrolment_trend(
+            conn, r.get("sa2_code")
+        )
+        cross_subtype_competition = _compute_cross_subtype_competition(
+            conn, r.get("sa2_code"), r.get("service_sub_type")
+        )
+
         # --- COMPETITIVE POSITIONING (Layer 1.5 panel) ---
         # Every centre in the same SA2 on a daily-fee × NQS axis with
         # subject centre emphasised. Patrick 2026-05-12 framing.
@@ -4313,9 +4470,11 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
             "executive":     executive_block,
             "matrix":        matrix_block,
             "drawer":        drawer_block,
-            "ccs_coverage":             ccs_coverage,
-            "provider_scale":           provider_scale,
-            "competitive_positioning":  competitive_positioning,
+            "ccs_coverage":              ccs_coverage,
+            "provider_scale":            provider_scale,
+            "competitive_positioning":   competitive_positioning,
+            "school_enrolment_trend":    school_enrolment_trend,
+            "cross_subtype_competition": cross_subtype_competition,
         }
         return payload
     finally:

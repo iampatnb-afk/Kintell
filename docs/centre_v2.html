@@ -4709,7 +4709,7 @@ const CATEGORY_LABELS = {
   population:    "Population",
   community:     "Community",
   labour_market: "Labour Market",
-  education:     "Education",
+  education:     "Learning environment",
   workforce:     "Workforce",
   quality:       "Quality",
   operator:      "Operator / Group identity",
@@ -4743,6 +4743,64 @@ function renderL5Matrix(centre) {
       obs_der_com:   ["DER"],
       commentary:    `Estimated share of catchment households below the A$${(ccs.threshold_aud/1000).toFixed(0)}K CCS full-benefit income threshold; derived from $${(ccs.median_annual_aud/1000).toFixed(0)}K SA2 median household income via lognormal model. High coverage → fee headroom capped by subsidy ceiling rather than discretionary income.`,
       drawer_key:    "ccs_coverage",
+    });
+  }
+
+  // School enrolment 3-year trend (Learning environment) — ECEC demand
+  // leading indicator. Patrick 2026-05-12 framing: rising school enrolment
+  // = rising under-5 cohort coming through. Computed in centre_page.py
+  // _compute_school_enrolment_trend from acara_school_enrolment_total.
+  const enrolTrend = centre.school_enrolment_trend || {};
+  if (enrolTrend.latest_value != null) {
+    const pct = enrolTrend.change_3y_pct;
+    // Plain-text direction string (commentary is htmlEscape'd by the row
+    // renderer; inline colour markup would render as visible <span> tags).
+    const directionStr = pct == null ? "trend unavailable"
+      : pct > 0.5  ? `+${pct.toFixed(1)}% over 3y`
+      : pct < -0.5 ? `${pct.toFixed(1)}% over 3y`
+      : `flat over 3y`;
+    // Sparkline carries the 18-year trajectory so the row doesn't get
+    // wrongly tagged with "static snapshot" by the _l5RowAnnotation helper.
+    rows.push({
+      metric:        "school_enrolment_3y_trend",
+      display:       "School enrolment trend (3y)",
+      category:      "education",
+      current_value: enrolTrend.latest_value,
+      value_format:  "int",
+      period:        String(enrolTrend.latest_year),
+      decile:        null,
+      band:          pct == null ? null : pct > 0.5 ? "high" : pct < -0.5 ? "low" : "mid",
+      cohort_n:      null,
+      obs_der_com:   ["OBS", "DER"],
+      commentary:    `${directionStr} · Total catchment school enrolment (${Math.round(enrolTrend.latest_value).toLocaleString()} in ${enrolTrend.latest_year}${enrolTrend.value_3y_ago != null ? `, ${Math.round(enrolTrend.value_3y_ago).toLocaleString()} in ${enrolTrend.year_3y_ago}` : ""}). Rising school enrolment is a leading indicator for the under-5 cohort coming through.`,
+      sparkline:     (enrolTrend.trajectory || []).slice(-12).map(p => ({ period: p.year, value: p.value })),
+      drawer_key:    "school_enrolment_trend",
+    });
+  }
+
+  // Cross-subtype care competition (Learning environment) — asymmetric per
+  // subject subtype. LDC sees OSHC (transition pathway); OSHC sees LDC
+  // (feeder pipeline). Patrick 2026-05-12 framing.
+  const xsub = centre.cross_subtype_competition || {};
+  if (xsub.target_subtype) {
+    const targetIsOshc = xsub.target_subtype === "OSHC";
+    rows.push({
+      metric:        `cross_subtype_${xsub.target_subtype.toLowerCase()}_count`,
+      display:       targetIsOshc
+                       ? "OSHC services in catchment (transition pathway)"
+                       : "LDC services in catchment (feeder pipeline)",
+      category:      "education",
+      current_value: xsub.count,
+      value_format:  "int",
+      period:        "current",
+      decile:        null,
+      band:          xsub.count >= 3 ? "high" : xsub.count >= 1 ? "mid" : "low",
+      cohort_n:      null,
+      obs_der_com:   ["OBS"],
+      commentary:    xsub.count === 0
+        ? `No ${xsub.target_subtype} services currently active in this catchment SA2.`
+        : `${xsub.count} ${xsub.target_subtype} service${xsub.count === 1 ? "" : "s"} · ${xsub.total_places.toLocaleString()} total approved places. ${xsub.framing}`,
+      drawer_key:    `cross_subtype_${xsub.target_subtype.toLowerCase()}`,
     });
   }
 
@@ -4825,7 +4883,12 @@ function renderL5Matrix(centre) {
 // Detect non-trajectory matrix rows so we can stamp them honestly.
 // Returns "" (no annotation) | "census-3pt" | "static" | "monthly-state".
 // Patrick queue #10 + the workforce scope stamp polish in #12.
+// Synthetic rows that ARE current counts (operations / education
+// cross-subtype etc.) carry period === "current" — they shouldn't get
+// the "static snapshot" stamp because they aren't a historical snapshot,
+// they're the present-state count.
 function _l5RowAnnotation(row) {
+  if (row.period === "current") return "";
   const spark = row.sparkline || [];
   if (spark.length <= 1) return "static";
   // Census 3-pt pattern — exactly 3 points at decade-class intervals
