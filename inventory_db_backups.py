@@ -1,0 +1,248 @@
+"""
+OI-12 backup inventory — read-only probe across all data/kintell.db.backup_*.
+
+For each backup, captures:
+  - filename, mtime, file size
+  - full table list with row counts
+  - full audit_log table contents (all rows, all columns)
+
+Writes a single markdown file:
+  recon/db_backup_inventory_<YYYY-MM-DD>.md
+
+Purpose: make backup deletion a reversible decision. Once committed to git,
+the inventory file preserves "what each backup contained" forever — so a
+future session can answer questions like "what mutations had run as of
+pre_step5b?" or "what tables existed at backup time?" without needing the
+binary backup itself.
+
+SAFETY:
+  - All backups are opened with SQLite mode=ro URI (`file:<path>?mode=ro`).
+    This is enforced at the SQLite layer and cannot be overridden by SQL.
+  - Zero file mutations on any DB file. Only the output markdown is written.
+  - Safe to run multiple times. Will overwrite the output file if today's
+    date is the same.
+
+Usage:
+  python inventory_db_backups.py            # writes inventory; verbose
+  python inventory_db_backups.py --quiet    # suppresses per-backup progress
+"""
+
+import argparse
+import sqlite3
+import sys
+from datetime import datetime
+from pathlib import Path
+
+DATA_DIR = Path("data")
+BACKUP_GLOB = "kintell.db.backup_*"
+TODAY = datetime.now().strftime("%Y-%m-%d")
+OUTPUT_PATH = Path(f"recon/db_backup_inventory_{TODAY}.md")
+
+CELL_TRUNCATE = 500  # max chars per markdown table cell (caps pathological JSON blobs)
+
+
+def fmt_size(n_bytes: float) -> str:
+    for unit in ("B", "KB", "MB", "GB"):
+        if n_bytes < 1024:
+            return f"{n_bytes:.1f} {unit}"
+        n_bytes /= 1024
+    return f"{n_bytes:.1f} TB"
+
+
+def fmt_int(n: int) -> str:
+    return f"{n:,}"
+
+
+def open_readonly(path: Path) -> sqlite3.Connection:
+    """Open a SQLite DB strictly read-only via URI mode=ro."""
+    uri = f"file:{path.as_posix()}?mode=ro"
+    return sqlite3.connect(uri, uri=True)
+
+
+def md_escape_cell(v) -> str:
+    """Escape markdown table cell content. Pipes, newlines, and oversized values."""
+    if v is None:
+        return ""
+    s = str(v).replace("|", "\\|").replace("\n", " ").replace("\r", "")
+    if len(s) > CELL_TRUNCATE:
+        s = s[:CELL_TRUNCATE] + "…"
+    return s
+
+
+def inventory_one(path: Path, verbose: bool = True) -> dict:
+    info = {
+        "filename": path.name,
+        "mtime_iso": datetime.fromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+        "size_bytes": path.stat().st_size,
+        "tables": [],          # list of (table_name, row_count)
+        "audit_log_columns": [],
+        "audit_log": [],       # list of row tuples
+        "error": None,
+    }
+    if verbose:
+        print(f"  inspecting {path.name} ({fmt_size(info['size_bytes'])})...", flush=True)
+    try:
+        con = open_readonly(path)
+        try:
+            tables_q = con.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+            ).fetchall()
+            for (tname,) in tables_q:
+                if tname.startswith("sqlite_"):
+                    continue
+                try:
+                    n = con.execute(f'SELECT COUNT(*) FROM "{tname}"').fetchone()[0]
+                except sqlite3.Error:
+                    n = -1
+                info["tables"].append((tname, n))
+
+            # audit_log
+            if any(t == "audit_log" for t, _ in info["tables"]):
+                try:
+                    cols_q = con.execute("PRAGMA table_info(audit_log)").fetchall()
+                    cols = [c[1] for c in cols_q]
+                    info["audit_log_columns"] = cols
+                    if cols:
+                        col_list = ", ".join(f'"{c}"' for c in cols)
+                        # Order by rowid for deterministic output
+                        rows = con.execute(
+                            f"SELECT {col_list} FROM audit_log ORDER BY rowid"
+                        ).fetchall()
+                        info["audit_log"] = rows
+                except sqlite3.Error as e:
+                    info["error"] = f"audit_log read failed: {e}"
+        finally:
+            con.close()
+    except sqlite3.Error as e:
+        info["error"] = f"open failed: {e}"
+    return info
+
+
+def render_markdown(inventories: list, today: str) -> str:
+    out = []
+    out.append(f"# DB Backup Inventory — {today}")
+    out.append("")
+    out.append("Read-only inventory of every `data/kintell.db.backup_*` file present at the time of generation.")
+    out.append("")
+    out.append("**Purpose.** Backup deletion is irreversible. This file captures the audit_log entries and table+rowcount snapshot for each backup so future questions like _\"what mutations had run as of `pre_step5b`?\"_ or _\"what tables existed at backup time?\"_ can be answered from this file without needing the binary backup itself.")
+    out.append("")
+    out.append("**Generated by** `inventory_db_backups.py` (read-only probe; opens each backup via SQLite `mode=ro` URI; zero file mutations on any DB).")
+    out.append("")
+    out.append(f"**Source files.** All files matching `data/kintell.db.backup_*` at the time of generation ({today}). Files added or removed after this generation are not reflected.")
+    out.append("")
+    out.append(f"**Cell-truncation note.** Markdown table cells are truncated at {CELL_TRUNCATE} chars (truncated cells end with `…`). For full audit_log row content beyond this length, restore the binary backup or query SQLite directly via `inventory_db_backups.py`-style probe.")
+    out.append("")
+    out.append("---")
+    out.append("")
+
+    # Summary table
+    out.append("## Summary")
+    out.append("")
+    out.append("| # | Backup | Date | Size | Tables | Total rows | audit_log rows |")
+    out.append("|---|--------|------|------|--------|------------|----------------|")
+    for i, inv in enumerate(inventories, 1):
+        total_rows = sum(n for _, n in inv["tables"] if n >= 0)
+        n_audit = len(inv["audit_log"])
+        flag = " ⚠" if inv["error"] else ""
+        out.append(
+            f"| {i} | `{inv['filename']}`{flag} | {inv['mtime_iso']} | "
+            f"{fmt_size(inv['size_bytes'])} | {len(inv['tables'])} | "
+            f"{fmt_int(total_rows)} | {fmt_int(n_audit)} |"
+        )
+    out.append("")
+    out.append("---")
+    out.append("")
+
+    # Per-backup detail
+    out.append("## Per-backup detail")
+    out.append("")
+
+    for i, inv in enumerate(inventories, 1):
+        out.append(f"### {i}. `{inv['filename']}`")
+        out.append("")
+        out.append(f"- **Date:** {inv['mtime_iso']}")
+        out.append(f"- **Size:** {fmt_size(inv['size_bytes'])}")
+        if inv["error"]:
+            out.append(f"- **⚠ Error:** {inv['error']}")
+        out.append("")
+
+        # Tables
+        out.append(f"#### Tables ({len(inv['tables'])})")
+        out.append("")
+        if inv["tables"]:
+            out.append("| Table | Rows |")
+            out.append("|-------|------|")
+            for tname, n in inv["tables"]:
+                n_str = fmt_int(n) if n >= 0 else "(error)"
+                out.append(f"| `{tname}` | {n_str} |")
+        else:
+            out.append("(no tables)")
+        out.append("")
+
+        # audit_log
+        if inv["audit_log"] and inv["audit_log_columns"]:
+            cols = inv["audit_log_columns"]
+            out.append(f"#### audit_log ({len(inv['audit_log'])} rows)")
+            out.append("")
+            out.append("| " + " | ".join(cols) + " |")
+            out.append("|" + "|".join("---" for _ in cols) + "|")
+            for row in inv["audit_log"]:
+                cells = [md_escape_cell(c) for c in row]
+                out.append("| " + " | ".join(cells) + " |")
+        else:
+            out.append("#### audit_log")
+            out.append("")
+            out.append("(empty or unavailable)")
+        out.append("")
+
+        out.append("---")
+        out.append("")
+
+    return "\n".join(out)
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="OI-12 backup inventory probe")
+    ap.add_argument("--quiet", action="store_true", help="suppress per-backup progress lines")
+    args = ap.parse_args()
+
+    if not DATA_DIR.exists():
+        print(f"ERROR: {DATA_DIR}/ not found. Run from repo root.")
+        return 1
+
+    backups = sorted(
+        DATA_DIR.glob(BACKUP_GLOB),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    if not backups:
+        print(f"No backups found matching '{BACKUP_GLOB}' in {DATA_DIR}/.")
+        return 0
+
+    if not args.quiet:
+        total_size = sum(b.stat().st_size for b in backups)
+        print(f"Inventorying {len(backups)} backup(s); total {fmt_size(total_size)}.")
+        print()
+
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    inventories = []
+    for b in backups:
+        inv = inventory_one(b, verbose=not args.quiet)
+        inventories.append(inv)
+
+    md = render_markdown(inventories, TODAY)
+    OUTPUT_PATH.write_text(md, encoding="utf-8")
+
+    print()
+    print(f"Inventory written: {OUTPUT_PATH}")
+    print(f"  {len(inventories)} backup(s) catalogued")
+    print(f"  output file size: {fmt_size(OUTPUT_PATH.stat().st_size)}")
+    n_errors = sum(1 for inv in inventories if inv["error"])
+    if n_errors:
+        print(f"  ⚠ {n_errors} backup(s) had errors (see ⚠ in output)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
