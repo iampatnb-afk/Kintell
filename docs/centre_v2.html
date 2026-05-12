@@ -724,6 +724,28 @@
     color: var(--text-mute);
     font-style: italic;
   }
+  /* Tenure tile pill — restored 2026-05-12 (Patrick: pill/badge styling
+     was dropped when tenure moved from carryover to L1). Green for
+     Greenfield, amber for Brownfield. Mirrors the carryover treatment. */
+  .l1-tile .tile-tenure-pill {
+    display: inline-block;
+    font-size: 13.5px;
+    font-weight: 600;
+    padding: 4px 11px;
+    border-radius: 12px;
+    line-height: 1.3;
+    border: 1px solid;
+  }
+  .l1-tile .tile-tenure-pill.green {
+    background: var(--green-bg);
+    color: var(--green);
+    border-color: #1f4632;
+  }
+  .l1-tile .tile-tenure-pill.amber {
+    background: var(--amber-bg);
+    color: var(--amber);
+    border-color: #4a3818;
+  }
   /* NQS rating tile (Layer 1, Patrick 2026-05-12 move-up). Pill-styled
      value carrying the rating colour, then issue date, then cadence pill.
      Reuses .nqs-pill colour palette from the carryover NQS card to keep
@@ -2302,9 +2324,14 @@ function renderL1Header(centre) {
   const tenureDate = isBrown ? tenure.transfer_date : tenure.approval_granted_date;
   const tenureDateLabel = isBrown ? "transferred" : "approved";
   const tenureMonths = isBrown ? tenure.months_since_transfer : null;
+  // Tenure tile pill — restored 2026-05-12 per Patrick. Green chip for
+  // Greenfield (original operator), amber for Brownfield (acquisition).
+  // Matches the carryover renderTenureCard treatment that was dropped
+  // when tenure moved to L1.
+  const tenurePillClass = isBrown ? "amber" : "green";
   const tileTenure = tenure.label
     ? `<div class="l1-tile">
-        <div class="tile-value tile-value-sm">${htmlEscape(tenure.label)}</div>
+        <div class="tile-tenure-pill ${tenurePillClass}">${htmlEscape(tenure.label)}</div>
         <div class="tile-label">Tenure</div>
         ${tenureDate ? `<div class="tile-caption">${tenureDateLabel} ${htmlEscape(formatMonYYYY(tenureDate))}${tenureMonths != null ? ` · ${tenureMonths}m ago` : ""}</div>` : ""}
       </div>` : "";
