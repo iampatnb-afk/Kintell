@@ -4583,6 +4583,46 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
             conn, r.get("sa2_code"), r.get("service_sub_type")
         )
 
+        # ACECQA service-offerings breakdown (Patrick 2026-05-12) — pull
+        # latest nqs_history row per service_approval_number for the five
+        # service-type flags. "Other" isn't in our DB; renderer surfaces
+        # it as not-captured. Defensive try/except so a missing column
+        # doesn't break the payload.
+        service_offerings = {
+            "preschool_in_school":   None,
+            "preschool_standalone":  None,
+            "oshc_before_school":    None,
+            "oshc_after_school":     None,
+            "oshc_vacation_care":    None,
+            "other":                 None,   # not in nqs_history
+            "snapshot_quarter":      None,
+            "source":                "ACECQA NQAITS quarterly snapshot",
+            "tag":                   TAG_OBS,
+        }
+        try:
+            san = r.get("service_approval_number")
+            if san:
+                offering_row = conn.execute(
+                    """
+                    SELECT quarter, preschool_in_school, preschool_standalone,
+                           oshc_before_school, oshc_after_school, oshc_vacation_care
+                      FROM nqs_history
+                     WHERE service_approval_number = ?
+                     ORDER BY quarter DESC
+                     LIMIT 1
+                    """,
+                    (san,),
+                ).fetchone()
+                if offering_row:
+                    service_offerings["snapshot_quarter"]     = offering_row[0]
+                    service_offerings["preschool_in_school"]  = offering_row[1]
+                    service_offerings["preschool_standalone"] = offering_row[2]
+                    service_offerings["oshc_before_school"]   = offering_row[3]
+                    service_offerings["oshc_after_school"]    = offering_row[4]
+                    service_offerings["oshc_vacation_care"]   = offering_row[5]
+        except sqlite3.OperationalError:
+            pass
+
         places = {
             "approved_places": {
                 "tag": TAG_OBS,
@@ -4591,6 +4631,7 @@ def get_centre_payload(service_id: int) -> Optional[dict]:
             },
             "service_sub_type": subtype,
             "long_day_care_flag": bool(r.get("long_day_care")) if r.get("long_day_care") is not None else None,
+            "service_offerings": service_offerings,
             "kinder_approved": {
                 "tag": TAG_OBS,
                 "value": kinder_acecqa,
